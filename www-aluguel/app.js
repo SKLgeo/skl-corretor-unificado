@@ -213,7 +213,8 @@
     function traduzErro(message) {
         const mapa = {
             "Invalid login credentials": "E-mail ou senha incorretos.",
-            "VERSION_CONFLICT": "Este imóvel foi alterado por outro usuário nesse meio-tempo. Feche e abra de novo."
+            "VERSION_CONFLICT": "Este imóvel foi alterado por outro usuário nesse meio-tempo. Feche e abra de novo.",
+            "CONSENT_REQUIRED": "Confirme o aviso de privacidade (LGPD) antes de enviar."
         };
         for (const chave of Object.keys(mapa)) {
             if (message && message.includes(chave)) return mapa[chave];
@@ -888,12 +889,14 @@
         $("interesseEmailInput").value = "";
         $("interesseEnderecoInput").value = "";
         $("interesseObservacaoInput").value = "";
+        $("interesseConsentInput").checked = false;
         $("interesseDialog").showModal();
     }
 
     async function enviarInteresse() {
         const nome = $("interesseNomeInput").value.trim();
         if (!nome) { showMessage($("interesseDialogMessage"), "Informe o nome do cliente."); return; }
+        if (!$("interesseConsentInput").checked) { showMessage($("interesseDialogMessage"), "Confirme o aviso de privacidade (LGPD) antes de enviar."); return; }
         $("submitInteresseButton").disabled = true;
         try {
             const { error } = await sb.rpc("criar_interesse_aluguel", {
@@ -903,7 +906,8 @@
                 p_cliente_cpf: $("interesseCpfInput").value.trim() || null,
                 p_cliente_email: $("interesseEmailInput").value.trim() || null,
                 p_cliente_endereco: $("interesseEnderecoInput").value.trim() || null,
-                p_observacao: $("interesseObservacaoInput").value.trim() || null
+                p_observacao: $("interesseObservacaoInput").value.trim() || null,
+                p_consentimento_lgpd: $("interesseConsentInput").checked
             });
             if (error) throw error;
             $("interesseDialog").close();
@@ -929,6 +933,8 @@
     function renderInteresses() {
         const rows = [ ...interesses.values() ];
         $("interessesTableEmpty").hidden = rows.length > 0;
+        const podeAnonimizar = currentUser.papel === "administrador";
+        const statusEncerrados = [ "concluido", "descartado" ];
         $("interessesTableBody").innerHTML = rows.map(i => {
             const construcao = construcoes.get(i.construcao_id);
             const opcoes = Object.entries(INTERESSE_STATUS).map(([valor, rotulo]) => `<option value="${valor}" ${i.status === valor ? "selected" : ""}>${rotulo}</option>`).join("");
@@ -941,11 +947,34 @@
         <td>${h(i.observacao || "—")}</td>
         <td><small>${h(formatDate(i.created_at))}</small></td>
         <td><select data-interesse-status="${h(i.id)}">${opcoes}</select></td>
+        <td>${podeAnonimizar && statusEncerrados.includes(i.status) && i.cliente_cpf !== null ? `<button class="row-button" data-anonimizar-interesse="${h(i.id)}">Anonimizar dados</button>` : ""}</td>
       </tr>`;
         }).join("");
         $("interessesTableBody").querySelectorAll("[data-interesse-status]").forEach(select => {
             select.addEventListener("change", () => atualizarStatusInteresse(select.dataset.interesseStatus, select.value));
         });
+        $("interessesTableBody").querySelectorAll("[data-anonimizar-interesse]").forEach(button => {
+            button.addEventListener("click", () => anonimizarClienteInteresse(button.dataset.anonimizarInteresse));
+        });
+    }
+    async function anonimizarClienteInteresse(interesseId) {
+        if (!confirm("Remover permanentemente nome, telefone, CPF, e-mail e endereço do cliente deste interesse? O restante do registro é preservado. Não é possível desfazer.")) return;
+        try {
+            const { error } = await sb.rpc("anonimizar_cliente_interesse_aluguel", { p_interesse_id: interesseId });
+            if (error) throw error;
+            const alvo = interesses.get(interesseId);
+            if (alvo) {
+                alvo.cliente_nome = "[dados removidos a pedido do titular]";
+                alvo.cliente_telefone = null;
+                alvo.cliente_cpf = null;
+                alvo.cliente_email = null;
+                alvo.cliente_endereco = null;
+            }
+            renderInteresses();
+            toast("Dados do cliente anonimizados.");
+        } catch (error) {
+            toast(traduzErro(error.message));
+        }
     }
 
     async function atualizarStatusInteresse(id, status) {
@@ -1026,6 +1055,7 @@
                 action: "criar_convite",
                 carteira_id: carteiraId,
                 display_name: $("inviteAluguelNameInput").value,
+                cpf: $("inviteAluguelCpfInput").value.trim() || null,
                 papel: $("inviteAluguelRoleInput").value,
                 percentual_comissao: $("inviteAluguelPercentualInput").value || null
             });
@@ -1044,6 +1074,7 @@
                 action: "criar_usuario_direto",
                 carteira_id: carteiraId,
                 display_name: $("directAluguelNameInput").value,
+                cpf: $("directAluguelCpfInput").value.trim() || null,
                 email: $("directAluguelEmailInput").value,
                 password: $("directAluguelPasswordInput").value,
                 papel: $("directAluguelRoleInput").value,
@@ -1054,6 +1085,7 @@
             const aviso = data.reused_existing_account ? " Esse e-mail já tinha conta em outra base SKL — vinculamos o acesso a esta carteira usando a senha que a pessoa já usa." : "";
             showMessage($("directUserAluguelMessage"), (data.expira_em ? `Acesso criado — expira em ${formatDate(data.expira_em)}.` : "Acesso criado sem prazo de validade.") + aviso, true);
             $("directAluguelNameInput").value = "";
+            $("directAluguelCpfInput").value = "";
             $("directAluguelEmailInput").value = "";
             $("directAluguelPasswordInput").value = "";
         } catch (error) {

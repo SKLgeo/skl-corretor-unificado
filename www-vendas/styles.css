@@ -706,3 +706,18 @@ summary { color: var(--navy); cursor: pointer; font-weight: 850; }
 .request-button[hidden],.unit-action-btn[hidden]{display:none!important}
 .unit-action-wide{grid-column:1/-1;flex-direction:row;justify-content:center;gap:10px;text-align:left}
 #simLotButton{margin-top:0}
+
+/* ---- Uso offline / GPS em campo ---- */
+#map.mapa-planta { background: #eef1ec; }
+.quadra-label { display: inline-block; transform: translate(-50%, -50%); padding: 2px 7px; border-radius: 8px; color: #fff; background: rgba(21,55,63,.82); font-size: 12px; font-weight: 850; white-space: nowrap; pointer-events: none; }
+.map-button.gps-ligado { color: #fff; background: #5d9be0; }
+.map-button.gps-seguindo { color: #fff; background: #2589ff; box-shadow: 0 0 0 4px rgba(37,137,255,.25), 0 7px 22px rgba(5,47,60,.22); }
+.campo-status { position: fixed; z-index: 1100; left: 50%; top: calc(132px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(520px, calc(100vw - 90px)); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.campo-status > * { pointer-events: auto; }
+.gps-chip { max-width: calc(100vw - 90px); padding: 8px 13px; border: 0; border-radius: 999px; color: #fff; background: rgba(20,72,140,.92); box-shadow: 0 6px 18px rgba(0,0,0,.25); font: inherit; font-size: 12px; font-weight: 800; text-align: center; cursor: pointer; }
+.campo-status .offline-banner { position: static; transform: none; width: auto; padding: 7px 12px; font-size: 11px; font-weight: 750; }
+.offline-ready-notice { position: fixed; z-index: 1150; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px; border-radius: 18px; color: var(--navy-deep); background: #fff; box-shadow: 0 24px 70px rgba(0,0,0,.35); font-size: 13px; line-height: 1.45; }
+.offline-ready-notice:not([hidden]) { display: grid; }
+.offline-ready-notice[hidden] { display: none; }
+.offline-ready-notice strong { color: #287a4a; font-size: 16px; }
+.auth-offline-hint { margin: 2px 0 0 !important; padding: 9px 11px; border-radius: 11px; background: #eef5f3; color: #2e5a57 !important; font-size: 11.5px !important; line-height: 1.45; }

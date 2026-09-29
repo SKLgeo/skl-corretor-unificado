@@ -28,6 +28,7 @@
         <button class="primary-button" type="submit">Entrar</button>
         <button id="showBrokerActivation" class="text-button" type="button">Primeiro acesso com convite</button>
         <div id="brokerLoginMessage" class="auth-message" hidden></div>
+        <p class="auth-offline-hint">📶 Vai usar no empreendimento sem internet? Abra o aplicativo e entre na sua conta antes, ainda com internet — o mapa, os lotes e a última situação ficam salvos no aparelho.</p>
       </form>
       <form id="brokerActivationForm" class="auth-card" hidden>
         <span class="eyebrow">PRIMEIRO ACESSO</span><h1>Crie seu acesso</h1>
@@ -120,13 +121,24 @@
         </section>
 
         <div class="map-actions" aria-label="Controles do mapa">
-          <button id="basemapButton" class="map-button" type="button" title="Alternar mapa" aria-label="Alternar entre satélite e ruas">▦</button>
+          <button id="basemapButton" class="map-button" type="button" title="Alternar fundo do mapa" aria-label="Alternar fundo do mapa: satélite, ruas ou planta (sem internet)">▦</button>
           <button id="locateButton" class="map-button" type="button" title="Minha localização" aria-label="Mostrar minha localização">◎</button>
           <button id="zoomInButton" class="map-button compact" type="button" aria-label="Aumentar zoom">+</button>
           <button id="zoomOutButton" class="map-button compact" type="button" aria-label="Diminuir zoom">−</button>
         </div>
 
         <div id="connectionBadge" class="connection-badge" aria-live="polite">Imagem de satélite</div>
+
+        <div class="campo-status">
+          <button id="gpsChip" class="gps-chip" type="button" aria-live="polite" hidden></button>
+          <div id="offlineBanner" class="offline-banner" hidden>Sem internet. Lotes e memoriais continuam disponíveis, mas o satélite e a sincronização podem não carregar.</div>
+        </div>
+
+        <div id="offlineReadyNotice" class="offline-ready-notice" role="status" hidden>
+          <strong>✓ Pronto para usar sem internet</strong>
+          <span>O mapa, os lotes e a situação atual ficaram salvos neste aparelho. No empreendimento, mesmo sem sinal, você abre o app, vê os lotes e sua posição pelo GPS (botão ◎). Antes de ir a campo, abra o app com internet para atualizar a situação dos lotes. Reservas só são enviadas com internet.</span>
+          <button id="offlineReadyClose" class="primary-button" type="button">Entendi</button>
+        </div>
 
         <article id="lotCard" class="lot-card" aria-live="polite" hidden>
           <button id="closeLotCard" class="close-button" type="button" aria-label="Fechar informações">×</button>
@@ -175,7 +187,6 @@
           <p class="technical-notice"><strong>Aviso técnico:</strong> a localização é para orientação comercial e navegação, não substituindo demarcação física ou levantamento técnico dos limites.</p>
         </article>
 
-        <div id="offlineBanner" class="offline-banner" hidden>Sem internet. Lotes e memoriais continuam disponíveis, mas o satélite e a sincronização podem não carregar.</div>
       </main>
     </div>
 
@@ -406,6 +417,7 @@
         <span class="eyebrow">ENVIAR PARA A CENTRAL</span><h2 id="requestLotTitle">Solicitar lote</h2>
         <p>A Central de Vendas receberá um alerta e decidirá a situação oficial do lote.</p>
         <p style="font-size:12px;color:var(--muted);margin:-6px 0 4px">Aviso de privacidade: os dados do cliente informados abaixo são tratados conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018) e usados apenas para esta solicitação.</p>
+        <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input id="requestConsentInput" type="checkbox" required style="margin-top:3px;flex:none;width:auto" /><span style="text-transform:none;font-size:12px;font-weight:500;letter-spacing:normal;color:var(--text,#1a1a1a)">Expliquei ao cliente como os dados serão usados, conforme o aviso acima.</span></label>
         <label><span>O que deseja informar?</span><select id="requestTypeInput"><option value="reserva">Solicitar reserva</option><option value="indicacao_venda">Indicar possível venda</option></select></label>
         <label><span>Nome do cliente</span><input id="requestCustomerInput" required /></label>
         <label><span>Telefone do cliente, se disponível</span><input id="requestPhoneInput" inputmode="tel" /></label>

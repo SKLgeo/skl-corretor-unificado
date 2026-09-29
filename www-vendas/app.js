@@ -51,6 +51,7 @@
         installInstructions: $("installInstructions"),
         toast: $("toast"),
         offline: $("offlineBanner"),
+        gpsChip: $("gpsChip"),
         connectionBadge: $("connectionBadge"),
         mapa3dButton: $("mapa3dButton"),
         mapa3dOverlay: $("mapa3dOverlay"),
@@ -66,7 +67,7 @@
     let mapa3dInstance = null;
     let mapa3dDados = null;
     let formasPagamentoDados = null;
-    const SERIE_TIPO_LABEL = { ato: "Ato", sinal: "Sinal", parcelas: "Parcelas", financiamento: "Financiamento", chaves: "Chaves", outro: "Outro" };
+    const SERIE_TIPO_LABEL = { ato: "Ato", sinal: "Sinal", parcelas: "Parcelas", balao: "Balão", financiamento: "Financiamento", chaves: "Chaves", outro: "Outro" };
     const BANKING_TIPO_LABEL = { pix: "PIX", boleto: "Boleto", deposito: "Depósito/TED", outro: "Outro" };
     function formatMoneyBR(value) {
         const n = Number(value);
@@ -207,6 +208,12 @@
     let userMarker = null;
     let accuracyCircle = null;
     let activeBasemap = "satellite";
+    let basemapAntesDoOffline = null;
+    let falhasDeImagem = [];
+    let gpsWatchId = null;
+    let gpsSeguindo = false;
+    let gpsPrimeiraPosicao = true;
+    let guiaAteLote = null;
     let deferredInstallPrompt = null;
     let toastTimer = null;
     let favorites = new Set(readStoredArray(STORAGE.favorites));
@@ -234,7 +241,25 @@
         maxNativeZoom: 19,
         attribution: "© OpenStreetMap"
     });
+    const BASEMAPS = {
+        satellite: { camada: satelliteLayer, rotulo: "Imagem de satélite" },
+        street: { camada: streetLayer, rotulo: "Mapa de ruas" },
+        planta: { camada: null, rotulo: "Planta dos lotes (funciona sem internet)" }
+    };
     satelliteLayer.addTo(map);
+    // Sem internet (ou internet "presa" no campo) as imagens não carregam e o fundo fica cinza:
+    // muitas falhas seguidas trocam sozinho para a planta (lotes sobre fundo claro).
+    [ satelliteLayer, streetLayer ].forEach(camada => camada.on("tileerror", () => {
+        const agora = Date.now();
+        falhasDeImagem = falhasDeImagem.filter(t => agora - t < 1e4);
+        falhasDeImagem.push(agora);
+        if (falhasDeImagem.length >= 8 && activeBasemap !== "planta") {
+            falhasDeImagem = [];
+            basemapAntesDoOffline = basemapAntesDoOffline || activeBasemap;
+            setBasemap("planta");
+            showToast("Imagem do mapa indisponível sem internet — mostrando a planta dos lotes.");
+        }
+    }));
     const lotLayer = L.geoJSON(lots, {
         style: feature => styleForFeature(feature, false),
         onEachFeature(feature, layer) {
@@ -262,6 +287,32 @@
             })
         }));
     });
+    // Nome das quadras (só no modo planta, para o corretor se orientar sem a imagem de fundo).
+    const quadraLabelsLayer = L.layerGroup();
+    (() => {
+        const somas = new Map;
+        lots.features.forEach(feature => {
+            const {quadra: quadra, center: center} = feature.properties;
+            if (!center) return;
+            const s = somas.get(quadra) || { lat: 0, lng: 0, n: 0 };
+            s.lat += center[1];
+            s.lng += center[0];
+            s.n += 1;
+            somas.set(quadra, s);
+        });
+        somas.forEach((s, quadra) => {
+            quadraLabelsLayer.addLayer(L.marker([ s.lat / s.n, s.lng / s.n ], {
+                interactive: false,
+                keyboard: false,
+                icon: L.divIcon({
+                    className: "lot-label-wrap",
+                    html: `<span class="quadra-label">Q${escapeHtml(quadra)}</span>`,
+                    iconSize: [ 1, 1 ],
+                    iconAnchor: [ 0, 0 ]
+                })
+            }));
+        });
+    })();
     const fullBounds = lotLayer.getBounds();
     map.fitBounds(fullBounds, {
         paddingTopLeft: [ 20, 235 ],
@@ -294,6 +345,11 @@
     $("closeLotCard").addEventListener("click", clearSelection);
     $("basemapButton").addEventListener("click", toggleBasemap);
     $("locateButton").addEventListener("click", locateUser);
+    elements.gpsChip?.addEventListener("click", () => {
+        const quadra = Number(elements.gpsChip.dataset.quadra);
+        const lote = Number(elements.gpsChip.dataset.lote);
+        if (quadra && lote) selectLot(quadra, lote, false);
+    });
     $("zoomInButton").addEventListener("click", () => map.zoomIn());
     $("zoomOutButton").addEventListener("click", () => map.zoomOut());
     $("savedButton").addEventListener("click", openSavedDialog);
@@ -364,7 +420,7 @@
         const {quadra: quadra, lote: lote} = feature.properties;
         const state = STATUS[commercialRecordFor(lotKey(quadra, lote)).status];
         return {
-            color: "#f7f4ec",
+            color: activeBasemap === "planta" ? "#35524f" : "#f7f4ec",
             weight: 1.2,
             opacity: .92,
             fillColor: state.fill,
@@ -505,6 +561,7 @@
         url.searchParams.delete("lote");
         history.replaceState({}, "", url);
         updateAdminPanel();
+        updateDistance();
     }
     function showAllLots() {
         clearSelection();
@@ -516,90 +573,223 @@
             animate: true
         });
     }
-    function toggleBasemap() {
-        if (activeBasemap === "satellite") {
-            map.removeLayer(satelliteLayer);
-            streetLayer.addTo(map);
-            activeBasemap = "street";
-            elements.connectionBadge.textContent = "Mapa de ruas";
-            showToast("Mapa de ruas ativado.");
-        } else {
-            map.removeLayer(streetLayer);
-            satelliteLayer.addTo(map);
-            activeBasemap = "satellite";
-            elements.connectionBadge.textContent = "Imagem de satélite";
-            showToast("Imagem de satélite ativada.");
-        }
+    function setBasemap(nome) {
+        if (!BASEMAPS[nome]) return;
+        Object.values(BASEMAPS).forEach(({camada: camada}) => {
+            if (camada && map.hasLayer(camada)) map.removeLayer(camada);
+        });
+        activeBasemap = nome;
+        if (BASEMAPS[nome].camada) BASEMAPS[nome].camada.addTo(map);
+        map.getContainer().classList.toggle("mapa-planta", nome === "planta");
+        if (nome === "planta") quadraLabelsLayer.addTo(map); else map.removeLayer(quadraLabelsLayer);
+        elements.connectionBadge.textContent = BASEMAPS[nome].rotulo;
+        applyCommercialStyles();
         lotLayer.bringToFront();
+        updateLabelsVisibility();
+    }
+    function toggleBasemap() {
+        const ordem = [ "satellite", "street", "planta" ];
+        const proximo = ordem[(ordem.indexOf(activeBasemap) + 1) % ordem.length];
+        basemapAntesDoOffline = null;
+        setBasemap(proximo);
+        showToast(`Fundo do mapa: ${BASEMAPS[proximo].rotulo}.`);
     }
     function updateLabelsVisibility() {
-        if (map.getZoom() >= 18) {
+        if (map.getZoom() >= (activeBasemap === "planta" ? 17 : 18)) {
             if (!map.hasLayer(labelsLayer)) labelsLayer.addTo(map);
         } else if (map.hasLayer(labelsLayer)) {
             map.removeLayer(labelsLayer);
         }
     }
+    // ---- GPS em campo: acompanha o corretor (funciona sem internet — é o GPS do aparelho) ----
+    // 1º toque: liga e segue a posição · arrastar o mapa: para de seguir (GPS continua)
+    // toque com GPS ligado e sem seguir: volta a seguir · toque seguindo: desliga.
     function locateUser() {
         if (!navigator.geolocation) {
             showToast("Este aparelho não disponibiliza localização.");
             return;
         }
-        showToast("Obtendo sua localização…");
-        navigator.geolocation.getCurrentPosition(({coords: coords}) => {
-            userPosition = {
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                accuracy: coords.accuracy
+        if (gpsWatchId !== null) {
+            if (!gpsSeguindo && userPosition) {
+                gpsSeguindo = true;
+                map.panTo([ userPosition.latitude, userPosition.longitude ]);
+                atualizarBotaoGps();
+                return;
+            }
+            pararGps();
+            showToast("Localização desligada.");
+            return;
+        }
+        gpsSeguindo = true;
+        gpsPrimeiraPosicao = true;
+        showToast(navigator.onLine ? "Obtendo sua localização…" : "Obtendo sua localização pelo GPS… sem internet a primeira posição pode levar até 1 minuto em céu aberto.");
+        gpsWatchId = navigator.geolocation.watchPosition(receberPosicao, erro => {
+            const messages = {
+                1: "Permita o acesso à localização nas configurações.",
+                2: "Não foi possível determinar sua localização agora.",
+                3: "O GPS ainda não encontrou sua posição. Fique em local aberto e aguarde."
             };
-            const latlng = [ coords.latitude, coords.longitude ];
-            if (userMarker) map.removeLayer(userMarker);
-            if (accuracyCircle) map.removeLayer(accuracyCircle);
+            showToast(messages[erro.code] || "Falha ao obter sua localização.");
+            if (erro.code === 1) pararGps();
+        }, {
+            enableHighAccuracy: true,
+            timeout: 6e4,
+            maximumAge: 5e3
+        });
+        atualizarBotaoGps();
+    }
+    function receberPosicao({coords: coords}) {
+        userPosition = {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy
+        };
+        const latlng = [ coords.latitude, coords.longitude ];
+        if (!userMarker) {
             userMarker = L.marker(latlng, {
                 title: "Sua localização",
+                interactive: false,
+                keyboard: false,
                 icon: L.divIcon({
                     className: "",
                     html: '<div class="user-location-marker"></div>',
                     iconSize: [ 18, 18 ],
                     iconAnchor: [ 9, 9 ]
                 })
-            }).addTo(map).bindPopup("Sua localização atual");
+            }).addTo(map);
             accuracyCircle = L.circle(latlng, {
                 radius: Math.min(coords.accuracy, 150),
                 color: "#2589ff",
                 weight: 1,
                 fillColor: "#2589ff",
-                fillOpacity: .12
+                fillOpacity: .12,
+                interactive: false
             }).addTo(map);
+        } else {
+            userMarker.setLatLng(latlng);
+            accuracyCircle.setLatLng(latlng).setRadius(Math.min(coords.accuracy, 150));
+        }
+        if (gpsPrimeiraPosicao) {
+            gpsPrimeiraPosicao = false;
             map.setView(latlng, Math.max(map.getZoom(), 18), {
                 animate: true
             });
-            updateDistance();
             showToast(`Localização encontrada${coords.accuracy ? ` · precisão aproximada: ${Math.round(coords.accuracy)} m` : ""}.`);
-        }, error => {
-            const messages = {
-                1: "Permita o acesso à localização nas configurações.",
-                2: "Não foi possível determinar sua localização agora.",
-                3: "A localização demorou demais. Tente novamente."
-            };
-            showToast(messages[error.code] || "Falha ao obter sua localização.");
-        }, {
-            enableHighAccuracy: true,
-            timeout: 15e3,
-            maximumAge: 1e4
-        });
+        } else if (gpsSeguindo && !map.getBounds().pad(-.25).contains(latlng)) {
+            map.panTo(latlng, {
+                animate: true
+            });
+        }
+        atualizarOndeEstou();
+        updateDistance();
+    }
+    function pararGps() {
+        if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+        gpsSeguindo = false;
+        userPosition = null;
+        if (userMarker) map.removeLayer(userMarker);
+        if (accuracyCircle) map.removeLayer(accuracyCircle);
+        userMarker = null;
+        accuracyCircle = null;
+        if (elements.gpsChip) elements.gpsChip.hidden = true;
+        atualizarBotaoGps();
+        updateDistance();
+    }
+    function atualizarBotaoGps() {
+        const botao = $("locateButton");
+        if (!botao) return;
+        botao.classList.toggle("gps-ligado", gpsWatchId !== null);
+        botao.classList.toggle("gps-seguindo", gpsWatchId !== null && gpsSeguindo);
+        botao.title = gpsWatchId === null ? "Minha localização" : gpsSeguindo ? "Desligar localização" : "Voltar para minha posição";
+    }
+    map.on("dragstart", () => {
+        if (gpsSeguindo) {
+            gpsSeguindo = false;
+            atualizarBotaoGps();
+        }
+    });
+    function pontoNoAnel(lng, lat, anel) {
+        let dentro = false;
+        for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+            const [xi, yi] = anel[i], [xj, yj] = anel[j];
+            if (yi > lat !== yj > lat && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) dentro = !dentro;
+        }
+        return dentro;
+    }
+    function pontoNoLote(lng, lat, geometry) {
+        if (!geometry) return false;
+        const poligonos = geometry.type === "Polygon" ? [ geometry.coordinates ] : geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+        return poligonos.some(aneis => pontoNoAnel(lng, lat, aneis[0]) && !aneis.slice(1).some(buraco => pontoNoAnel(lng, lat, buraco)));
+    }
+    function atualizarOndeEstou() {
+        const chip = elements.gpsChip;
+        if (!chip || !userPosition) return;
+        const {latitude: lat, longitude: lng, accuracy: precisao} = userPosition;
+        const dentro = lots.features.find(feature => pontoNoLote(lng, lat, feature.geometry));
+        let texto, alvo = dentro;
+        if (dentro) {
+            texto = `Você está na Quadra ${dentro.properties.quadra} · Lote ${dentro.properties.lote}`;
+        } else {
+            let melhor = null, menor = Infinity;
+            lots.features.forEach(feature => {
+                const c = feature.properties.center;
+                if (!c) return;
+                const d = distanceMeters(lat, lng, c[1], c[0]);
+                if (d < menor) {
+                    menor = d;
+                    melhor = feature;
+                }
+            });
+            alvo = melhor;
+            texto = !melhor ? "Sua posição" : menor > 2e3 ? `Você está a ${formatarDistancia(menor)} do empreendimento` : `Mais perto: Quadra ${melhor.properties.quadra} · Lote ${melhor.properties.lote} (${formatarDistancia(menor)})`;
+        }
+        if (precisao > 25) texto += ` · precisão baixa (±${Math.round(precisao)} m)`;
+        chip.textContent = "📍 " + texto;
+        chip.dataset.quadra = alvo ? alvo.properties.quadra : "";
+        chip.dataset.lote = alvo ? alvo.properties.lote : "";
+        chip.hidden = false;
+    }
+    function formatarDistancia(metros) {
+        return metros < 1e3 ? `${Math.round(metros)} m` : `${(metros / 1e3).toLocaleString("pt-BR", {
+            maximumFractionDigits: 2
+        })} km`;
+    }
+    function rumo(lat1, lon1, lat2, lon2) {
+        const toRad = v => v * Math.PI / 180;
+        const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+        const graus = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        return [ "norte", "nordeste", "leste", "sudeste", "sul", "sudoeste", "oeste", "noroeste" ][Math.round(graus / 45) % 8];
     }
     function updateDistance() {
         if (!selectedFeature || !userPosition) {
             elements.distanceRow.hidden = true;
+            if (guiaAteLote) map.removeLayer(guiaAteLote);
+            guiaAteLote = null;
             return;
         }
         const props = selectedFeature.properties;
         const destination = props.access ? [ props.access.latitude, props.access.longitude ] : [ props.center[1], props.center[0] ];
         const distance = distanceMeters(userPosition.latitude, userPosition.longitude, destination[0], destination[1]);
-        elements.lotDistance.textContent = distance < 1e3 ? `${Math.round(distance)} m` : `${(distance / 1e3).toLocaleString("pt-BR", {
-            maximumFractionDigits: 2
-        })} km`;
+        const chegou = distance < 15 || pontoNoLote(userPosition.longitude, userPosition.latitude, selectedFeature.geometry);
+        elements.lotDistance.textContent = chegou ? "Você chegou ao lote" : `${formatarDistancia(distance)} · siga para ${rumo(userPosition.latitude, userPosition.longitude, destination[0], destination[1])}`;
         elements.distanceRow.hidden = false;
+        const pontos = [ [ userPosition.latitude, userPosition.longitude ], destination ];
+        if (chegou) {
+            if (guiaAteLote) map.removeLayer(guiaAteLote);
+            guiaAteLote = null;
+        } else if (guiaAteLote) {
+            guiaAteLote.setLatLngs(pontos);
+        } else {
+            guiaAteLote = L.polyline(pontos, {
+                color: "#2589ff",
+                weight: 3,
+                opacity: .9,
+                dashArray: "6 8",
+                interactive: false
+            }).addTo(map);
+        }
     }
     function distanceMeters(lat1, lon1, lat2, lon2) {
         const toRad = value => value * Math.PI / 180;
@@ -984,7 +1174,25 @@
         });
     }
     function updateOnlineState() {
-        elements.offline.hidden = navigator.onLine;
+        const semInternet = !navigator.onLine;
+        if (semInternet) {
+            const quando = remoteUpdatedAt ? new Date(remoteUpdatedAt).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+            }) : null;
+            elements.offline.textContent = `Sem internet · mapa, lotes e GPS funcionando${quando ? ` · situação dos lotes de ${quando}` : ""} · reservas só com internet`;
+            if (activeBasemap !== "planta") {
+                basemapAntesDoOffline = activeBasemap;
+                setBasemap("planta");
+            }
+        } else if (basemapAntesDoOffline) {
+            const voltar = basemapAntesDoOffline;
+            basemapAntesDoOffline = null;
+            setBasemap(voltar);
+        }
+        elements.offline.hidden = !semInternet;
     }
     function escapeHtml(value) {
         return String(value ?? "").replace(/[&<>"']/g, character => ({

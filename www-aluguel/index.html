@@ -96,7 +96,7 @@
       <section id="page-interesses" class="page">
         <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel registrados pelos corretores, com a ficha de contato do cliente.</p>
         <div class="panel table-panel">
-          <table><thead><tr><th>Imóvel</th><th>Cliente</th><th>Telefone</th><th>CPF</th><th>E-mail</th><th>Observação</th><th>Data</th><th>Situação</th></tr></thead><tbody id="interessesTableBody"></tbody></table>
+          <table><thead><tr><th>Imóvel</th><th>Cliente</th><th>Telefone</th><th>CPF</th><th>E-mail</th><th>Observação</th><th>Data</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="interessesTableBody"></tbody></table>
           <div id="interessesTableEmpty" class="empty-state" hidden>Nenhum interesse registrado ainda.</div>
         </div>
       </section>
@@ -219,6 +219,7 @@
       <h2>Registrar interesse do cliente</h2>
       <p id="interesseImovelNome" class="muted-text" style="margin:-8px 0 0">—</p>
       <p style="font-size:12px;color:var(--muted);margin:0">Aviso de privacidade: os dados do cliente informados abaixo são tratados conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018) e usados apenas para este atendimento.</p>
+      <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input id="interesseConsentInput" type="checkbox" required style="margin-top:3px;flex:none;width:auto" /><span style="text-transform:none;font-size:12px;font-weight:500;letter-spacing:normal;color:var(--text,#1a1a1a)">Expliquei ao cliente como os dados serão usados, conforme o aviso acima.</span></label>
       <label><span>Nome do cliente</span><input id="interesseNomeInput" required /></label>
       <div class="form-row">
         <label><span>Telefone do cliente</span><input id="interesseTelefoneInput" inputmode="tel" /></label>
@@ -256,6 +257,8 @@
       <span class="eyebrow">NOVO ACESSO</span>
       <h2>Gerar convite</h2>
       <label><span>Nome da pessoa</span><input id="inviteAluguelNameInput" required /></label>
+      <label><span>CPF do usuário (opcional)</span><input id="inviteAluguelCpfInput" placeholder="000.000.000-00" /></label>
+      <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
       <div class="form-row">
         <label><span>Perfil</span>
           <select id="inviteAluguelRoleInput">
@@ -278,6 +281,8 @@
       <h2>Criar usuário já com senha</h2>
       <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Cria o login pronto na hora. Se o e-mail já tiver conta em outra base SKL, a senha digitada é ignorada e só vinculamos o acesso a esta carteira.</p>
       <label><span>Nome da pessoa</span><input id="directAluguelNameInput" required /></label>
+      <label><span>CPF do usuário (opcional)</span><input id="directAluguelCpfInput" placeholder="000.000.000-00" /></label>
+      <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
       <label><span>E-mail</span><input id="directAluguelEmailInput" type="email" required /></label>
       <label><span>Senha</span><input id="directAluguelPasswordInput" type="text" minlength="6" required /></label>
       <div class="form-row">

@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.3.1-web";
+    const APP_VERSION = "0.4.0-web";
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -41,6 +41,7 @@
             if (error) throw error;
             await detectarLinhasEEntrar();
         } catch (error) {
+            if (!navigator.onLine) return showMessage($("loginMessage"), MSG_SEM_INTERNET);
             await sb.auth.signOut();
             showMessage($("loginMessage"), traduzErro(error.message));
         } finally {
@@ -48,13 +49,43 @@
         }
     }
 
+    // Uso offline ("modo campo"): www-vendas/online.js grava este resumo depois de entrar com
+    // internet (mesma origem → mesmo localStorage). Sem internet, o shell pula a verificação
+    // de acessos (que depende do servidor) e abre direto o mapa de Vendas com os dados salvos.
+    const OFFLINE_ACESSO_KEY = "sklu_offline_acesso";
+    const MSG_SEM_INTERNET = "Sem internet. Para usar o aplicativo sem internet, é preciso abri-lo e entrar na sua conta pelo menos uma vez com internet — assim o mapa, os lotes e a última situação ficam salvos no aparelho.";
+    function temAcessoOfflineSalvo() {
+        try {
+            const acesso = JSON.parse(localStorage.getItem(OFFLINE_ACESSO_KEY) || "null");
+            return Boolean(acesso && acesso.id && (Date.now() - Date.parse(acesso.validado_em)) / 864e5 <= 30);
+        } catch {
+            return false;
+        }
+    }
+    function ehErroDeRede(error) {
+        if (!navigator.onLine) return true;
+        return /Failed to fetch|NetworkError|Load failed|network|fetch failed|AuthRetryableFetchError|servidor está ocupado/i.test(String(error?.name || "") + " " + String(error?.message || error || ""));
+    }
+
     async function restoreSession() {
-        const { data } = await sb.auth.getSession();
-        if (!data?.session) return mostrarLogin();
+        let data = null, erroSessao = null;
+        try {
+            ({ data, error: erroSessao } = await sb.auth.getSession());
+        } catch (error) {
+            erroSessao = error;
+        }
+        if (!data?.session) {
+            if ((erroSessao || !navigator.onLine) && temAcessoOfflineSalvo()) return abrirLinha("vendas");
+            mostrarLogin();
+            if (!navigator.onLine) showMessage($("loginMessage"), MSG_SEM_INTERNET);
+            return;
+        }
         try {
             await detectarLinhasEEntrar();
-        } catch {
+        } catch (error) {
+            if (ehErroDeRede(error) && temAcessoOfflineSalvo()) return abrirLinha("vendas");
             mostrarLogin();
+            showMessage($("loginMessage"), navigator.onLine ? traduzErro(error.message) : MSG_SEM_INTERNET);
         }
     }
 
@@ -124,6 +155,7 @@
     }
 
     async function sair() {
+        try { localStorage.removeItem(OFFLINE_ACESSO_KEY); } catch {}
         try { localStorage.removeItem("sklu_linhas"); } catch {}
         await sb.auth.signOut();
         mostrarLogin();

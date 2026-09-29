@@ -5,7 +5,7 @@
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
     const ORIGEM = "app_corretor";
     const SLUGS_OCULTOS_NA_BASE = [ "skl-demo" ];
-    const APP_VERSION = "3.4.3-base";
+    const APP_VERSION = "3.7.0-base";
     if ($("brokerAppVersion")) $("brokerAppVersion").textContent = APP_VERSION;
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
@@ -49,6 +49,99 @@
     let lotesChannel = null;
     let solicitacoesChannel = null;
     let online = false;
+    // ---- Uso offline ("modo campo") ----
+    // Depois de entrar com internet, guarda um resumo do acesso (empreendimento + nome) para o
+    // corretor conseguir abrir o mapa, os lotes e o GPS sem internet no empreendimento. Os
+    // contornos dos lotes já vêm no app e a última situação fica salva por app.js. Sair da conta
+    // apaga esse resumo. Validade: OFFLINE_VALIDADE_DIAS desde a última conferência com a Central.
+    const OFFLINE_ACESSO_KEY = "sklu_offline_acesso";
+    const OFFLINE_VALIDADE_DIAS = 30;
+    const MSG_SEM_INTERNET_PRIMEIRO_ACESSO = "Sem internet. Para usar o aplicativo sem internet, é preciso abri-lo e entrar na sua conta pelo menos uma vez com internet — assim o mapa, os lotes e a última situação ficam salvos no aparelho.";
+    let modoOffline = false;
+    function salvarAcessoOffline(emp, nomeCorretor) {
+        if (!emp || emp.tipo === "vertical") return;
+        const anterior = lerAcessoOffline(true);
+        try {
+            localStorage.setItem(OFFLINE_ACESSO_KEY, JSON.stringify({
+                id: emp.id,
+                nome: emp.nome,
+                slug: emp.slug,
+                tipo: emp.tipo,
+                corretor: nomeCorretor || anterior?.corretor || "Corretor",
+                validado_em: (new Date).toISOString()
+            }));
+        } catch {}
+        return !anterior || anterior.id !== emp.id;
+    }
+    function lerAcessoOffline(ignorarValidade = false) {
+        try {
+            const acesso = JSON.parse(localStorage.getItem(OFFLINE_ACESSO_KEY) || "null");
+            if (!acesso || !acesso.id) return null;
+            const idadeDias = (Date.now() - Date.parse(acesso.validado_em)) / 864e5;
+            if (!ignorarValidade && !(idadeDias <= OFFLINE_VALIDADE_DIAS)) return null;
+            return acesso;
+        } catch {
+            return null;
+        }
+    }
+    function limparAcessoOffline() {
+        try {
+            localStorage.removeItem(OFFLINE_ACESSO_KEY);
+        } catch {}
+    }
+    function ehErroDeRede(error) {
+        if (!navigator.onLine) return true;
+        const texto = String(error?.name || "") + " " + String(error?.message || error || "");
+        return /Failed to fetch|NetworkError|Load failed|network|fetch failed|AuthRetryableFetchError|TEMPO_ESGOTADO/i.test(texto);
+    }
+    function comTempoLimite(promessa, ms) {
+        return Promise.race([ promessa, new Promise((_, rejeitar) => setTimeout(() => rejeitar(new Error("TEMPO_ESGOTADO")), ms)) ]);
+    }
+    function entrarOffline(acesso) {
+        modoOffline = true;
+        currentEmpreendimento = acesso;
+        empreendimentoId = acesso.id;
+        authView.hidden = true;
+        empreendimentoPicker.hidden = true;
+        document.getElementById("app").hidden = false;
+        $("brokerAccountName").textContent = acesso.corretor || "Corretor";
+        updateConnection(false, "Sem internet · usando dados salvos no aparelho");
+        window.SKLApp?.showToast?.("Sem internet: mapa, lotes e GPS funcionam com os dados salvos. Reservas voltam quando a internet voltar.");
+    }
+    async function revalidarAposOffline() {
+        try {
+            const {data: data} = await comTempoLimite(sb.auth.getSession(), 15e3);
+            if (!data?.session) {
+                modoOffline = false;
+                limparAcessoOffline();
+                document.getElementById("app").hidden = true;
+                return showLogin("A internet voltou. Entre novamente para atualizar os dados.");
+            }
+            const lista = await comTempoLimite(listarEmpreendimentosDoCorretor(), 15e3);
+            const emp = lista.find(item => item.id === empreendimentoId) || lista[0];
+            if (!emp) throw new Error("Este acesso não pertence a um corretor com empreendimento ativo.");
+            modoOffline = false;
+            entrarNoEmpreendimento(emp);
+        } catch (error) {
+            if (ehErroDeRede(error)) return;
+            modoOffline = false;
+            limparAcessoOffline();
+            closeRealtime();
+            document.getElementById("app").hidden = true;
+            await sb.auth.signOut();
+            showLogin(traduzErro(error.message));
+        }
+    }
+    function mostrarAvisoProntoOffline() {
+        const aviso = $("offlineReadyNotice");
+        if (!aviso) return;
+        aviso.hidden = false;
+        $("offlineReadyClose")?.addEventListener("click", () => {
+            aviso.hidden = true;
+        }, {
+            once: true
+        });
+    }
     function setMessage(element, message, isError = true) {
         element.textContent = message;
         element.classList.toggle("success", !isError);
@@ -70,8 +163,11 @@
         authView.hidden = true;
         empreendimentoPicker.hidden = true;
         document.getElementById("app").hidden = false;
+        modoOffline = false;
         sb.auth.getUser().then(({data: data}) => {
-            $("brokerAccountName").textContent = data?.user?.user_metadata?.nome_exibicao || "Corretor";
+            const nome = data?.user?.user_metadata?.nome_exibicao || "Corretor";
+            $("brokerAccountName").textContent = nome;
+            if (salvarAcessoOffline(currentEmpreendimento, nome)) mostrarAvisoProntoOffline();
         });
         updateConnection(true);
         sync(false);
@@ -187,11 +283,29 @@
         }
     }
     async function restoreSession() {
-        const {data: data} = await sb.auth.getSession();
-        if (!data?.session) return showLogin();
+        const acessoOffline = lerAcessoOffline();
+        let data = null;
+        let sessaoErro = null;
         try {
-            await resolverEmpreendimentoEEntrar();
+            ({data: data, error: sessaoErro} = await comTempoLimite(sb.auth.getSession(), 12e3));
         } catch (error) {
+            sessaoErro = error;
+        }
+        if (!data?.session) {
+            // Sem internet o token vencido não renova: entra com os dados salvos em vez de pedir login
+            // (a tela de login também não funcionaria sem internet).
+            if (acessoOffline && (sessaoErro || !navigator.onLine)) return entrarOffline(acessoOffline);
+            if (!navigator.onLine) return showLogin(MSG_SEM_INTERNET_PRIMEIRO_ACESSO);
+            return showLogin();
+        }
+        try {
+            await comTempoLimite(resolverEmpreendimentoEEntrar(), 20e3);
+        } catch (error) {
+            if (ehErroDeRede(error)) {
+                if (acessoOffline) return entrarOffline(acessoOffline);
+                return showLogin(MSG_SEM_INTERNET_PRIMEIRO_ACESSO);
+            }
+            limparAcessoOffline();
             await sb.auth.signOut();
             showLogin(error.message || "Entre novamente.");
         }
@@ -262,6 +376,7 @@
             $("brokerPasswordInput").value = "";
             await resolverEmpreendimentoEEntrar();
         } catch (error) {
+            if (ehErroDeRede(error)) return setMessage($("brokerLoginMessage"), MSG_SEM_INTERNET_PRIMEIRO_ACESSO);
             await sb.auth.signOut();
             setMessage($("brokerLoginMessage"), traduzErro(error.message));
         }
@@ -488,6 +603,7 @@
         if (!requestContext || requestSubmitting) return;
         const customer = $("requestCustomerInput").value.trim();
         if (customer.length < 3) return setMessage($("requestMessage"), "Informe o nome do cliente.");
+        if (!$("requestConsentInput").checked) return setMessage($("requestMessage"), "Confirme o aviso de privacidade (LGPD) antes de enviar.");
         requestSubmitting = true;
         $("submitRequestButton").disabled = true;
         try {
@@ -505,7 +621,8 @@
                 p_cliente_endereco: $("requestAddressInput").value,
                 p_forma_pagamento_id: formaPagamentoId,
                 p_forma_pagamento_nome: formaPagamentoNome,
-                p_simulacao: (window.SKLSimulador && alvoSimulacaoAtual() && window.SKLSimulador.escolhida(alvoSimulacaoAtual().alvo)) || null
+                p_simulacao: (window.SKLSimulador && alvoSimulacaoAtual() && window.SKLSimulador.escolhida(alvoSimulacaoAtual().alvo)) || null,
+                p_consentimento_lgpd: $("requestConsentInput").checked
             };
             if (requestContext.kind === "lote") {
                 const {data: loteRow, error: loteError} = await sb.from("lotes").select("id").eq("empreendimento_id", empreendimentoId).eq("chave", requestContext.lotKey).single();
@@ -525,6 +642,7 @@
             [ $("requestCustomerInput"), $("requestPhoneInput"), $("requestCpfInput"), $("requestEmailInput"), $("requestAddressInput"), $("requestNoteInput") ].forEach(input => {
                 input.value = "";
             });
+            $("requestConsentInput").checked = false;
             if (paymentSelect) paymentSelect.selectedIndex = 0;
             if (window.SKLSimulador && alvoSimulacaoAtual()) window.SKLSimulador.limparEscolhida(alvoSimulacaoAtual().alvo);
             requestDialog.close();
@@ -659,6 +777,8 @@
         window.SKLVertical?.leave();
         empreendimentoId = null;
         currentEmpreendimento = null;
+        modoOffline = false;
+        limparAcessoOffline();
         await sb.auth.signOut();
         showLogin("Você saiu deste aparelho.");
     }
@@ -690,7 +810,7 @@
         });
     }
     function traduzErro(message) {
-        const codigo = /^(REQUEST_PENDING|RESERVA_BLOQUEADA|RESERVA_ATIVA|REQUEST_EXPIRED):\s*(.*)$/s.exec(message || "");
+        const codigo = /^(REQUEST_PENDING|RESERVA_BLOQUEADA|RESERVA_ATIVA|REQUEST_EXPIRED|CONSENT_REQUIRED):\s*(.*)$/s.exec(message || "");
         if (codigo) return codigo[2];
         const mapa = {
             "Invalid login credentials": "E-mail ou senha incorretos.",
@@ -727,6 +847,10 @@
         }[character]));
     }
     window.addEventListener("online", () => {
+        if (modoOffline) {
+            revalidarAposOffline();
+            return;
+        }
         if (empreendimentoId && currentEmpreendimento?.tipo !== "vertical") {
             sync(false);
             openRealtime();
