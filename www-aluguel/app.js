@@ -4,16 +4,26 @@
 
     const STATUS = {
         disponivel: "Disponível",
-        alugado: "Alugado",
         reservado: "Reservado",
+        alugado: "Alugado",
+        em_negociacao: "Em negociação",
+        vendido: "Vendido",
         indisponivel: "Indisponível"
     };
     const STATUS_COLOR = {
         disponivel: "#2f8a56",
         alugado: "#bd5147",
         reservado: "#d59a22",
+        em_negociacao: "#7d5bc4",
+        vendido: "#56636b",
         indisponivel: "#477fa4"
     };
+    // Situações por finalidade: "reservado"/"alugado" só existem no aluguel; "em_negociacao"/"vendido" só na venda.
+    const STATUS_ALUGUEL = [ "disponivel", "reservado", "alugado", "indisponivel" ];
+    const STATUS_VENDA = [ "disponivel", "em_negociacao", "vendido", "indisponivel" ];
+    // O corretor não vê imóvel que já saiu do mercado (só a Central).
+    const STATUS_OCULTOS_CORRETOR = [ "alugado", "vendido", "indisponivel" ];
+    const APROVACAO = { rascunho: "Rascunho", pendente: "Aguardando aprovação", aprovado: "Aprovado", recusado: "Recusado" };
     const ROLE = {
         corretor: "Corretor",
         central_vendas: "Controle de aluguéis",
@@ -22,7 +32,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.1.7";
+    const APP_VERSION = "0.2.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -47,6 +57,12 @@
 
     let pickerMap = null;
     let pickerMarker = null;
+
+    let finalidadeFiltro = "todos";
+    let bairrosFiltro = [];
+    let faixaValor = null;
+    let notaMinimaCadastro = null;
+    let modoDialogo = "leitura";
 
     let editandoId = null;
     let fotosExistentes = [];
@@ -103,15 +119,40 @@
         document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
         document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.go)));
         document.querySelectorAll(".metric-card").forEach(button => button.addEventListener("click", () => {
+            definirFinalidadeFiltro("todos");
             $("construcaoStatusFilter").value = button.dataset.status;
             showPage("construcoes");
             renderConstrucoes();
         }));
+        $("finalidadeFiltro").querySelectorAll("[data-finalidade]").forEach(button => {
+            button.addEventListener("click", () => { definirFinalidadeFiltro(button.dataset.finalidade); renderConstrucoes(); });
+        });
         $("construcaoSearchInput").addEventListener("input", renderConstrucoes);
         $("construcaoStatusFilter").addEventListener("change", renderConstrucoes);
+        $("bairroFiltroInput").addEventListener("change", adicionarBairroFiltro);
+        $("bairroFiltroInput").addEventListener("keydown", event => {
+            if (event.key === "Enter") { event.preventDefault(); adicionarBairroFiltro(); }
+        });
+        $("valorMinRange").addEventListener("input", () => aoMoverFaixa("min"));
+        $("valorMaxRange").addEventListener("input", () => aoMoverFaixa("max"));
+        $("limparFiltrosButton").addEventListener("click", limparFiltros);
         $("toggleConstrucaoViewButton").addEventListener("click", toggleConstrucaoView);
         $("newConstrucaoButton").addEventListener("click", () => openConstrucaoDialog(null));
-        $("saveConstrucaoButton").addEventListener("click", saveConstrucao);
+        $("novoCadastroButton").addEventListener("click", () => openConstrucaoDialog(null));
+        $("cadastrosFiltro").addEventListener("change", renderCadastros);
+        $("saveConstrucaoButton").addEventListener("click", () => salvarImovel());
+        $("enviarCadastroButton").addEventListener("click", () => salvarImovel({ enviar: true }));
+        $("aprovarCadastroButton").addEventListener("click", () => salvarImovel({ aprovar: true }));
+        $("recusarCadastroButton").addEventListener("click", abrirRecusarCadastro);
+        $("confirmRecusarButton").addEventListener("click", confirmarRecusarCadastro);
+        $("salvarNotaMinimaButton").addEventListener("click", salvarNotaMinima);
+        $("finalidadeAluguelInput").addEventListener("change", atualizarCamposFinalidade);
+        $("finalidadeVendaInput").addEventListener("change", atualizarCamposFinalidade);
+        $("condominioTipoInput").addEventListener("change", atualizarCamposCusto);
+        $("iptuTipoInput").addEventListener("change", atualizarCamposCusto);
+        $("ufInput").addEventListener("input", () => { $("ufInput").value = $("ufInput").value.toUpperCase(); });
+        $("formEdicao").addEventListener("input", atualizarQualidade);
+        $("formEdicao").addEventListener("change", atualizarQualidade);
         $("deleteConstrucaoButton").addEventListener("click", openDeleteDialog);
         $("confirmDeleteConstrucaoButton").addEventListener("click", confirmDeleteConstrucao);
         $("registrarInteresseButton").addEventListener("click", () => abrirInteresseDialog(construcoes.get(editandoId)));
@@ -198,6 +239,70 @@
     function statusPill(status) {
         return `<span class="status-pill ${h(status)}">${h(STATUS[status] || status)}</span>`;
     }
+    function aprovacaoPill(aprovacao) {
+        return `<span class="status-pill aprov-${h(aprovacao)}">${h(APROVACAO[aprovacao] || aprovacao)}</span>`;
+    }
+    function podeGerenciar() {
+        return !!currentUser && [ "administrador", "central_vendas" ].includes(currentUser.papel);
+    }
+    function formatMoney(valor, casas = 2) {
+        if (valor == null || valor === "") return "—";
+        return "R$ " + Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+    }
+    function precoCurto(valor) {
+        return formatMoney(valor, Number(valor) % 1 ? 2 : 0);
+    }
+    // Aceita "R$ 1.234,56", "1234,56", "1234.56" e "450.000" (milhar com ponto).
+    function parseValor(texto) {
+        let s = String(texto == null ? "" : texto).replace(/[^\d.,]/g, "");
+        if (!s) return null;
+        if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+        else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : null;
+    }
+    function numeroOuNulo(valor) {
+        if (valor === "" || valor == null) return null;
+        const n = Number(valor);
+        return Number.isFinite(n) ? n : null;
+    }
+    function normalizar(texto) {
+        return String(texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+    }
+    function estrelasTexto(estrelas) {
+        return "★".repeat(estrelas) + "☆".repeat(5 - estrelas);
+    }
+    function finalidadeTexto(c) {
+        if (c.para_venda && c.para_aluguel !== false) return "Venda e aluguel";
+        return c.para_venda ? "Venda" : "Aluguel";
+    }
+    function enderecoTexto(c) {
+        const cidadeUf = [ c.cidade, c.uf ].filter(Boolean).join("-");
+        const partes = [ c.logradouro, c.numero, c.complemento, c.bairro, cidadeUf ].filter(Boolean);
+        return partes.length ? partes.join(", ") : (c.endereco || "");
+    }
+
+    // Nota de qualidade do cadastro: 10 itens de 10%, 20% por estrela. A mesma regra está no banco
+    // (função qualidade_imovel), que é quem vale na hora de enviar para aprovação.
+    function qualidadeImovel(c, totalFotos) {
+        const vazio = v => !String(v == null ? "" : v).trim();
+        const fotos = totalFotos != null ? totalFotos : (c.fotos || []).length;
+        const custoOk = (tipo, valor) => !!tipo && (tipo !== "valor" || valor != null);
+        const itens = [
+            [ !vazio(c.tipo_imovel), "tipo do imóvel" ],
+            [ !vazio(c.bairro), "bairro" ],
+            [ !vazio(c.logradouro) && !vazio(c.numero) && !vazio(c.cidade), "endereço completo (rua, número e cidade)" ],
+            [ c.latitude != null && c.longitude != null, "localização no mapa" ],
+            [ (c.para_aluguel === false || Number(c.valor_aluguel) > 0) && (!c.para_venda || Number(c.valor_venda) > 0), "valor" ],
+            [ custoOk(c.condominio_tipo, c.valor_condominio) && custoOk(c.iptu_tipo, c.valor_iptu), "condomínio e IPTU" ],
+            [ String(c.descricao || "").trim().length >= 150, "descrição com 150 caracteres ou mais" ],
+            [ fotos >= 3, "pelo menos 3 fotos" ],
+            [ fotos >= 8, "8 fotos ou mais" ],
+            [ Number(c.area_m2) > 0 && c.quartos != null && c.banheiros != null && c.vagas != null, "características (área, quartos, banheiros e vagas)" ]
+        ];
+        const pct = itens.filter(([ ok ]) => ok).length * 10;
+        return { pct, estrelas: Math.floor(pct / 20), faltando: itens.filter(([ ok ]) => !ok).map(([ , rotulo ]) => rotulo) };
+    }
     function showMessage(element, message, success = false) {
         element.textContent = message;
         element.style.background = success ? "#dff4e8" : "#f7e8e6";
@@ -219,6 +324,10 @@
         for (const chave of Object.keys(mapa)) {
             if (message && message.includes(chave)) return mapa[chave];
         }
+        if (message && message.includes("construcoes_codigo_uk")) return "Já existe um imóvel com esse código nesta carteira.";
+        // Erros das funções do banco vêm como "CODIGO: explicação em português".
+        const comCodigo = message && message.match(/^[A-Z_]{4,}: (.+)$/);
+        if (comCodigo) return comCodigo[1].charAt(0).toUpperCase() + comCodigo[1].slice(1);
         return message || "Não foi possível concluir a operação.";
     }
 
@@ -336,17 +445,29 @@
         $("appView").hidden = false;
         $("currentUserName").textContent = currentUser.display_name;
         $("currentUserRole").textContent = ROLE[currentUser.papel] || currentUser.papel;
-        const podeGerenciar = [ "administrador", "central_vendas" ].includes(currentUser.papel);
-        $("newConstrucaoButton").hidden = !podeGerenciar;
-        $("navInteresses").hidden = !podeGerenciar;
-        $("navCorretores").hidden = !podeGerenciar;
-        $("navComissoes").hidden = !podeGerenciar;
+        const gerencia = podeGerenciar();
+        $("newConstrucaoButton").hidden = !gerencia;
+        $("navInteresses").hidden = !gerencia;
+        $("navCorretores").hidden = !gerencia;
+        $("navComissoes").hidden = !gerencia;
+        $("navCadastrosTexto").textContent = gerencia ? "Cadastros" : "Meus cadastros";
+        $("cadastrosFiltro").hidden = !gerencia;
+        $("novoCadastroButton").hidden = gerencia;
+        $("cadastrosIntro").textContent = gerencia
+            ? "Imóveis cadastrados pelos corretores. Revise, corrija o que precisar e aprove para o imóvel aparecer para toda a equipe."
+            : "Cadastre imóveis para venda ou aluguel. A Central revisa e, depois de aprovado, o imóvel aparece para todos os corretores.";
+        $("settingsCadastroPanel").hidden = !gerencia;
+        document.querySelectorAll("[data-so-central]").forEach(el => { el.hidden = !gerencia; });
         $("dashboardCarteiraNome").textContent = carteiraNomeAtual;
         $("settingsCarteiraNome").textContent = carteiraNomeAtual;
+        finalidadeFiltro = "todos";
+        bairrosFiltro = [];
+        faixaValor = null;
+        await carregarConfigCarteira();
+        if (gerencia) await loadCorretores();
         await loadConstrucoes();
-        if (podeGerenciar) {
+        if (gerencia) {
             await loadInteresses();
-            await loadCorretores();
             await loadComissoesAluguel();
         }
         connectRealtime();
@@ -381,25 +502,56 @@
         document.querySelectorAll(".nav-button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
         document.querySelectorAll(".page").forEach(section => section.classList.remove("active-page"));
         $(`page-${page}`).classList.add("active-page");
-        const titles = { dashboard: "Visão geral", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões", settings: "Configurações" };
+        const titles = {
+            dashboard: "Visão geral", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
+            settings: "Configurações", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
+        };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
     }
 
     // ===== Dados =====
 
+    async function carregarConfigCarteira() {
+        notaMinimaCadastro = null;
+        const { data } = await sb.from("carteiras_aluguel").select("nota_minima_cadastro").eq("id", carteiraId).maybeSingle();
+        notaMinimaCadastro = data?.nota_minima_cadastro ?? null;
+        $("notaMinimaSelect").value = notaMinimaCadastro == null ? "" : String(notaMinimaCadastro);
+    }
+
+    async function salvarNotaMinima() {
+        const valor = $("notaMinimaSelect").value;
+        $("salvarNotaMinimaButton").disabled = true;
+        try {
+            const { error } = await sb.rpc("configurar_cadastro_imoveis", { p_carteira_id: carteiraId, p_nota_minima: valor === "" ? null : Number(valor) });
+            if (error) throw error;
+            notaMinimaCadastro = valor === "" ? null : Number(valor);
+            toast(notaMinimaCadastro ? `Agora o corretor precisa de ${notaMinimaCadastro} estrela(s) para enviar.` : "Nota mínima desativada.");
+        } catch (error) {
+            toast(traduzErro(error.message));
+        } finally {
+            $("salvarNotaMinimaButton").disabled = false;
+        }
+    }
+
     async function loadConstrucoes() {
         const { data, error } = await sb.from("construcoes").select("*").eq("carteira_id", carteiraId).order("updated_at", { ascending: false });
         if (error) { toast(traduzErro(error.message)); return; }
         construcoes.clear();
         (data || []).forEach(c => construcoes.set(c.id, c));
-        updateMetrics();
-        renderConstrucoes();
-        renderDashboardRecentes();
+        atualizarTudo();
         $("connectionBadge").textContent = "Conectado";
         $("connectionBadge").classList.remove("offline");
         $("connectionBadge").classList.add("online");
         $("syncTime").textContent = `Sincronizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+    }
+
+    function atualizarTudo() {
+        updateMetrics();
+        atualizarListaBairros();
+        renderConstrucoes();
+        renderDashboardRecentes();
+        renderCadastros();
     }
 
     function connectRealtime() {
@@ -409,65 +561,337 @@
                 if (payload.eventType === "DELETE") {
                     construcoes.delete(payload.old.id);
                 } else {
+                    avisarMudancaDoMeuCadastro(construcoes.get(payload.new.id), payload.new);
                     construcoes.set(payload.new.id, payload.new);
                 }
-                updateMetrics();
-                renderConstrucoes();
-                renderDashboardRecentes();
+                atualizarTudo();
             })
             .subscribe();
     }
 
+    function avisarMudancaDoMeuCadastro(antes, depois) {
+        if (!antes || !currentUser || depois.cadastrado_por !== currentUser.id || antes.aprovacao === depois.aprovacao) return;
+        if (depois.aprovacao === "aprovado") toast(`Seu cadastro "${depois.nome}" foi aprovado e já aparece para todos.`);
+        if (depois.aprovacao === "recusado") toast(`Seu cadastro "${depois.nome}" foi recusado. Veja o motivo em Meus cadastros.`);
+    }
+
+    // Imóveis que entram na busca: só os aprovados; para o corretor, sem os que já saíram do mercado.
+    function imovelVisivelNaBusca(c) {
+        if ((c.aprovacao || "aprovado") !== "aprovado") return false;
+        return podeGerenciar() || !STATUS_OCULTOS_CORRETOR.includes(c.status);
+    }
+    function baseBusca() {
+        return [ ...construcoes.values() ].filter(imovelVisivelNaBusca);
+    }
+    function passaFinalidade(c) {
+        if (finalidadeFiltro === "aluguel") return c.para_aluguel !== false;
+        if (finalidadeFiltro === "venda") return !!c.para_venda;
+        return true;
+    }
+    function valorNaFinalidade(c) {
+        const v = finalidadeFiltro === "venda" ? c.valor_venda : c.valor_aluguel;
+        return v == null || v === "" ? null : Number(v);
+    }
+
     function updateMetrics() {
-        const contagem = { disponivel: 0, alugado: 0, reservado: 0, indisponivel: 0 };
-        construcoes.forEach(c => { if (contagem[c.status] != null) contagem[c.status]++; });
+        const contagem = { disponivel: 0, reservado: 0, alugado: 0, em_negociacao: 0, vendido: 0, indisponivel: 0 };
+        baseBusca().forEach(c => { if (contagem[c.status] != null) contagem[c.status]++; });
         $("metricDisponivel").textContent = contagem.disponivel;
-        $("metricAlugado").textContent = contagem.alugado;
         $("metricReservado").textContent = contagem.reservado;
+        $("metricEmNegociacao").textContent = contagem.em_negociacao;
+        $("metricAlugado").textContent = contagem.alugado;
+        $("metricVendido").textContent = contagem.vendido;
         $("metricIndisponivel").textContent = contagem.indisponivel;
     }
 
     function renderDashboardRecentes() {
-        const recentes = [ ...construcoes.values() ].slice(0, 5);
+        const recentes = baseBusca().slice(0, 5);
         $("dashboardRecentes").innerHTML = recentes.length ? recentes.map(c => `
-      <div class="compact-item"><div><strong>${h(c.nome)}</strong><br><small>${h(c.endereco || "Sem endereço")}</small></div>${statusPill(c.status)}</div>
+      <div class="compact-item"><div><strong>${h(c.nome)}</strong><br><small>${h([ c.codigo && "Cód. " + c.codigo, finalidadeTexto(c), c.bairro ].filter(Boolean).join(" · "))}</small></div>${statusPill(c.status)}</div>
     `).join("") : `<p class="muted-text">Nenhum imóvel cadastrado ainda.</p>`;
     }
 
+    // ===== Busca: finalidade, bairros (até 3), faixa de valor, situação =====
+
+    function definirFinalidadeFiltro(finalidade) {
+        finalidadeFiltro = finalidade;
+        $("finalidadeFiltro").querySelectorAll("[data-finalidade]").forEach(b => b.classList.toggle("ativo", b.dataset.finalidade === finalidade));
+        faixaValor = null;
+        montarOpcoesStatusFiltro();
+    }
+
+    function statusDaFinalidade(finalidade) {
+        if (finalidade === "aluguel") return STATUS_ALUGUEL;
+        if (finalidade === "venda") return STATUS_VENDA;
+        return Object.keys(STATUS);
+    }
+
+    function montarOpcoesStatusFiltro() {
+        const select = $("construcaoStatusFilter");
+        const atual = select.value;
+        const lista = statusDaFinalidade(finalidadeFiltro).filter(s => podeGerenciar() || !STATUS_OCULTOS_CORRETOR.includes(s));
+        select.innerHTML = `<option value="">Todas as situações</option>` + lista.map(s => `<option value="${s}">${h(STATUS[s])}</option>`).join("");
+        select.value = lista.includes(atual) ? atual : "";
+        $("mapLegend").innerHTML = lista.map(s => `<span class="dot ${s}"></span>${h(STATUS[s])}`).join(" ");
+    }
+
+    function atualizarListaBairros() {
+        const vistos = new Map();
+        [ ...construcoes.values() ].forEach(c => {
+            const b = String(c.bairro || "").trim();
+            if (b && !vistos.has(normalizar(b))) vistos.set(normalizar(b), b);
+        });
+        const nomes = [ ...vistos.values() ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+        $("bairrosLista").innerHTML = nomes.map(n => `<option value="${h(n)}"></option>`).join("");
+        return nomes;
+    }
+
+    function adicionarBairroFiltro() {
+        const input = $("bairroFiltroInput");
+        const texto = input.value.trim();
+        if (!texto) return;
+        const encontrado = atualizarListaBairros().find(n => normalizar(n) === normalizar(texto));
+        if (!encontrado) { toast("Bairro não encontrado entre os imóveis cadastrados."); return; }
+        if (bairrosFiltro.some(b => normalizar(b) === normalizar(encontrado))) { input.value = ""; return; }
+        if (bairrosFiltro.length >= 3) { toast("Escolha no máximo 3 bairros."); return; }
+        bairrosFiltro.push(encontrado);
+        input.value = "";
+        renderConstrucoes();
+    }
+
+    function renderChipsBairro() {
+        $("bairroChips").innerHTML = bairrosFiltro.map((b, i) => `<span class="bairro-chip">${h(b)}<button type="button" data-remover-bairro="${i}" aria-label="Remover ${h(b)}">×</button></span>`).join("");
+        $("bairroChips").querySelectorAll("[data-remover-bairro]").forEach(button => button.addEventListener("click", () => {
+            bairrosFiltro.splice(Number(button.dataset.removerBairro), 1);
+            renderConstrucoes();
+        }));
+        const cheio = bairrosFiltro.length >= 3;
+        $("bairroFiltroInput").disabled = cheio;
+        $("bairroFiltroInput").placeholder = cheio ? "Máximo de 3 bairros" : (bairrosFiltro.length ? "Mais um bairro" : "Bairro (até 3)");
+    }
+
+    // Faixa de valor: a escala sai do menor e do maior valor cadastrado na finalidade escolhida
+    // (aluguel e venda têm escalas muito diferentes, por isso não existe faixa no modo "Todos").
+    function atualizarFaixaValor(candidatos) {
+        const box = $("faixaValorBox");
+        $("faixaValorDica").hidden = finalidadeFiltro !== "todos";
+        if (finalidadeFiltro === "todos") { box.hidden = true; faixaValor = null; return; }
+        const valores = candidatos.map(valorNaFinalidade).filter(v => v != null && v > 0);
+        if (valores.length < 2 || Math.min(...valores) === Math.max(...valores)) { box.hidden = true; faixaValor = null; return; }
+        const passo = finalidadeFiltro === "venda" ? 5000 : 50;
+        const limMin = Math.floor(Math.min(...valores) / passo) * passo;
+        const limMax = Math.ceil(Math.max(...valores) / passo) * passo;
+        if (!faixaValor || faixaValor.limMin !== limMin || faixaValor.limMax !== limMax) {
+            const antigo = faixaValor;
+            faixaValor = { limMin, limMax, min: limMin, max: limMax };
+            if (antigo) {
+                faixaValor.min = Math.min(Math.max(antigo.min, limMin), limMax);
+                faixaValor.max = Math.max(Math.min(antigo.max, limMax), faixaValor.min);
+            }
+        }
+        [ $("valorMinRange"), $("valorMaxRange") ].forEach(r => { r.min = limMin; r.max = limMax; r.step = passo; });
+        $("valorMinRange").value = faixaValor.min;
+        $("valorMaxRange").value = faixaValor.max;
+        box.hidden = false;
+        desenharFaixa();
+    }
+
+    function desenharFaixa() {
+        if (!faixaValor) return;
+        const total = faixaValor.limMax - faixaValor.limMin || 1;
+        const ini = (faixaValor.min - faixaValor.limMin) / total * 100;
+        const fim = (faixaValor.max - faixaValor.limMin) / total * 100;
+        // a bolinha (22px) percorre a largura menos o próprio tamanho
+        $("faixaValorPreenchido").style.left = `calc(11px + (100% - 22px) * ${ini / 100})`;
+        $("faixaValorPreenchido").style.width = `calc((100% - 22px) * ${(fim - ini) / 100})`;
+        $("faixaValorRotulo").textContent = finalidadeFiltro === "venda" ? "Valor de venda" : "Valor do aluguel";
+        $("faixaValorTexto").textContent = `${precoCurto(faixaValor.min)} até ${precoCurto(faixaValor.max)}`;
+    }
+
+    function aoMoverFaixa(qual) {
+        if (!faixaValor) return;
+        let min = Number($("valorMinRange").value);
+        let max = Number($("valorMaxRange").value);
+        if (min > max) { if (qual === "min") min = max; else max = min; }
+        $("valorMinRange").value = min;
+        $("valorMaxRange").value = max;
+        faixaValor.min = min;
+        faixaValor.max = max;
+        desenharFaixa();
+        renderConstrucoes();
+    }
+
+    function faixaAtiva() {
+        return !!faixaValor && (faixaValor.min > faixaValor.limMin || faixaValor.max < faixaValor.limMax);
+    }
+
+    function limparFiltros() {
+        bairrosFiltro = [];
+        faixaValor = null;
+        $("construcaoSearchInput").value = "";
+        $("bairroFiltroInput").value = "";
+        definirFinalidadeFiltro("todos");
+        renderConstrucoes();
+    }
+
     function filteredConstrucoes() {
-        const termo = $("construcaoSearchInput").value.trim().toLowerCase();
+        const termo = normalizar($("construcaoSearchInput").value);
         const status = $("construcaoStatusFilter").value;
-        return [ ...construcoes.values() ].filter(c => {
+        const bairros = bairrosFiltro.map(normalizar);
+        const porFinalidade = baseBusca().filter(passaFinalidade);
+        atualizarFaixaValor(porFinalidade);
+        const usarFaixa = faixaAtiva();
+        return porFinalidade.filter(c => {
             if (status && c.status !== status) return false;
-            if (termo && !(`${c.nome} ${c.endereco || ""}`.toLowerCase().includes(termo))) return false;
+            if (bairros.length && !bairros.includes(normalizar(c.bairro))) return false;
+            if (usarFaixa) {
+                const v = valorNaFinalidade(c);
+                if (v == null || v < faixaValor.min || v > faixaValor.max) return false;
+            }
+            if (termo) {
+                const texto = normalizar([ c.nome, c.codigo, c.edificio, c.bairro, enderecoTexto(c), c.tipo_imovel ].join(" "));
+                if (!texto.includes(termo)) return false;
+            }
             return true;
         });
     }
 
+    function precoCard(c) {
+        const aluguel = c.para_aluguel !== false && c.valor_aluguel ? `${precoCurto(c.valor_aluguel)}<small>aluguel/mês</small>` : "";
+        const venda = c.para_venda && c.valor_venda ? `${precoCurto(c.valor_venda)}<small>venda</small>` : "";
+        if (finalidadeFiltro === "aluguel") return aluguel || "—";
+        if (finalidadeFiltro === "venda") return venda || "—";
+        return [ venda, aluguel ].filter(Boolean).map(p => `<span>${p}</span>`).join("") || "—";
+    }
+
+    function specsResumo(c) {
+        const partes = [];
+        if (Number(c.area_m2) > 0) partes.push(`📐 ${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
+        if (Number(c.quartos) > 0) partes.push(`🛏 ${c.quartos}`);
+        if (Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
+        if (Number(c.vagas) > 0) partes.push(`🚗 ${c.vagas}`);
+        return partes.join(" · ");
+    }
+
+    function preencherFotoCapa(c, seletor) {
+        const foto = (c.fotos || [])[0];
+        if (!foto) return;
+        resolveFotoUrl(foto.path).then(url => {
+            const holder = document.querySelector(seletor);
+            if (!holder || !url) return;
+            holder.style.backgroundImage = `url("${url}")`;
+            holder.querySelector(".sem-foto")?.remove();
+        });
+    }
+
     function renderConstrucoes() {
+        if (!$("construcaoStatusFilter").options.length) montarOpcoesStatusFiltro();
+        renderChipsBairro();
         const rows = filteredConstrucoes();
+        const gerencia = podeGerenciar();
+        $("buscaResultado").textContent = rows.length === 1 ? "1 imóvel encontrado" : `${rows.length} imóveis encontrados`;
         $("construcaoGridEmpty").hidden = rows.length > 0;
         $("construcaoGrid").innerHTML = rows.map(c => {
-            const foto = (c.fotos || [])[0];
+            const q = gerencia ? qualidadeImovel(c) : null;
+            const specs = specsResumo(c);
             return `<article class="construcao-card" data-id="${h(c.id)}">
-        <div class="construcao-card-photo" data-foto-holder="${h(c.id)}">${foto ? "" : "Sem foto"}</div>
+        <div class="construcao-card-photo" data-foto-holder="${h(c.id)}">${(c.fotos || []).length ? "" : `<span class="sem-foto">Sem foto</span>`}
+          ${c.destaque ? `<span class="card-destaque">★ Destaque</span>` : ""}<span class="card-finalidade">${h(finalidadeTexto(c))}</span></div>
         <div class="construcao-card-body">
+          <div class="card-topo"><small class="card-codigo">${c.codigo ? "Cód. " + h(c.codigo) : ""}</small>${q ? `<span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelasTexto(q.estrelas)}</span>` : ""}</div>
           <h3>${h(c.nome)}</h3>
-          <p>${h(c.endereco || "Endereço não informado")}</p>
-          <div class="construcao-card-footer">${statusPill(c.status)}<span class="construcao-card-valor">${c.valor_aluguel ? "R$ " + Number(c.valor_aluguel).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</span></div>
+          <p>${h([ c.bairro, c.cidade ].filter(Boolean).join(" · ") || enderecoTexto(c) || "Endereço não informado")}</p>
+          ${specs ? `<div class="card-specs">${specs}</div>` : ""}
+          <div class="construcao-card-footer">${statusPill(c.status)}<span class="construcao-card-valor">${precoCard(c)}</span></div>
         </div>
       </article>`;
         }).join("");
         $("construcaoGrid").querySelectorAll("[data-id]").forEach(card => card.addEventListener("click", () => openConstrucaoDialog(construcoes.get(card.dataset.id))));
-        rows.forEach(c => {
-            const foto = (c.fotos || [])[0];
-            if (!foto) return;
-            resolveFotoUrl(foto.path).then(url => {
-                const holder = document.querySelector(`[data-foto-holder="${CSS.escape(c.id)}"]`);
-                if (holder && url) { holder.style.backgroundImage = `url("${url}")`; holder.textContent = ""; }
-            });
-        });
+        rows.forEach(c => preencherFotoCapa(c, `[data-foto-holder="${CSS.escape(c.id)}"]`));
         if (mapaVisivel) { ensureMap(); renderMapMarkers(rows); }
+    }
+
+    // ===== Cadastros feitos pelos corretores (aprovação da Central) =====
+
+    function nomeDoUsuario(id) {
+        if (!id) return "—";
+        if (currentUser && id === currentUser.id) return currentUser.display_name;
+        return corretores.find(u => u.id === id)?.display_name || "usuário da equipe";
+    }
+
+    function renderCadastros() {
+        if (!currentUser) return;
+        const gerencia = podeGerenciar();
+        let lista;
+        if (gerencia) {
+            const filtro = $("cadastrosFiltro").value || "pendente";
+            const idsCorretores = new Set(corretores.filter(u => u.papel === "corretor").map(u => u.id));
+            lista = [ ...construcoes.values() ].filter(c => filtro === "aprovado"
+                ? c.aprovacao === "aprovado" && idsCorretores.has(c.cadastrado_por)
+                : c.aprovacao === filtro);
+            lista.sort((a, b) => String(b.enviado_em || b.updated_at).localeCompare(String(a.enviado_em || a.updated_at)));
+        } else {
+            lista = [ ...construcoes.values() ].filter(c => c.cadastrado_por && c.cadastrado_por === currentUser.id);
+            lista.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+        }
+        const pendentes = [ ...construcoes.values() ].filter(c => c.aprovacao === "pendente").length;
+        const recusadosMeus = [ ...construcoes.values() ].filter(c => c.aprovacao === "recusado" && c.cadastrado_por === currentUser.id).length;
+        const badge = gerencia ? pendentes : recusadosMeus;
+        $("navCadastrosBadge").hidden = !badge;
+        $("navCadastrosBadge").textContent = badge;
+
+        $("cadastrosVazio").hidden = lista.length > 0;
+        $("cadastrosVazio").textContent = gerencia ? "Nenhum cadastro nesta situação." : "Você ainda não cadastrou nenhum imóvel. Toque em \"Cadastrar imóvel\" para começar.";
+        $("cadastrosLista").innerHTML = lista.map(c => {
+            const q = qualidadeImovel(c);
+            const mostrarNota = gerencia || c.aprovacao !== "aprovado";
+            const preco = [ c.para_venda && c.valor_venda ? "Venda " + precoCurto(c.valor_venda) : "", c.para_aluguel !== false && c.valor_aluguel ? "Aluguel " + precoCurto(c.valor_aluguel) : "" ].filter(Boolean).join(" · ");
+            const linha2 = gerencia
+                ? `Corretor: ${h(nomeDoUsuario(c.cadastrado_por))}${c.enviado_em ? " · enviado em " + h(formatDate(c.enviado_em)) : ""}`
+                : `Atualizado em ${h(formatDate(c.updated_at))}`;
+            const acao = gerencia ? (c.aprovacao === "pendente" ? "Revisar" : "Abrir") : (c.aprovacao === "aprovado" ? "Ver" : "Editar");
+            return `<article class="cadastro-item" data-abrir-cadastro="${h(c.id)}">
+        <div class="cadastro-foto" data-cadastro-foto="${h(c.id)}"></div>
+        <div class="cadastro-info">
+          <strong>${h(c.nome)}</strong>
+          <small>${h([ finalidadeTexto(c), c.bairro, preco ].filter(Boolean).join(" · "))}</small>
+          <small>${linha2}</small>
+          ${c.aprovacao === "recusado" && c.aprovacao_motivo ? `<p class="cadastro-motivo">Motivo da recusa: ${h(c.aprovacao_motivo)}</p>` : ""}
+        </div>
+        <div class="cadastro-lado">
+          ${aprovacaoPill(c.aprovacao)}
+          ${mostrarNota ? `<span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelasTexto(q.estrelas)}</span>` : ""}
+          <button type="button" class="secondary-button">${acao}</button>
+        </div>
+      </article>`;
+        }).join("");
+        $("cadastrosLista").querySelectorAll("[data-abrir-cadastro]").forEach(item => item.addEventListener("click", () => openConstrucaoDialog(construcoes.get(item.dataset.abrirCadastro))));
+        lista.forEach(c => preencherFotoCapa(c, `[data-cadastro-foto="${CSS.escape(c.id)}"]`));
+    }
+
+    function abrirRecusarCadastro() {
+        $("recusarMotivoInput").value = "";
+        $("recusarMessage").hidden = true;
+        $("recusarCadastroDialog").showModal();
+    }
+
+    async function confirmarRecusarCadastro() {
+        const motivo = $("recusarMotivoInput").value.trim();
+        if (!motivo) { showMessage($("recusarMessage"), "Informe o motivo para o corretor saber o que corrigir."); return; }
+        $("confirmRecusarButton").disabled = true;
+        try {
+            const { data, error } = await sb.rpc("revisar_cadastro_imovel", { p_id: editandoId, p_aprovar: false, p_motivo: motivo });
+            if (error) throw error;
+            construcoes.set(data.id, data);
+            atualizarTudo();
+            $("recusarCadastroDialog").close();
+            $("construcaoDialog").close();
+            toast("Cadastro recusado. O corretor já pode ver o motivo.");
+        } catch (error) {
+            showMessage($("recusarMessage"), traduzErro(error.message));
+        } finally {
+            $("confirmRecusarButton").disabled = false;
+        }
     }
 
     async function resolveFotoUrl(path) {
@@ -523,7 +947,9 @@
         if (pontos.length) map.fitBounds(pontos, { padding: [ 30, 30 ], maxZoom: 15 });
     }
 
-    // ===== Diálogo de construção =====
+    // ===== Diálogo do imóvel =====
+    // Três modos: "central" (central/admin edita qualquer imóvel), "corretor" (corretor cria ou edita o próprio
+    // cadastro enquanto não foi aprovado) e "leitura" (corretor vendo um imóvel aprovado: ficha + interesse).
 
     function openConstrucaoDialog(construcao) {
         editandoId = construcao ? construcao.id : null;
@@ -531,26 +957,81 @@
         fotosNovas = [];
         fotosRemovidas = [];
         heroIndex = 0;
+        const gerencia = podeGerenciar();
+        const meuEditavel = !!construcao && construcao.cadastrado_por === currentUser.id
+            && [ "rascunho", "pendente", "recusado" ].includes(construcao.aprovacao);
+        modoDialogo = gerencia ? "central" : (!construcao || meuEditavel ? "corretor" : "leitura");
+        const leitura = modoDialogo === "leitura";
+
         $("construcaoDialogMessage").hidden = true;
-        $("construcaoDialogTitle").textContent = construcao ? "Editar imóvel" : "Novo imóvel";
+        $("construcaoDialogEyebrow").textContent = construcao
+            ? [ construcao.codigo ? "CÓD. " + construcao.codigo : "IMÓVEL", finalidadeTexto(construcao).toUpperCase() ].join(" · ")
+            : (gerencia ? "NOVO IMÓVEL" : "NOVO CADASTRO");
+        $("construcaoDialogTitle").textContent = leitura ? construcao.nome : (construcao ? (gerencia ? "Editar imóvel" : "Meu cadastro") : (gerencia ? "Novo imóvel" : "Cadastrar imóvel"));
+
         $("construcaoNomeInput").value = construcao?.nome || "";
+        $("finalidadeAluguelInput").checked = construcao ? construcao.para_aluguel !== false : true;
+        $("finalidadeVendaInput").checked = !!construcao?.para_venda;
         $("construcaoTipoInput").value = construcao?.tipo_imovel || "Casa";
-        $("construcaoStatusInput").value = construcao?.status || "disponivel";
-        atualizarStatusHero();
-        $("construcaoEnderecoInput").value = construcao?.endereco || "";
-        $("construcaoValorInput").value = construcao?.valor_aluguel ?? "";
+        $("construcaoValorInput").value = construcao?.valor_aluguel != null ? formatMoney(construcao.valor_aluguel) : "";
+        $("construcaoValorVendaInput").value = construcao?.valor_venda != null ? formatMoney(construcao.valor_venda) : "";
+        $("construcaoCodigoInput").value = construcao?.codigo || "";
+        $("construcaoEdificioInput").value = construcao?.edificio || "";
+        $("condominioTipoInput").value = construcao?.condominio_tipo || "";
+        $("condominioValorInput").value = construcao?.valor_condominio != null ? formatMoney(construcao.valor_condominio) : "";
+        $("iptuTipoInput").value = construcao?.iptu_tipo || "";
+        $("iptuValorInput").value = construcao?.valor_iptu != null ? formatMoney(construcao.valor_iptu) : "";
+        $("areaInput").value = construcao?.area_m2 ?? "";
+        $("quartosInput").value = construcao?.quartos ?? "";
+        $("suitesInput").value = construcao?.suites ?? "";
+        $("banheirosInput").value = construcao?.banheiros ?? "";
+        $("vagasInput").value = construcao?.vagas ?? "";
+        $("cepInput").value = construcao?.cep || "";
+        $("logradouroInput").value = construcao?.logradouro || "";
+        $("numeroInput").value = construcao?.numero || "";
+        $("complementoInput").value = construcao?.complemento || "";
+        $("bairroInput").value = construcao?.bairro || "";
+        $("cidadeInput").value = construcao?.cidade || "";
+        $("ufInput").value = construcao?.uf || "";
         $("construcaoDescricaoInput").value = construcao?.descricao || "";
+        $("destaqueInput").checked = !!construcao?.destaque;
+        $("publicarSiteInput").checked = !!construcao?.publicar_site;
         $("construcaoLatInput").value = construcao?.latitude ?? "";
         $("construcaoLngInput").value = construcao?.longitude ?? "";
         $("construcaoLinkMapaInput").value = "";
         $("construcaoLinkMapaMensagem").hidden = true;
+        atualizarListaBairros();
+        atualizarCamposFinalidade();
+        $("construcaoStatusInput").value = construcao?.status || "disponivel";
+        atualizarStatusHero();
+        atualizarCamposCusto();
         atualizarBotoesMapa();
-        const podeGerenciar = [ "administrador", "central_vendas" ].includes(currentUser.papel);
-        $("deleteConstrucaoButton").hidden = !construcao || !podeGerenciar;
-        $("saveConstrucaoButton").hidden = !podeGerenciar;
-        $("registrarInteresseButton").hidden = podeGerenciar || !construcao;
-        document.querySelector(".foto-add-button").hidden = !podeGerenciar;
-        $("construcaoDialog").querySelectorAll("input, select, textarea").forEach(field => field.disabled = !podeGerenciar);
+
+        // O que aparece em cada modo
+        $("formEdicao").hidden = leitura;
+        $("fichaLeitura").hidden = !leitura;
+        if (leitura) renderFichaLeitura(construcao);
+        $("construcaoStatusInput").disabled = modoDialogo !== "central";
+        $("codigoLabel").hidden = modoDialogo !== "central";
+        $("opcoesCentralRow").hidden = modoDialogo !== "central";
+        $("construcaoLinkMapaInput").closest("label").hidden = leitura;
+        document.querySelector(".foto-add-button").hidden = leitura;
+        $("construcaoFotosInput").disabled = leitura;
+        renderAprovacaoBanner(construcao);
+        renderAutoria(construcao);
+
+        const pendente = construcao?.aprovacao === "pendente";
+        $("deleteConstrucaoButton").hidden = !construcao || leitura;
+        $("deleteConstrucaoButton").textContent = gerencia ? "Excluir" : "Excluir cadastro";
+        $("recusarCadastroButton").hidden = !(gerencia && pendente);
+        $("aprovarCadastroButton").hidden = !(gerencia && pendente);
+        $("saveConstrucaoButton").hidden = leitura;
+        $("saveConstrucaoButton").textContent = gerencia ? (pendente ? "Salvar correções" : "Salvar imóvel") : "Salvar rascunho";
+        $("saveConstrucaoButton").className = gerencia && !pendente ? "primary-button" : "secondary-button";
+        $("enviarCadastroButton").hidden = modoDialogo !== "corretor";
+        $("enviarCadastroButton").textContent = construcao?.aprovacao === "pendente" ? "Salvar e manter na fila" : "Enviar para aprovação";
+        $("registrarInteresseButton").hidden = !leitura;
+
         renderGaleria();
         $("construcaoDialog").showModal();
         setTimeout(() => {
@@ -564,7 +1045,129 @@
                 if (pickerMarker) { pickerMap.removeLayer(pickerMarker); pickerMarker = null; }
                 pickerMap.setView(CENTRO_PADRAO, 4);
             }
+            if (pickerMarker) pickerMarker.dragging[leitura ? "disable" : "enable"]();
         }, 60);
+    }
+
+    function atualizarCamposFinalidade() {
+        let aluguel = $("finalidadeAluguelInput").checked;
+        const venda = $("finalidadeVendaInput").checked;
+        if (!aluguel && !venda) { $("finalidadeAluguelInput").checked = true; aluguel = true; }
+        $("valorAluguelLabel").hidden = !aluguel;
+        $("valorVendaLabel").hidden = !venda;
+        const select = $("construcaoStatusInput");
+        const atual = select.value;
+        const lista = Object.keys(STATUS).filter(s => (aluguel && STATUS_ALUGUEL.includes(s)) || (venda && STATUS_VENDA.includes(s)));
+        select.innerHTML = lista.map(s => `<option value="${s}">${h(STATUS[s])}</option>`).join("");
+        select.value = lista.includes(atual) ? atual : "disponivel";
+        atualizarStatusHero();
+    }
+
+    function atualizarCamposCusto() {
+        $("condominioValorInput").hidden = $("condominioTipoInput").value !== "valor";
+        $("iptuValorInput").hidden = $("iptuTipoInput").value !== "valor";
+    }
+
+    function renderAprovacaoBanner(c) {
+        const banner = $("aprovacaoBanner");
+        if (!c || (c.aprovacao || "aprovado") === "aprovado") { banner.hidden = true; return; }
+        const textos = {
+            rascunho: "Rascunho: ainda não foi enviado para a Central.",
+            pendente: `Aguardando aprovação da Central${c.enviado_em ? " (enviado em " + formatDate(c.enviado_em) + ")" : ""}.`,
+            recusado: `Recusado pela Central: ${String(c.aprovacao_motivo || "sem motivo informado").replace(/[.\s]+$/, "")}. Corrija e envie de novo.`
+        };
+        banner.className = `aprovacao-banner ${c.aprovacao}`;
+        banner.textContent = textos[c.aprovacao] || "";
+        banner.hidden = false;
+    }
+
+    function renderAutoria(c) {
+        const box = $("autoriaInfo");
+        if (!podeGerenciar() || !c || !c.cadastrado_por) { box.hidden = true; return; }
+        let texto = `Cadastrado por ${nomeDoUsuario(c.cadastrado_por)}${c.cadastrado_em ? " em " + formatDate(c.cadastrado_em) : ""}`;
+        if (c.aprovado_por && c.aprovado_por !== c.cadastrado_por) texto += ` · aprovado por ${nomeDoUsuario(c.aprovado_por)}${c.aprovado_em ? " em " + formatDate(c.aprovado_em) : ""}`;
+        box.textContent = texto;
+        box.hidden = false;
+    }
+
+    // Ficha só-leitura (corretor vendo imóvel aprovado), com as características em blocos como no app de prédios.
+    function renderFichaLeitura(c) {
+        const precos = [];
+        if (c.para_venda) precos.push(`<div class="preco-bloco"><span>Venda</span><strong>${h(formatMoney(c.valor_venda))}</strong></div>`);
+        if (c.para_aluguel !== false) precos.push(`<div class="preco-bloco"><span>Aluguel</span><strong>${h(formatMoney(c.valor_aluguel))}</strong><small>por mês</small></div>`);
+        $("fichaPrecos").innerHTML = precos.join("");
+        const custo = (tipo, valor, periodo) => tipo === "valor" ? `${precoCurto(valor)}${periodo}` : tipo === "incluso" ? "Incluso no valor" : tipo === "nao_tem" ? "Não tem" : "Não informado";
+        const plural = (n, um, varios) => `${n ?? "—"} ${n === 1 ? um : varios}`;
+        const specs = [
+            [ "📐", Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString("pt-BR")} m²` : "— m²", "Área" ],
+            [ "🛏️", plural(c.quartos, "quarto", "quartos") + (Number(c.suites) > 0 ? ` (${plural(c.suites, "suíte", "suítes")})` : ""), c.tipo_imovel || null ],
+            [ "🚿", plural(c.banheiros, "banheiro", "banheiros"), null ],
+            [ "🚗", plural(c.vagas, "vaga", "vagas"), "de garagem" ],
+            [ "🏢", custo(c.condominio_tipo, c.valor_condominio, "/mês"), "Condomínio" ],
+            [ "🧾", custo(c.iptu_tipo, c.valor_iptu, "/ano"), "IPTU" ]
+        ];
+        $("fichaSpecs").innerHTML = specs.map(([ icone, titulo, sub ]) => `<div class="unit-spec-item"><span class="unit-spec-icon">${icone}</span><div><strong>${h(titulo)}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div></div>`).join("");
+        const endereco = enderecoTexto(c);
+        $("fichaEndereco").textContent = [ c.edificio, endereco ].filter(Boolean).join(" · ") || "Endereço não informado";
+        $("fichaDescricao").textContent = c.descricao || "";
+        $("fichaDescricao").hidden = !c.descricao;
+    }
+
+    function coletarDadosFormulario() {
+        const aluguel = $("finalidadeAluguelInput").checked;
+        const venda = $("finalidadeVendaInput").checked;
+        const condominioTipo = $("condominioTipoInput").value;
+        const iptuTipo = $("iptuTipoInput").value;
+        return {
+            nome: $("construcaoNomeInput").value.trim(),
+            tipo_imovel: $("construcaoTipoInput").value,
+            status: $("construcaoStatusInput").value || "disponivel",
+            para_aluguel: aluguel,
+            para_venda: venda,
+            valor_aluguel: aluguel ? parseValor($("construcaoValorInput").value) : null,
+            valor_venda: venda ? parseValor($("construcaoValorVendaInput").value) : null,
+            codigo: $("construcaoCodigoInput").value.trim() || null,
+            edificio: $("construcaoEdificioInput").value.trim() || null,
+            condominio_tipo: condominioTipo || null,
+            valor_condominio: condominioTipo === "valor" ? parseValor($("condominioValorInput").value) : null,
+            iptu_tipo: iptuTipo || null,
+            valor_iptu: iptuTipo === "valor" ? parseValor($("iptuValorInput").value) : null,
+            area_m2: numeroOuNulo($("areaInput").value),
+            quartos: numeroOuNulo($("quartosInput").value),
+            suites: numeroOuNulo($("suitesInput").value),
+            banheiros: numeroOuNulo($("banheirosInput").value),
+            vagas: numeroOuNulo($("vagasInput").value),
+            cep: $("cepInput").value.trim() || null,
+            logradouro: $("logradouroInput").value.trim() || null,
+            numero: $("numeroInput").value.trim() || null,
+            complemento: $("complementoInput").value.trim() || null,
+            bairro: $("bairroInput").value.trim() || null,
+            cidade: $("cidadeInput").value.trim() || null,
+            uf: $("ufInput").value.trim().toUpperCase() || null,
+            descricao: $("construcaoDescricaoInput").value.trim() || null,
+            latitude: $("construcaoLatInput").value === "" ? null : parseFloat($("construcaoLatInput").value),
+            longitude: $("construcaoLngInput").value === "" ? null : parseFloat($("construcaoLngInput").value),
+            destaque: $("destaqueInput").checked,
+            publicar_site: $("publicarSiteInput").checked
+        };
+    }
+
+    // Medidor de estrelas: Central sempre; corretor só enquanto edita o próprio cadastro.
+    function atualizarQualidade() {
+        const box = $("qualidadeBox");
+        const mostrar = modoDialogo === "central" || modoDialogo === "corretor";
+        box.hidden = !mostrar;
+        if (!mostrar) return;
+        const q = qualidadeImovel(coletarDadosFormulario(), obterItensFotos().length);
+        $("qualidadeEstrelas").textContent = estrelasTexto(q.estrelas);
+        $("qualidadePct").textContent = `${q.pct}%`;
+        $("qualidadeBarra").style.width = `${q.pct}%`;
+        let falta = q.faltando.length ? "Para completar: " + q.faltando.join(", ") + "." : "Cadastro completo.";
+        if (modoDialogo === "corretor" && notaMinimaCadastro) {
+            const ok = q.estrelas >= notaMinimaCadastro;
+            falta += ` A imobiliária exige no mínimo ${notaMinimaCadastro} estrela(s) para enviar${ok ? " (atingido)." : "."}`;
+        }
+        $("qualidadeFalta").textContent = falta;
     }
 
     function ensurePickerMap() {
@@ -575,6 +1178,7 @@
         }).addTo(pickerMap);
         pickerMap.setView(CENTRO_PADRAO, 4);
         pickerMap.on("click", event => {
+            if (modoDialogo === "leitura") return;
             posicionarPickerMarker(event.latlng.lat, event.latlng.lng);
             $("construcaoLatInput").value = event.latlng.lat.toFixed(6);
             $("construcaoLngInput").value = event.latlng.lng.toFixed(6);
@@ -605,6 +1209,7 @@
     function atualizarBotoesMapa() {
         const lat = parseFloat($("construcaoLatInput").value);
         const lng = parseFloat($("construcaoLngInput").value);
+        atualizarQualidade();
         const google = $("googleMapsButton");
         const apple = $("appleMapsButton");
         if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -671,9 +1276,9 @@
 
     function renderGaleria() {
         const itens = obterItensFotos();
-        const podeGerenciar = [ "administrador", "central_vendas" ].includes(currentUser.papel);
+        const podeEditar = modoDialogo !== "leitura";
         const grid = $("construcaoFotosGrid");
-        grid.innerHTML = itens.map((item, i) => `<div class="foto-thumb" data-foto-index="${i}">${podeGerenciar ? `<button class="foto-remove-button" type="button" data-remove-foto="${i}">×</button>` : ""}</div>`).join("");
+        grid.innerHTML = itens.map((item, i) => `<div class="foto-thumb" data-foto-index="${i}">${podeEditar ? `<button class="foto-remove-button" type="button" data-remove-foto="${i}">×</button>` : ""}</div>`).join("");
         itens.forEach((item, i) => {
             const el = grid.children[i];
             if (!el) return;
@@ -686,8 +1291,9 @@
                 const idx = Number(button.dataset.removeFoto);
                 const item = itens[idx];
                 if (item.tipo === "existente") {
+                    // remove só esta posição (a mesma foto pode aparecer repetida na galeria)
                     fotosRemovidas.push(item.path);
-                    fotosExistentes = fotosExistentes.filter(f => f.path !== item.path);
+                    fotosExistentes.splice(idx, 1);
                 } else {
                     fotosNovas.splice(item.index, 1);
                 }
@@ -696,6 +1302,7 @@
             });
         });
         mostrarHero(heroIndex);
+        atualizarQualidade();
     }
 
     async function mostrarHero(index) {
@@ -792,61 +1399,82 @@
         return enviados;
     }
 
+    // Só apaga o arquivo quando nenhuma foto que fica (deste ou de outro imóvel) usa o mesmo arquivo.
     async function removerFotosMarcadas() {
         if (!fotosRemovidas.length) return;
-        await sb.storage.from(FOTOS_BUCKET).remove(fotosRemovidas);
+        const emUso = new Set(fotosExistentes.map(f => f.path));
+        construcoes.forEach(c => { if (c.id !== editandoId) (c.fotos || []).forEach(f => emUso.add(f.path)); });
+        const apagar = [ ...new Set(fotosRemovidas) ].filter(p => !emUso.has(p));
+        if (apagar.length) await sb.storage.from(FOTOS_BUCKET).remove(apagar);
     }
 
-    async function saveConstrucao() {
-        const nome = $("construcaoNomeInput").value.trim();
-        if (!nome) { showMessage($("construcaoDialogMessage"), "Informe o nome do imóvel."); return; }
-        const payload = {
-            p_nome: nome,
-            p_tipo_imovel: $("construcaoTipoInput").value,
-            p_descricao: $("construcaoDescricaoInput").value.trim() || null,
-            p_endereco: $("construcaoEnderecoInput").value.trim() || null,
-            p_latitude: $("construcaoLatInput").value === "" ? null : parseFloat($("construcaoLatInput").value),
-            p_longitude: $("construcaoLngInput").value === "" ? null : parseFloat($("construcaoLngInput").value),
-            p_valor_aluguel: $("construcaoValorInput").value === "" ? null : parseFloat($("construcaoValorInput").value.replace(/[^\d.,]/g, "").replace(",", ".")),
-            p_status: $("construcaoStatusInput").value
-        };
-        $("saveConstrucaoButton").disabled = true;
+    // Salva pelo RPC salvar_imovel (o banco decide o que cada papel pode gravar). Depois, se pedido,
+    // envia para aprovação (corretor) ou aprova e publica (Central).
+    async function salvarImovel({ enviar = false, aprovar = false } = {}) {
+        const dados = coletarDadosFormulario();
+        const mensagem = $("construcaoDialogMessage");
+        if (!dados.nome) { showMessage(mensagem, "Informe o nome do anúncio."); return; }
+        if (dados.para_aluguel && $("construcaoValorInput").value.trim() && dados.valor_aluguel == null) { showMessage(mensagem, "Valor do aluguel inválido."); return; }
+        if (dados.para_venda && $("construcaoValorVendaInput").value.trim() && dados.valor_venda == null) { showMessage(mensagem, "Valor de venda inválido."); return; }
+        const botoes = [ "saveConstrucaoButton", "enviarCadastroButton", "aprovarCadastroButton" ].map($);
+        botoes.forEach(b => { b.disabled = true; });
+        let salvo = false;
         try {
-            let construcao;
+            let imovel;
             if (editandoId) {
                 const atual = construcoes.get(editandoId);
                 await removerFotosMarcadas();
                 const novasEnviadas = await uploadFotosNovas(editandoId);
-                const fotosFinal = [ ...fotosExistentes, ...novasEnviadas ];
-                const { data, error } = await sb.rpc("atualizar_construcao", {
-                    p_id: editandoId, p_expected_version: atual.version, ...payload, p_fotos: fotosFinal
+                dados.fotos = [ ...fotosExistentes, ...novasEnviadas ];
+                const { data, error } = await sb.rpc("salvar_imovel", {
+                    p_carteira_id: carteiraId, p_dados: dados, p_id: editandoId, p_expected_version: atual?.version ?? null
                 });
                 if (error) throw error;
-                construcao = data;
+                imovel = data;
             } else {
-                const { data: criada, error: erroCriar } = await sb.rpc("criar_construcao", { p_carteira_id: carteiraId, ...payload });
+                const { data: criado, error: erroCriar } = await sb.rpc("salvar_imovel", { p_carteira_id: carteiraId, p_dados: dados });
                 if (erroCriar) throw erroCriar;
-                const novasEnviadas = await uploadFotosNovas(criada.id);
+                imovel = criado;
+                editandoId = criado.id;
+                construcoes.set(criado.id, criado);
+                const novasEnviadas = await uploadFotosNovas(criado.id);
                 if (novasEnviadas.length) {
-                    const { data: atualizada, error: erroFotos } = await sb.rpc("atualizar_construcao", {
-                        p_id: criada.id, p_expected_version: criada.version, p_fotos: novasEnviadas
+                    dados.fotos = novasEnviadas;
+                    const { data: comFotos, error: erroFotos } = await sb.rpc("salvar_imovel", {
+                        p_carteira_id: carteiraId, p_dados: dados, p_id: criado.id, p_expected_version: criado.version
                     });
                     if (erroFotos) throw erroFotos;
-                    construcao = atualizada;
-                } else {
-                    construcao = criada;
+                    imovel = comFotos;
                 }
             }
-            construcoes.set(construcao.id, construcao);
-            updateMetrics();
-            renderConstrucoes();
-            renderDashboardRecentes();
+            construcoes.set(imovel.id, imovel);
+            fotosExistentes = [ ...(imovel.fotos || []) ];
+            fotosNovas = [];
+            fotosRemovidas = [];
+            salvo = true;
+            if (enviar && imovel.aprovacao !== "pendente") {
+                const { data, error } = await sb.rpc("enviar_cadastro_imovel", { p_id: imovel.id });
+                if (error) throw error;
+                imovel = data;
+                construcoes.set(imovel.id, imovel);
+            }
+            if (aprovar) {
+                const { data, error } = await sb.rpc("revisar_cadastro_imovel", { p_id: imovel.id, p_aprovar: true });
+                if (error) throw error;
+                imovel = data;
+                construcoes.set(imovel.id, imovel);
+            }
+            atualizarTudo();
             $("construcaoDialog").close();
-            toast("Imóvel salvo com sucesso.");
+            if (aprovar) toast("Cadastro aprovado. O imóvel já aparece para todos.");
+            else if (enviar) toast("Cadastro enviado. A Central vai revisar.");
+            else toast(podeGerenciar() ? "Imóvel salvo com sucesso." : "Rascunho salvo. Envie para aprovação quando estiver pronto.");
         } catch (error) {
-            showMessage($("construcaoDialogMessage"), traduzErro(error.message));
+            if (salvo) atualizarTudo();
+            const texto = traduzErro(error.message);
+            showMessage(mensagem, salvo && enviar ? `O cadastro foi salvo, mas não pôde ser enviado: ${texto}` : texto);
         } finally {
-            $("saveConstrucaoButton").disabled = false;
+            botoes.forEach(b => { b.disabled = false; });
         }
     }
 
@@ -860,14 +1488,16 @@
     async function confirmDeleteConstrucao() {
         try {
             const construcao = construcoes.get(editandoId);
-            const paths = (construcao?.fotos || []).map(f => f.path);
+            // Fotos antes do cadastro: a permissão de apagar foto do corretor depende do cadastro ainda existir.
+            // Arquivos usados por outro imóvel ficam (a mesma foto pode estar em mais de um anúncio).
+            const emUso = new Set();
+            construcoes.forEach(c => { if (c.id !== editandoId) (c.fotos || []).forEach(f => emUso.add(f.path)); });
+            const paths = [ ...new Set((construcao?.fotos || []).map(f => f.path)) ].filter(p => !emUso.has(p));
+            if (paths.length) await sb.storage.from(FOTOS_BUCKET).remove(paths);
             const { error } = await sb.rpc("excluir_construcao", { p_id: editandoId });
             if (error) throw error;
-            if (paths.length) await sb.storage.from(FOTOS_BUCKET).remove(paths);
             construcoes.delete(editandoId);
-            updateMetrics();
-            renderConstrucoes();
-            renderDashboardRecentes();
+            atualizarTudo();
             $("deleteConstrucaoDialog").close();
             $("construcaoDialog").close();
             toast("Imóvel excluído.");
@@ -882,6 +1512,10 @@
         if (!construcao) return;
         interesseConstrucaoId = construcao.id;
         $("interesseImovelNome").textContent = construcao.nome;
+        const tipo = $("interesseTipoInput");
+        tipo.querySelector('[value="aluguel"]').disabled = construcao.para_aluguel === false;
+        tipo.querySelector('[value="compra"]').disabled = !construcao.para_venda;
+        tipo.value = construcao.para_aluguel === false ? "compra" : "aluguel";
         $("interesseDialogMessage").hidden = true;
         $("interesseNomeInput").value = "";
         $("interesseTelefoneInput").value = "";
@@ -907,7 +1541,8 @@
                 p_cliente_email: $("interesseEmailInput").value.trim() || null,
                 p_cliente_endereco: $("interesseEnderecoInput").value.trim() || null,
                 p_observacao: $("interesseObservacaoInput").value.trim() || null,
-                p_consentimento_lgpd: $("interesseConsentInput").checked
+                p_consentimento_lgpd: $("interesseConsentInput").checked,
+                p_tipo: $("interesseTipoInput").value
             });
             if (error) throw error;
             $("interesseDialog").close();
@@ -940,6 +1575,7 @@
             const opcoes = Object.entries(INTERESSE_STATUS).map(([valor, rotulo]) => `<option value="${valor}" ${i.status === valor ? "selected" : ""}>${rotulo}</option>`).join("");
             return `<tr>
         <td>${h(construcao?.nome || "—")}</td>
+        <td>${i.tipo === "compra" ? "Comprar" : "Alugar"}</td>
         <td>${h(i.cliente_nome)}</td>
         <td>${h(i.cliente_telefone || "—")}</td>
         <td>${h(i.cliente_cpf || "—")}</td>

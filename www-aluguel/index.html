@@ -22,7 +22,7 @@
     <form id="loginForm" class="login-card">
       <span class="eyebrow">SKL ALUGUÉIS</span>
       <h1>Acesso ao sistema</h1>
-      <p>Entre com sua conta autorizada para administrar as construções.</p>
+      <p>Entre com sua conta autorizada para administrar os imóveis.</p>
       <label><span>E-mail</span><input id="emailInput" type="email" autocomplete="username" required /></label>
       <label><span>Senha</span><input id="passwordInput" type="password" autocomplete="current-password" required /></label>
       <button class="primary-button" type="submit">Entrar</button>
@@ -46,6 +46,7 @@
       <nav id="mainNav">
         <button class="nav-button active" data-page="dashboard"><span>◫</span> Visão geral</button>
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
+        <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
         <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Corretores</button>
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
@@ -66,9 +67,11 @@
       <section id="page-dashboard" class="page active-page">
         <div class="metric-grid">
           <button class="metric-card status-disponivel" data-status="disponivel"><span>Disponíveis</span><strong id="metricDisponivel">0</strong></button>
-          <button class="metric-card status-alugado" data-status="alugado"><span>Alugados</span><strong id="metricAlugado">0</strong></button>
-          <button class="metric-card status-reservado" data-status="reservado"><span>Reservados</span><strong id="metricReservado">0</strong></button>
-          <button class="metric-card status-indisponivel" data-status="indisponivel"><span>Indisponíveis</span><strong id="metricIndisponivel">0</strong></button>
+          <button class="metric-card status-reservado" data-status="reservado"><span>Reservados (aluguel)</span><strong id="metricReservado">0</strong></button>
+          <button class="metric-card status-em_negociacao" data-status="em_negociacao"><span>Em negociação (venda)</span><strong id="metricEmNegociacao">0</strong></button>
+          <button class="metric-card status-alugado" data-status="alugado" data-so-central><span>Alugados</span><strong id="metricAlugado">0</strong></button>
+          <button class="metric-card status-vendido" data-status="vendido" data-so-central><span>Vendidos</span><strong id="metricVendido">0</strong></button>
+          <button class="metric-card status-indisponivel" data-status="indisponivel" data-so-central><span>Indisponíveis</span><strong id="metricIndisponivel">0</strong></button>
         </div>
         <div class="dashboard-grid">
           <article class="panel"><div class="panel-heading"><div><span class="eyebrow">CARTEIRA</span><h2 id="dashboardCarteiraNome">—</h2></div><button class="text-button" data-go="construcoes">Ver imóveis</button></div><div id="dashboardRecentes" class="compact-list"></div></article>
@@ -76,27 +79,64 @@
       </section>
 
       <section id="page-construcoes" class="page">
-        <div class="toolbar">
-          <input id="construcaoSearchInput" type="search" placeholder="Pesquisar por nome ou endereço" />
-          <select id="construcaoStatusFilter">
-            <option value="">Todas as situações</option>
-            <option value="disponivel">Disponível</option>
-            <option value="alugado">Alugado</option>
-            <option value="reservado">Reservado</option>
-            <option value="indisponivel">Indisponível</option>
-          </select>
-          <button id="toggleConstrucaoViewButton" class="secondary-button">Alternar mapa/lista</button>
-          <button id="newConstrucaoButton" class="primary-button">Novo imóvel</button>
+        <div class="busca-painel">
+          <div class="busca-linha">
+            <div id="finalidadeFiltro" class="segmentado" role="group" aria-label="Finalidade">
+              <button type="button" data-finalidade="aluguel">Aluguel</button>
+              <button type="button" data-finalidade="venda">Venda</button>
+              <button type="button" data-finalidade="todos" class="ativo">Todos</button>
+            </div>
+            <input id="construcaoSearchInput" type="search" placeholder="Nome, código, endereço ou edifício" />
+            <select id="construcaoStatusFilter"></select>
+          </div>
+          <div class="busca-linha">
+            <div class="bairro-filtro">
+              <input id="bairroFiltroInput" list="bairrosLista" placeholder="Bairro (até 3)" autocomplete="off" />
+              <div id="bairroChips" class="bairro-chips"></div>
+            </div>
+            <div id="faixaValorBox" class="faixa-valor" hidden>
+              <div class="faixa-valor-topo"><span id="faixaValorRotulo">Valor</span><strong id="faixaValorTexto">—</strong></div>
+              <div class="faixa-valor-trilho">
+                <div id="faixaValorPreenchido" class="faixa-valor-preenchido"></div>
+                <input id="valorMinRange" type="range" aria-label="Valor mínimo" />
+                <input id="valorMaxRange" type="range" aria-label="Valor máximo" />
+              </div>
+            </div>
+            <p id="faixaValorDica" class="muted-text faixa-dica">Escolha Aluguel ou Venda para filtrar por faixa de valor.</p>
+          </div>
+          <div class="busca-linha busca-acoes">
+            <span id="buscaResultado" class="muted-text">—</span>
+            <button id="limparFiltrosButton" type="button" class="text-button">Limpar filtros</button>
+            <button id="toggleConstrucaoViewButton" class="secondary-button">Alternar mapa/lista</button>
+            <button id="newConstrucaoButton" class="primary-button">Novo imóvel</button>
+          </div>
         </div>
-        <div id="construcaoMapPanel" class="map-panel" hidden><div id="construcaoMap"></div><div class="map-legend"><span class="dot disponivel"></span>Disponível <span class="dot alugado"></span>Alugado <span class="dot reservado"></span>Reservado <span class="dot indisponivel"></span>Indisponível</div></div>
+        <datalist id="bairrosLista"></datalist>
+        <div id="construcaoMapPanel" class="map-panel" hidden><div id="construcaoMap"></div><div id="mapLegend" class="map-legend"></div></div>
         <div id="construcaoGrid" class="construcao-grid"></div>
-        <div id="construcaoGridEmpty" class="empty-state" hidden>Nenhum imóvel cadastrado ainda.</div>
+        <div id="construcaoGridEmpty" class="empty-state" hidden>Nenhum imóvel encontrado com esses filtros.</div>
+      </section>
+
+      <section id="page-cadastros" class="page">
+        <div class="page-actions">
+          <p id="cadastrosIntro">—</p>
+          <div class="cadastros-acoes">
+            <select id="cadastrosFiltro" hidden>
+              <option value="pendente">Aguardando aprovação</option>
+              <option value="recusado">Recusados</option>
+              <option value="aprovado">Aprovados (enviados por corretores)</option>
+            </select>
+            <button id="novoCadastroButton" type="button" class="primary-button" hidden>Cadastrar imóvel</button>
+          </div>
+        </div>
+        <div id="cadastrosLista" class="cadastros-lista"></div>
+        <div id="cadastrosVazio" class="empty-state" hidden>—</div>
       </section>
 
       <section id="page-interesses" class="page">
-        <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel registrados pelos corretores, com a ficha de contato do cliente.</p>
+        <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel e de compra registrados pelos corretores, com a ficha de contato do cliente.</p>
         <div class="panel table-panel">
-          <table><thead><tr><th>Imóvel</th><th>Cliente</th><th>Telefone</th><th>CPF</th><th>E-mail</th><th>Observação</th><th>Data</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="interessesTableBody"></tbody></table>
+          <table><thead><tr><th>Imóvel</th><th>Tipo</th><th>Cliente</th><th>Telefone</th><th>CPF</th><th>E-mail</th><th>Observação</th><th>Data</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="interessesTableBody"></tbody></table>
           <div id="interessesTableEmpty" class="empty-state" hidden>Nenhum interesse registrado ainda.</div>
         </div>
       </section>
@@ -133,6 +173,22 @@
         <div class="settings-grid">
           <form id="passwordForm" class="panel form-panel"><span class="eyebrow">SEGURANÇA</span><h2>Alterar minha senha</h2><label><span>Nova senha</span><input id="changedPasswordInput" type="password" required minlength="6" /></label><button class="primary-button">Alterar senha</button></form>
           <div class="panel form-panel"><span class="eyebrow">CARTEIRA</span><h2 id="settingsCarteiraNome">—</h2><button id="switchCarteiraButton" type="button" class="secondary-button full-width">Trocar carteira</button></div>
+          <div id="settingsCadastroPanel" class="panel form-panel" hidden>
+            <span class="eyebrow">CADASTRO PELOS CORRETORES</span>
+            <h2>Nota mínima para envio</h2>
+            <p>Quando ativada, o corretor só consegue enviar um imóvel para aprovação se o cadastro atingir a quantidade de estrelas escolhida. Cada estrela vale 20% do cadastro completo.</p>
+            <label><span>Exigir no mínimo</span>
+              <select id="notaMinimaSelect">
+                <option value="">Desativado (sem exigência)</option>
+                <option value="1">★ 1 estrela (20%)</option>
+                <option value="2">★★ 2 estrelas (40%)</option>
+                <option value="3">★★★ 3 estrelas (60%)</option>
+                <option value="4">★★★★ 4 estrelas (80%)</option>
+                <option value="5">★★★★★ 5 estrelas (100%)</option>
+              </select>
+            </label>
+            <button id="salvarNotaMinimaButton" type="button" class="primary-button">Salvar</button>
+          </div>
           <div class="panel form-panel"><span class="eyebrow">SOBRE</span><h2>Versão instalada</h2><p id="appVersionText">—</p></div>
         </div>
       </section>
@@ -156,36 +212,99 @@
         <label class="secondary-button foto-add-button">+ Fotos<input id="construcaoFotosInput" type="file" accept="image/*" multiple hidden /></label>
       </div>
 
-      <span class="eyebrow">IMÓVEL</span>
+      <span id="construcaoDialogEyebrow" class="eyebrow">IMÓVEL</span>
       <h2 id="construcaoDialogTitle">Novo imóvel</h2>
+      <div id="aprovacaoBanner" class="aprovacao-banner" hidden></div>
+      <div id="autoriaInfo" class="autoria-info" hidden></div>
+      <div id="qualidadeBox" class="qualidade-box" hidden>
+        <div class="qualidade-topo"><span class="eyebrow">QUALIDADE DO CADASTRO</span><strong id="qualidadeEstrelas">☆☆☆☆☆</strong><span id="qualidadePct">0%</span></div>
+        <div class="qualidade-barra"><div id="qualidadeBarra"></div></div>
+        <p id="qualidadeFalta" class="muted-text"></p>
+      </div>
 
-      <label><span>Nome</span><input id="construcaoNomeInput" placeholder="ex.: Casa Rua das Flores, 120" required /></label>
-      <div class="form-row">
-        <label><span>Tipo de imóvel</span>
-          <select id="construcaoTipoInput">
-            <option value="Casa">Casa</option>
-            <option value="Apartamento">Apartamento</option>
-            <option value="Kitnet/Studio">Kitnet/Studio</option>
-            <option value="Sala comercial">Sala comercial</option>
-            <option value="Galpão">Galpão</option>
-            <option value="Terreno">Terreno</option>
-            <option value="Outro">Outro</option>
-          </select>
-        </label>
-        <label><span>Situação</span>
-          <select id="construcaoStatusInput">
-            <option value="disponivel">Disponível</option>
-            <option value="alugado">Alugado</option>
-            <option value="reservado">Reservado</option>
-            <option value="indisponivel">Indisponível</option>
-          </select>
-        </label>
+      <div id="fichaLeitura" class="ficha-leitura" hidden>
+        <div id="fichaPrecos" class="imovel-precos"></div>
+        <div id="fichaSpecs" class="unit-specs-card"></div>
+        <p id="fichaEndereco" class="ficha-endereco"></p>
+        <p id="fichaDescricao" class="ficha-descricao"></p>
       </div>
-      <div class="form-row">
-        <label><span>Endereço</span><input id="construcaoEnderecoInput" placeholder="Rua, número, bairro, cidade" /></label>
-        <label><span>Valor do aluguel</span><input id="construcaoValorInput" placeholder="R$ 0,00" /></label>
+
+      <div id="formEdicao" class="form-edicao">
+        <label><span>Nome do anúncio</span><input id="construcaoNomeInput" placeholder="ex.: Casa 3 quartos no Vila Aurora" required /></label>
+        <div class="finalidade-row">
+          <span class="campo-rotulo">Finalidade</span>
+          <label class="check-inline"><input id="finalidadeAluguelInput" type="checkbox" /> Aluguel</label>
+          <label class="check-inline"><input id="finalidadeVendaInput" type="checkbox" /> Venda</label>
+        </div>
+        <div class="form-row">
+          <label><span>Tipo de imóvel</span>
+            <select id="construcaoTipoInput">
+              <option value="Casa">Casa</option>
+              <option value="Casa de condomínio">Casa de condomínio</option>
+              <option value="Sobrado">Sobrado</option>
+              <option value="Apartamento">Apartamento</option>
+              <option value="Cobertura">Cobertura</option>
+              <option value="Kitnet/Studio">Kitnet/Studio</option>
+              <option value="Sala comercial">Sala comercial</option>
+              <option value="Ponto comercial">Ponto comercial</option>
+              <option value="Galpão">Galpão</option>
+              <option value="Terreno">Terreno</option>
+              <option value="Chácara/Sítio">Chácara/Sítio</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </label>
+          <label><span>Situação</span><select id="construcaoStatusInput"></select></label>
+        </div>
+        <div class="form-row">
+          <label id="valorAluguelLabel"><span>Valor do aluguel (por mês)</span><input id="construcaoValorInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label id="valorVendaLabel"><span>Valor de venda</span><input id="construcaoValorVendaInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
+        </div>
+        <div class="form-row">
+          <label id="codigoLabel"><span>Código do imóvel</span><input id="construcaoCodigoInput" placeholder="Gerado automaticamente" /></label>
+          <label><span>Edifício ou condomínio (se houver)</span><input id="construcaoEdificioInput" /></label>
+        </div>
+        <div class="form-row">
+          <div class="custo-campo">
+            <label><span>Condomínio</span>
+              <select id="condominioTipoInput"><option value="">Não informado</option><option value="valor">Valor mensal</option><option value="incluso">Incluso no valor</option><option value="nao_tem">Não tem</option></select>
+            </label>
+            <input id="condominioValorInput" inputmode="decimal" placeholder="R$ por mês" hidden />
+          </div>
+          <div class="custo-campo">
+            <label><span>IPTU</span>
+              <select id="iptuTipoInput"><option value="">Não informado</option><option value="valor">Valor anual</option><option value="incluso">Incluso no valor</option><option value="nao_tem">Não tem</option></select>
+            </label>
+            <input id="iptuValorInput" inputmode="decimal" placeholder="R$ por ano" hidden />
+          </div>
+        </div>
+        <div>
+          <span class="campo-rotulo">Características</span>
+          <div class="caracteristicas-grid">
+            <label><span>Área (m²)</span><input id="areaInput" type="number" min="0" step="0.01" inputmode="decimal" /></label>
+            <label><span>Quartos</span><input id="quartosInput" type="number" min="0" step="1" inputmode="numeric" /></label>
+            <label><span>Suítes</span><input id="suitesInput" type="number" min="0" step="1" inputmode="numeric" /></label>
+            <label><span>Banheiros</span><input id="banheirosInput" type="number" min="0" step="1" inputmode="numeric" /></label>
+            <label><span>Vagas</span><input id="vagasInput" type="number" min="0" step="1" inputmode="numeric" /></label>
+          </div>
+        </div>
+        <div>
+          <span class="campo-rotulo">Endereço</span>
+          <div class="endereco-grid">
+            <label class="c-3"><span>CEP</span><input id="cepInput" inputmode="numeric" placeholder="00000-000" /></label>
+            <label class="c-6 largo"><span>Rua / avenida</span><input id="logradouroInput" /></label>
+            <label class="c-3"><span>Número</span><input id="numeroInput" /></label>
+            <label class="c-3"><span>Complemento</span><input id="complementoInput" placeholder="Apto, sala, bloco" /></label>
+            <label class="c-3"><span>Bairro</span><input id="bairroInput" list="bairrosLista" autocomplete="off" /></label>
+            <label class="c-4"><span>Cidade</span><input id="cidadeInput" /></label>
+            <label class="c-2"><span>UF</span><input id="ufInput" maxlength="2" /></label>
+          </div>
+        </div>
+        <label><span>Descrição</span><textarea id="construcaoDescricaoInput" rows="4" placeholder="Detalhes do imóvel: cômodos, acabamentos, diferenciais, proximidades..."></textarea></label>
+        <div id="opcoesCentralRow" class="finalidade-row">
+          <label class="check-inline"><input id="destaqueInput" type="checkbox" /> Destaque</label>
+          <label class="check-inline"><input id="publicarSiteInput" type="checkbox" /> Publicar no site</label>
+        </div>
       </div>
-      <label><span>Descrição</span><textarea id="construcaoDescricaoInput" rows="3" placeholder="Detalhes do imóvel: cômodos, área, diferenciais..."></textarea></label>
 
       <details class="dialog-section coordenada-details">
         <summary class="eyebrow">COORDENADA E MAPA ▾</summary>
@@ -205,8 +324,11 @@
 
       <div class="dialog-actions">
         <button id="deleteConstrucaoButton" type="button" class="danger-button" hidden>Excluir</button>
-        <button id="registrarInteresseButton" type="button" class="primary-button" hidden>Registrar interesse de aluguel</button>
+        <button id="recusarCadastroButton" type="button" class="danger-button" hidden>Recusar</button>
+        <button id="registrarInteresseButton" type="button" class="primary-button" hidden>Registrar interesse</button>
         <button id="saveConstrucaoButton" type="button" class="primary-button">Salvar imóvel</button>
+        <button id="enviarCadastroButton" type="button" class="primary-button" hidden>Enviar para aprovação</button>
+        <button id="aprovarCadastroButton" type="button" class="primary-button" hidden>Aprovar e publicar</button>
       </div>
       <div id="construcaoDialogMessage" class="form-message" hidden></div>
     </form>
@@ -215,9 +337,12 @@
   <dialog id="interesseDialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
-      <span class="eyebrow">INTERESSE DE ALUGUEL</span>
+      <span class="eyebrow">INTERESSE DO CLIENTE</span>
       <h2>Registrar interesse do cliente</h2>
       <p id="interesseImovelNome" class="muted-text" style="margin:-8px 0 0">—</p>
+      <label><span>O cliente quer</span>
+        <select id="interesseTipoInput"><option value="aluguel">Alugar</option><option value="compra">Comprar</option></select>
+      </label>
       <p style="font-size:12px;color:var(--muted);margin:0">Aviso de privacidade: os dados do cliente informados abaixo são tratados conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018) e usados apenas para este atendimento.</p>
       <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input id="interesseConsentInput" type="checkbox" required style="margin-top:3px;flex:none;width:auto" /><span style="text-transform:none;font-size:12px;font-weight:500;letter-spacing:normal;color:var(--text,#1a1a1a)">Expliquei ao cliente como os dados serão usados, conforme o aviso acima.</span></label>
       <label><span>Nome do cliente</span><input id="interesseNomeInput" required /></label>
@@ -230,6 +355,18 @@
       <label><span>Observação</span><textarea id="interesseObservacaoInput" rows="3"></textarea></label>
       <button id="submitInteresseButton" type="button" class="primary-button full-width">Enviar interesse</button>
       <div id="interesseDialogMessage" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="recusarCadastroDialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">RECUSAR CADASTRO</span>
+      <h2>Por que este cadastro foi recusado?</h2>
+      <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">O corretor vê o motivo, corrige e pode enviar de novo.</p>
+      <label><span>Motivo</span><textarea id="recusarMotivoInput" rows="3" placeholder="ex.: faltam fotos da fachada e o valor do condomínio"></textarea></label>
+      <button id="confirmRecusarButton" type="button" class="danger-button">Recusar cadastro</button>
+      <div id="recusarMessage" class="form-message" hidden></div>
     </form>
   </dialog>
 

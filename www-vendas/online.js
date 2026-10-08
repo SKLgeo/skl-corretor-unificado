@@ -5,7 +5,7 @@
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
     const ORIGEM = "app_corretor";
     const SLUGS_OCULTOS_NA_BASE = [ "skl-demo" ];
-    const APP_VERSION = "3.7.0-base";
+    const APP_VERSION = "3.7.1-base";
     if ($("brokerAppVersion")) $("brokerAppVersion").textContent = APP_VERSION;
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
@@ -666,23 +666,98 @@
     function requestTypeLabel(type) {
         return type === "reserva" ? "Reserva" : "Indicação de venda";
     }
+    // Minhas solicitações: resumo por situação, filtro, prazos (resposta da Central / validade da
+    // reserva) e a observação que a Central deixou ao analisar. Só as do próprio corretor.
+    let meusPedidos = [];
+    let meusPedidosFiltro = "todas";
+    let meusPedidosTimer = null;
+    function situacaoPedido(item) {
+        const agora = Date.now();
+        if (item.status === "pendente" && item.expira_em && new Date(item.expira_em).getTime() < agora) return "expirada";
+        if (item.status === "aprovada" && item.tipo === "reserva" && item.reserva_ate) {
+            if (item.reserva_desfecho === "vencida" || (!item.reserva_encerrada_em && new Date(item.reserva_ate).getTime() < agora)) return "reserva_vencida";
+            if (!item.reserva_encerrada_em) return "reserva_ativa";
+        }
+        return item.status;
+    }
+    const SITUACAO_PEDIDO = {
+        pendente: { rotulo: "Aguardando a Central", classe: "reservado" },
+        reserva_ativa: { rotulo: "Reserva ativa", classe: "disponivel" },
+        aprovada: { rotulo: "Aprovada", classe: "disponivel" },
+        rejeitada: { rotulo: "Recusada", classe: "vendido" },
+        expirada: { rotulo: "Sem resposta a tempo", classe: "nao_informado" },
+        reserva_vencida: { rotulo: "Reserva vencida", classe: "nao_informado" }
+    };
+    function tempoRestante(iso) {
+        const ms = new Date(iso).getTime() - Date.now();
+        if (ms <= 0) return "0 min";
+        const min = Math.floor(ms / 60000), hh = Math.floor(min / 60), mm = min % 60;
+        return hh ? `${hh} h ${String(mm).padStart(2, "0")} min` : `${mm} min`;
+    }
+    function renderMyRequests() {
+        const list = $("myRequestsList");
+        const cont = { todas: meusPedidos.length, pendente: 0, aprovadas: 0, rejeitada: 0, outras: 0 };
+        meusPedidos.forEach(item => {
+            const sit = situacaoPedido(item);
+            if (sit === "pendente") cont.pendente++;
+            else if (sit === "aprovada" || sit === "reserva_ativa") cont.aprovadas++;
+            else if (sit === "rejeitada") cont.rejeitada++;
+            else cont.outras++;
+        });
+        const chips = [ [ "todas", "Todas" ], [ "pendente", "Aguardando" ], [ "aprovadas", "Aprovadas" ], [ "rejeitada", "Recusadas" ], [ "outras", "Vencidas" ] ];
+        const filtroOk = item => {
+            const sit = situacaoPedido(item);
+            if (meusPedidosFiltro === "todas") return true;
+            if (meusPedidosFiltro === "aprovadas") return sit === "aprovada" || sit === "reserva_ativa";
+            if (meusPedidosFiltro === "outras") return sit === "expirada" || sit === "reserva_vencida";
+            return sit === meusPedidosFiltro;
+        };
+        const visiveis = meusPedidos.filter(filtroOk);
+        list.replaceChildren();
+        const barra = document.createElement("div");
+        barra.className = "meus-pedidos-filtros";
+        barra.innerHTML = chips.map(([k, r]) => `<button type="button" class="meus-pedidos-chip${meusPedidosFiltro === k ? " ativo" : ""}" data-filtro="${k}">${r} <b>${cont[k]}</b></button>`).join("");
+        barra.querySelectorAll("[data-filtro]").forEach(b => b.addEventListener("click", () => { meusPedidosFiltro = b.dataset.filtro; renderMyRequests(); }));
+        list.append(barra);
+        if (!meusPedidos.length) {
+            list.insertAdjacentHTML("beforeend", '<p class="empty-state">Você ainda não enviou solicitações.</p>');
+            return;
+        }
+        if (!visiveis.length) list.insertAdjacentHTML("beforeend", '<p class="empty-state">Nenhuma solicitação nesta situação.</p>');
+        visiveis.forEach(item => {
+            const sit = situacaoPedido(item);
+            const info = SITUACAO_PEDIDO[sit] || { rotulo: requestStatusLabel(item.status), classe: "nao_informado" };
+            const card = document.createElement("article");
+            card.className = `request-record request-${item.status}`;
+            const alvo = item.lotes ? `Quadra ${escapeHtml(item.lotes.quadra)} · Lote ${escapeHtml(item.lotes.lote)}` : `Apto ${escapeHtml(item.unidades?.numero)} · ${escapeHtml(item.unidades?.andar)}º andar`;
+            let prazo = "";
+            if (sit === "pendente" && item.expira_em) prazo = `<p class="meus-pedidos-prazo">A Central tem até ${new Date(item.expira_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} para responder (faltam ${tempoRestante(item.expira_em)}).</p>`;
+            if (sit === "reserva_ativa") prazo = `<p class="meus-pedidos-prazo ok">Reserva vale até ${new Date(item.reserva_ate).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} — faltam ${tempoRestante(item.reserva_ate)} para juntar a documentação.</p>`;
+            if (sit === "expirada") prazo = '<p class="meus-pedidos-prazo">A Central não respondeu dentro do prazo. Você pode enviar um novo pedido, se o lote continuar disponível.</p>';
+            if (sit === "reserva_vencida") prazo = '<p class="meus-pedidos-prazo">O prazo da reserva acabou antes da conclusão e o lote foi liberado.</p>';
+            const obs = item.observacao_revisao ? `<p class="meus-pedidos-obs"><b>Resposta da Central:</b> ${escapeHtml(item.observacao_revisao)}</p>` : "";
+            const revisado = item.revisado_em ? ` · analisada em ${new Date(item.revisado_em).toLocaleString("pt-BR")}` : "";
+            card.innerHTML = `<div><strong>${alvo}</strong><span>${escapeHtml(requestTypeLabel(item.tipo))}</span></div><span class="status-badge status-${info.classe}">${escapeHtml(info.rotulo)}</span><p>Cliente: ${escapeHtml(item.cliente_nome)}</p>${prazo}${obs}<small>Enviada em ${new Date(item.created_at).toLocaleString("pt-BR")}${revisado}</small>`;
+            list.append(card);
+        });
+    }
     async function loadMyRequests() {
         const list = $("myRequestsList");
         list.innerHTML = '<p class="empty-state">Carregando…</p>';
         try {
-            const {data: requests, error: error} = await sb.from("solicitacoes").select("id, tipo, cliente_nome, status, created_at, lote_id, unidade_id, lotes(chave, quadra, lote), unidades(numero, andar)").eq("empreendimento_id", empreendimentoId).order("created_at", {
-                ascending: false
-            });
+            const {data: userData} = await sb.auth.getUser();
+            const uid = userData?.user?.id;
+            let consulta = sb.from("solicitacoes").select("id, tipo, cliente_nome, status, created_at, revisado_em, expira_em, reserva_ate, reserva_encerrada_em, reserva_desfecho, observacao_revisao, lote_id, unidade_id, lotes(chave, quadra, lote), unidades(numero, andar)").eq("empreendimento_id", empreendimentoId);
+            if (uid) consulta = consulta.eq("criado_por", uid);
+            const {data: requests, error: error} = await consulta.order("created_at", { ascending: false }).limit(300);
             if (error) throw error;
-            list.replaceChildren();
-            if (!requests.length) list.innerHTML = '<p class="empty-state">Você ainda não enviou solicitações.</p>';
-            requests.forEach(item => {
-                const card = document.createElement("article");
-                card.className = `request-record request-${item.status}`;
-                const alvo = item.lotes ? `Quadra ${escapeHtml(item.lotes.quadra)} · Lote ${escapeHtml(item.lotes.lote)}` : `Apto ${escapeHtml(item.unidades?.numero)} · ${escapeHtml(item.unidades?.andar)}º andar`;
-                card.innerHTML = `<div><strong>${alvo}</strong><span>${escapeHtml(requestTypeLabel(item.tipo))}</span></div><strong>${escapeHtml(requestStatusLabel(item.status))}</strong><p>Cliente: ${escapeHtml(item.cliente_nome)}</p><small>Enviada em ${new Date(item.created_at).toLocaleString("pt-BR")}</small>`;
-                list.append(card);
-            });
+            meusPedidos = requests || [];
+            renderMyRequests();
+            clearInterval(meusPedidosTimer);
+            meusPedidosTimer = setInterval(() => {
+                if (!requestsDialog.open) return clearInterval(meusPedidosTimer);
+                renderMyRequests();
+            }, 30000);
         } catch (error) {
             list.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
         }
