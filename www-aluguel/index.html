@@ -15,6 +15,7 @@
   <link rel="icon" type="image/png" href="../assets/icons/icon-192.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="avatar.css" />
 </head>
 <body>
   <section id="loginView" class="login-view">
@@ -52,7 +53,7 @@
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
         <button class="nav-button" data-page="settings"><span>⚙</span> Configurações</button>
       </nav>
-      <div class="sidebar-user"><strong id="currentUserName">Usuário</strong><span id="currentUserRole">—</span><button id="logoutButton">Sair</button></div>
+      <div class="sidebar-user"><span id="currentUserAvatar" class="sidebar-avatar"></span><strong id="currentUserName">Usuário</strong><span id="currentUserRole">—</span><button id="logoutButton">Sair</button></div>
     </aside>
 
     <main class="workspace">
@@ -171,6 +172,7 @@
 
       <section id="page-settings" class="page">
         <div class="settings-grid">
+          <div class="panel form-panel"><span class="eyebrow">PERFIL</span><h2>Minha foto</h2><div id="minhaFotoPainel"></div></div>
           <form id="passwordForm" class="panel form-panel"><span class="eyebrow">SEGURANÇA</span><h2>Alterar minha senha</h2><label><span>Nova senha</span><input id="changedPasswordInput" type="password" required minlength="6" /></label><button class="primary-button">Alterar senha</button></form>
           <div class="panel form-panel"><span class="eyebrow">CARTEIRA</span><h2 id="settingsCarteiraNome">—</h2><button id="switchCarteiraButton" type="button" class="secondary-button full-width">Trocar carteira</button></div>
           <div id="settingsCadastroPanel" class="panel form-panel" hidden>
@@ -503,6 +505,7 @@
   <div id="toast" class="toast" hidden></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
+  <script src="avatar.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

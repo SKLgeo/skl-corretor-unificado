@@ -14,6 +14,7 @@
     <link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="avatar.css" />
   </head>
   <body>
     <div class="demo-ribbon">DEMONSTRAÇÃO SKL • dados comerciais simulados</div>
@@ -323,6 +324,7 @@
         <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
         <span class="eyebrow">MINHA CONTA</span>
         <h2 id="vtAccountName">Corretor</h2>
+        <section class="admin-card"><div id="vtFotoPainel"></div></section>
         <p class="dialog-intro">As disponibilidades, reservas, vendas e valores são publicados pela Central de Vendas.</p>
 
         <section class="admin-card account-summary">
@@ -379,6 +381,7 @@
         <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
         <span class="eyebrow">MINHA CONTA</span>
         <h2 id="brokerAccountName">Corretor</h2>
+        <section class="admin-card"><div id="brokerFotoPainel"></div></section>
         <p class="dialog-intro">As disponibilidades, reservas, vendas e valores são publicados pela Central de Vendas.</p>
 
         <section class="admin-card account-summary">
@@ -495,6 +498,7 @@
     <script src="app.js"></script>
     <script src="vertical.js"></script>
     <script src="simulador.js"></script>
+    <script src="avatar.js"></script>
     <script src="online.js"></script>
       <script src="../trocar-linha.js" defer></script>
   </body>

@@ -5,7 +5,7 @@
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
     const ORIGEM = "app_corretor";
     const SLUGS_OCULTOS_NA_BASE = [ "skl-demo" ];
-    const APP_VERSION = "3.7.1-base";
+    const APP_VERSION = "3.7.2-base";
     if ($("brokerAppVersion")) $("brokerAppVersion").textContent = APP_VERSION;
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
@@ -167,6 +167,7 @@
         sb.auth.getUser().then(({data: data}) => {
             const nome = data?.user?.user_metadata?.nome_exibicao || "Corretor";
             $("brokerAccountName").textContent = nome;
+            if (window.SKLAvatar) { window.SKLAvatar.init(sb); window.SKLAvatar.painelDoUsuarioLogado($("brokerFotoPainel")); }
             if (salvarAcessoOffline(currentEmpreendimento, nome)) mostrarAvisoProntoOffline();
         });
         updateConnection(true);
@@ -188,6 +189,7 @@
         empreendimentoPicker.hidden = true;
         sb.auth.getUser().then(({data: data}) => {
             $("vtAccountName").textContent = data?.user?.user_metadata?.nome_exibicao || "Corretor";
+            if (window.SKLAvatar) { window.SKLAvatar.init(sb); window.SKLAvatar.painelDoUsuarioLogado($("vtFotoPainel")); }
         });
         $("vtAppVersion").textContent = APP_VERSION;
         $("vtConnectionText").textContent = "Conectado à Central";

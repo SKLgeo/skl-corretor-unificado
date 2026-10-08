@@ -42,7 +42,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.2.1";
+    const APP_VERSION = "0.2.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -479,6 +479,7 @@
         $("loginView").hidden = true;
         $("appView").hidden = false;
         $("currentUserName").textContent = currentUser.display_name;
+        iniciarFotoPerfil();
         $("currentUserRole").textContent = ROLE[currentUser.papel] || currentUser.papel;
         const gerencia = podeGerenciar();
         $("newConstrucaoButton").hidden = !gerencia;
@@ -902,7 +903,7 @@
             const mostrarNota = gerencia || c.aprovacao !== "aprovado";
             const preco = [ c.para_venda && c.valor_venda ? "Venda " + precoCurto(c.valor_venda) : "", c.para_aluguel !== false && c.valor_aluguel ? "Aluguel " + precoCurto(c.valor_aluguel) : "" ].filter(Boolean).join(" · ");
             const linha2 = gerencia
-                ? `Corretor: ${h(nomeDoUsuario(c.cadastrado_por))}${c.enviado_em ? " · enviado em " + h(formatDate(c.enviado_em)) : ""}`
+                ? `${fotoDoUsuario(c.cadastrado_por, 24)} Corretor: ${h(nomeDoUsuario(c.cadastrado_por))}${c.enviado_em ? " · enviado em " + h(formatDate(c.enviado_em)) : ""}`
                 : `Atualizado em ${h(formatDate(c.updated_at))}`;
             const acao = gerencia ? (c.aprovacao === "pendente" ? "Revisar" : "Abrir") : (c.aprovacao === "aprovado" ? "Ver" : "Editar");
             return `<article class="cadastro-item" data-abrir-cadastro="${h(c.id)}">
@@ -1706,12 +1707,13 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, perfis(nome_exibicao)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, perfis(nome_exibicao, foto_path)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
             id: v.usuario_id,
             display_name: v.perfis?.nome_exibicao || "—",
+            foto_path: v.perfis?.foto_path || null,
             email: v.email,
             papel: v.papel,
             active: v.ativo,
@@ -1740,15 +1742,61 @@
         return true;
     }
 
+    // Foto de perfil (avatar.js): menu lateral, Configurações > Minha foto, lista de corretores e cadastros.
+    let fotoPerfilIniciada = false;
+    async function iniciarFotoPerfil() {
+        if (!window.SKLAvatar) return;
+        if (!fotoPerfilIniciada) { window.SKLAvatar.init(sb); fotoPerfilIniciada = true; }
+        currentUser.foto_path = await window.SKLAvatar.fotoDe(currentUser.id);
+        desenharMinhaFoto();
+    }
+    function desenharMinhaFoto() {
+        if (!window.SKLAvatar || !currentUser) return;
+        $("currentUserAvatar").innerHTML = window.SKLAvatar.html(currentUser.display_name, currentUser.foto_path, 44);
+        window.SKLAvatar.painel($("minhaFotoPainel"), {
+            usuarioId: currentUser.id, nome: currentUser.display_name, path: currentUser.foto_path,
+            aoMudar: novo => {
+                currentUser.foto_path = novo;
+                $("currentUserAvatar").innerHTML = window.SKLAvatar.html(currentUser.display_name, novo, 44);
+                const eu = corretores.find(u => u.id === currentUser.id);
+                if (eu) { eu.foto_path = novo; renderCorretores(); }
+            }
+        });
+    }
+    function nomeComFoto(user) {
+        if (!window.SKLAvatar) return `<strong>${h(user.display_name)}</strong>`;
+        return `<span class="skl-avatar-nome">${window.SKLAvatar.html(user.display_name, user.foto_path, 32)}<strong>${h(user.display_name)}</strong></span>`;
+    }
+    function fotoDoUsuario(id, tamanho) {
+        if (!window.SKLAvatar || !id) return "";
+        const user = corretores.find(u => u.id === id) || (currentUser && currentUser.id === id ? currentUser : null);
+        return user ? window.SKLAvatar.html(user.display_name, user.foto_path, tamanho) : "";
+    }
+    async function trocarFotoUsuario(id) {
+        const user = corretores.find(u => u.id === id);
+        if (!user || !window.SKLAvatar) return;
+        try {
+            const novo = await window.SKLAvatar.trocar(id, user.foto_path);
+            if (!novo) return;
+            user.foto_path = novo;
+            if (id === currentUser.id) { currentUser.foto_path = novo; desenharMinhaFoto(); }
+            renderCorretores();
+            renderCadastros();
+            toast("Foto atualizada.");
+        } catch (error) {
+            toast(error.message);
+        }
+    }
     function renderCorretores() {
         $("corretorTableBody").innerHTML = corretores.map(user => {
             const percentualTexto = user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—";
             if (!canManageCorretor(user)) {
-                return `<tr><td><strong>${h(user.display_name)}</strong></td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? "Conta atual" : "—"}</td></tr>`;
+                return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button>` : "—"}</td></tr>`;
             }
             const toggleLabel = user.active ? "Desativar" : "Reativar";
-            return `<tr><td><strong>${h(user.display_name)}</strong></td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
+            return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
         }).join("");
+        $("corretorTableBody").querySelectorAll("[data-user-foto]").forEach(button => button.addEventListener("click", () => trocarFotoUsuario(button.dataset.userFoto)));
         $("corretorTableBody").querySelectorAll("[data-corretor-percentual]").forEach(button => button.addEventListener("click", () => openEditPercentual(button.dataset.corretorPercentual)));
         $("corretorTableBody").querySelectorAll("[data-corretor-reset]").forEach(button => button.addEventListener("click", () => openResetPasswordAluguel(button.dataset.corretorReset)));
         $("corretorTableBody").querySelectorAll("[data-corretor-toggle]").forEach(button => button.addEventListener("click", () => toggleCorretorStatus(button.dataset.corretorToggle, button.dataset.nextActive === "1")));
