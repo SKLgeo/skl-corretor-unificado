@@ -24,6 +24,16 @@
     // O corretor não vê imóvel que já saiu do mercado (só a Central).
     const STATUS_OCULTOS_CORRETOR = [ "alugado", "vendido", "indisponivel" ];
     const APROVACAO = { rascunho: "Rascunho", pendente: "Aguardando aprovação", aprovado: "Aprovado", recusado: "Recusado" };
+    // Características por tipo de imóvel: comercial não fala em quartos nem garagem; terreno só área.
+    // A mesma classificação está no banco (categoria_imovel), que vale na nota de qualidade.
+    const TIPOS_RESIDENCIAIS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Chácara/Sítio" ];
+    const TIPOS_COMERCIAIS = [ "Sala comercial", "Ponto comercial", "Galpão" ];
+    const CARACTERISTICAS_POR_CATEGORIA = {
+        residencial: [ "area", "quartos", "suites", "banheiros", "vagas" ],
+        comercial: [ "area", "salas", "banheiros" ],
+        terreno: [ "area" ],
+        outro: [ "area", "salas", "quartos", "banheiros", "vagas" ]
+    };
     const ROLE = {
         corretor: "Corretor",
         central_vendas: "Controle de aluguéis",
@@ -32,7 +42,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.2.0";
+    const APP_VERSION = "0.2.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -149,10 +159,13 @@
         $("finalidadeAluguelInput").addEventListener("change", atualizarCamposFinalidade);
         $("finalidadeVendaInput").addEventListener("change", atualizarCamposFinalidade);
         $("condominioTipoInput").addEventListener("change", atualizarCamposCusto);
+        $("construcaoTipoInput").addEventListener("change", atualizarCamposCaracteristicas);
         $("iptuTipoInput").addEventListener("change", atualizarCamposCusto);
         $("ufInput").addEventListener("input", () => { $("ufInput").value = $("ufInput").value.toUpperCase(); });
         $("formEdicao").addEventListener("input", atualizarQualidade);
         $("formEdicao").addEventListener("change", atualizarQualidade);
+        document.addEventListener("visibilitychange", aoVoltarParaOApp);
+        window.addEventListener("online", aoVoltarParaOApp);
         $("deleteConstrucaoButton").addEventListener("click", openDeleteDialog);
         $("confirmDeleteConstrucaoButton").addEventListener("click", confirmDeleteConstrucao);
         $("registrarInteresseButton").addEventListener("click", () => abrirInteresseDialog(construcoes.get(editandoId)));
@@ -276,6 +289,28 @@
         if (c.para_venda && c.para_aluguel !== false) return "Venda e aluguel";
         return c.para_venda ? "Venda" : "Aluguel";
     }
+    function categoriaImovel(tipo) {
+        if (TIPOS_RESIDENCIAIS.includes(tipo)) return "residencial";
+        if (TIPOS_COMERCIAIS.includes(tipo)) return "comercial";
+        return tipo === "Terreno" ? "terreno" : "outro";
+    }
+    function caracteristicasCompletas(c) {
+        const preenchido = v => v != null && v !== "";
+        if (!(Number(c.area_m2) > 0)) return false;
+        const categoria = categoriaImovel(c.tipo_imovel);
+        if (categoria === "residencial") return preenchido(c.quartos) && preenchido(c.banheiros) && preenchido(c.vagas);
+        if (categoria === "comercial") return preenchido(c.salas) && preenchido(c.banheiros);
+        if (categoria === "terreno") return true;
+        return preenchido(c.banheiros);
+    }
+    function rotuloCaracteristicas(tipo) {
+        return {
+            residencial: "características (área, quartos, banheiros e vagas)",
+            comercial: "características (área, salas e banheiros)",
+            terreno: "área do terreno",
+            outro: "características (área e banheiros)"
+        }[categoriaImovel(tipo)];
+    }
     function enderecoTexto(c) {
         const cidadeUf = [ c.cidade, c.uf ].filter(Boolean).join("-");
         const partes = [ c.logradouro, c.numero, c.complemento, c.bairro, cidadeUf ].filter(Boolean);
@@ -298,7 +333,7 @@
             [ String(c.descricao || "").trim().length >= 150, "descrição com 150 caracteres ou mais" ],
             [ fotos >= 3, "pelo menos 3 fotos" ],
             [ fotos >= 8, "8 fotos ou mais" ],
-            [ Number(c.area_m2) > 0 && c.quartos != null && c.banheiros != null && c.vagas != null, "características (área, quartos, banheiros e vagas)" ]
+            [ caracteristicasCompletas(c), rotuloCaracteristicas(c.tipo_imovel) ]
         ];
         const pct = itens.filter(([ ok ]) => ok).length * 10;
         return { pct, estrelas: Math.floor(pct / 20), faltando: itens.filter(([ ok ]) => !ok).map(([ , rotulo ]) => rotulo) };
@@ -480,6 +515,7 @@
         currentUser = null;
         construcoes.clear();
         if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+        if (conferenciaTimer) { clearInterval(conferenciaTimer); conferenciaTimer = null; }
         $("appView").hidden = true;
         $("carteiraPicker").hidden = true;
         $("loginView").hidden = false;
@@ -534,9 +570,9 @@
         }
     }
 
-    async function loadConstrucoes() {
+    async function loadConstrucoes(silencioso = false) {
         const { data, error } = await sb.from("construcoes").select("*").eq("carteira_id", carteiraId).order("updated_at", { ascending: false });
-        if (error) { toast(traduzErro(error.message)); return; }
+        if (error) { if (!silencioso) toast(traduzErro(error.message)); return; }
         construcoes.clear();
         (data || []).forEach(c => construcoes.set(c.id, c));
         atualizarTudo();
@@ -554,7 +590,24 @@
         renderCadastros();
     }
 
+    // No Android, com o app em segundo plano o WebView "adormece" o Realtime e perde avisos (cadastro enviado,
+    // aprovado, recusado — visto no tablet em 07/10/2026). Ao voltar para o app e a cada 60 s, recarrega os imóveis.
+    let conferenciaTimer = null;
+    async function sincronizarDeNovo() {
+        if (!carteiraId || !currentUser || document.visibilityState !== "visible") return;
+        const antes = new Map(construcoes);
+        await loadConstrucoes(true);
+        construcoes.forEach((c, id) => avisarMudancaDoMeuCadastro(antes.get(id), c));
+    }
+    function aoVoltarParaOApp() {
+        if (!carteiraId || !currentUser || document.visibilityState !== "visible") return;
+        sincronizarDeNovo();
+        if (podeGerenciar()) loadInteresses();
+        connectRealtime();
+    }
+
     function connectRealtime() {
+        if (!conferenciaTimer) conferenciaTimer = setInterval(sincronizarDeNovo, 60000);
         if (realtimeChannel) sb.removeChannel(realtimeChannel);
         realtimeChannel = sb.channel(`construcoes-${carteiraId}`)
             .on("postgres_changes", { event: "*", schema: "public", table: "construcoes", filter: `carteira_id=eq.${carteiraId}` }, payload => {
@@ -765,11 +818,13 @@
     }
 
     function specsResumo(c) {
+        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel(c.tipo_imovel)];
         const partes = [];
         if (Number(c.area_m2) > 0) partes.push(`📐 ${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
-        if (Number(c.quartos) > 0) partes.push(`🛏 ${c.quartos}`);
-        if (Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
-        if (Number(c.vagas) > 0) partes.push(`🚗 ${c.vagas}`);
+        if (campos.includes("salas") && Number(c.salas) > 0) partes.push(`🚪 ${c.salas} ${c.salas == 1 ? "sala" : "salas"}`);
+        if (campos.includes("quartos") && Number(c.quartos) > 0) partes.push(`🛏 ${c.quartos}`);
+        if (campos.includes("banheiros") && Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
+        if (campos.includes("vagas") && Number(c.vagas) > 0) partes.push(`🚗 ${c.vagas}`);
         return partes.join(" · ");
     }
 
@@ -982,6 +1037,7 @@
         $("iptuTipoInput").value = construcao?.iptu_tipo || "";
         $("iptuValorInput").value = construcao?.valor_iptu != null ? formatMoney(construcao.valor_iptu) : "";
         $("areaInput").value = construcao?.area_m2 ?? "";
+        $("salasInput").value = construcao?.salas ?? "";
         $("quartosInput").value = construcao?.quartos ?? "";
         $("suitesInput").value = construcao?.suites ?? "";
         $("banheirosInput").value = construcao?.banheiros ?? "";
@@ -1001,6 +1057,7 @@
         $("construcaoLinkMapaInput").value = "";
         $("construcaoLinkMapaMensagem").hidden = true;
         atualizarListaBairros();
+        atualizarCamposCaracteristicas();
         atualizarCamposFinalidade();
         $("construcaoStatusInput").value = construcao?.status || "disponivel";
         atualizarStatusHero();
@@ -1063,6 +1120,12 @@
         atualizarStatusHero();
     }
 
+    function atualizarCamposCaracteristicas() {
+        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel($("construcaoTipoInput").value)];
+        document.querySelectorAll("[data-car]").forEach(label => { label.hidden = !campos.includes(label.dataset.car); });
+        $("areaRotulo").textContent = $("construcaoTipoInput").value === "Terreno" ? "Área do terreno (m²)" : "Área (m²)";
+    }
+
     function atualizarCamposCusto() {
         $("condominioValorInput").hidden = $("condominioTipoInput").value !== "valor";
         $("iptuValorInput").hidden = $("iptuTipoInput").value !== "valor";
@@ -1098,14 +1161,19 @@
         $("fichaPrecos").innerHTML = precos.join("");
         const custo = (tipo, valor, periodo) => tipo === "valor" ? `${precoCurto(valor)}${periodo}` : tipo === "incluso" ? "Incluso no valor" : tipo === "nao_tem" ? "Não tem" : "Não informado";
         const plural = (n, um, varios) => `${n ?? "—"} ${n === 1 ? um : varios}`;
+        // blocos conforme o tipo: comercial mostra salas (sem quartos/garagem); terreno só a área
+        const categoria = categoriaImovel(c.tipo_imovel);
+        const campos = CARACTERISTICAS_POR_CATEGORIA[categoria];
+        const mostrar = campo => campos.includes(campo) && (categoria !== "outro" || c[campo] != null);
         const specs = [
-            [ "📐", Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString("pt-BR")} m²` : "— m²", "Área" ],
-            [ "🛏️", plural(c.quartos, "quarto", "quartos") + (Number(c.suites) > 0 ? ` (${plural(c.suites, "suíte", "suítes")})` : ""), c.tipo_imovel || null ],
-            [ "🚿", plural(c.banheiros, "banheiro", "banheiros"), null ],
-            [ "🚗", plural(c.vagas, "vaga", "vagas"), "de garagem" ],
+            [ "📐", Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString("pt-BR")} m²` : "— m²", categoria === "terreno" ? "Área do terreno" : "Área" ],
+            mostrar("salas") && [ "🚪", plural(c.salas, "sala", "salas"), c.tipo_imovel || null ],
+            mostrar("quartos") && [ "🛏️", plural(c.quartos, "quarto", "quartos") + (Number(c.suites) > 0 ? ` (${plural(c.suites, "suíte", "suítes")})` : ""), c.tipo_imovel || null ],
+            mostrar("banheiros") && [ "🚿", plural(c.banheiros, "banheiro", "banheiros"), null ],
+            mostrar("vagas") && [ "🚗", plural(c.vagas, "vaga", "vagas"), "de garagem" ],
             [ "🏢", custo(c.condominio_tipo, c.valor_condominio, "/mês"), "Condomínio" ],
             [ "🧾", custo(c.iptu_tipo, c.valor_iptu, "/ano"), "IPTU" ]
-        ];
+        ].filter(Boolean);
         $("fichaSpecs").innerHTML = specs.map(([ icone, titulo, sub ]) => `<div class="unit-spec-item"><span class="unit-spec-icon">${icone}</span><div><strong>${h(titulo)}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div></div>`).join("");
         const endereco = enderecoTexto(c);
         $("fichaEndereco").textContent = [ c.edificio, endereco ].filter(Boolean).join(" · ") || "Endereço não informado";
@@ -1118,6 +1186,7 @@
         const venda = $("finalidadeVendaInput").checked;
         const condominioTipo = $("condominioTipoInput").value;
         const iptuTipo = $("iptuTipoInput").value;
+        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel($("construcaoTipoInput").value)];
         return {
             nome: $("construcaoNomeInput").value.trim(),
             tipo_imovel: $("construcaoTipoInput").value,
@@ -1132,11 +1201,13 @@
             valor_condominio: condominioTipo === "valor" ? parseValor($("condominioValorInput").value) : null,
             iptu_tipo: iptuTipo || null,
             valor_iptu: iptuTipo === "valor" ? parseValor($("iptuValorInput").value) : null,
-            area_m2: numeroOuNulo($("areaInput").value),
-            quartos: numeroOuNulo($("quartosInput").value),
-            suites: numeroOuNulo($("suitesInput").value),
-            banheiros: numeroOuNulo($("banheirosInput").value),
-            vagas: numeroOuNulo($("vagasInput").value),
+            // característica que não se aplica ao tipo (ex.: quartos em sala comercial) vai vazia
+            area_m2: campos.includes("area") ? numeroOuNulo($("areaInput").value) : null,
+            salas: campos.includes("salas") ? numeroOuNulo($("salasInput").value) : null,
+            quartos: campos.includes("quartos") ? numeroOuNulo($("quartosInput").value) : null,
+            suites: campos.includes("suites") ? numeroOuNulo($("suitesInput").value) : null,
+            banheiros: campos.includes("banheiros") ? numeroOuNulo($("banheirosInput").value) : null,
+            vagas: campos.includes("vagas") ? numeroOuNulo($("vagasInput").value) : null,
             cep: $("cepInput").value.trim() || null,
             logradouro: $("logradouroInput").value.trim() || null,
             numero: $("numeroInput").value.trim() || null,

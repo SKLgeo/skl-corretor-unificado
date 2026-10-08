@@ -220,7 +220,7 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .check-inline{display:inline-flex;flex-direction:row;align-items:center;gap:8px;font-weight:700;color:var(--ink)}
 .check-inline input{width:18px;height:18px;margin:0;padding:0}
 .custo-campo{display:grid;gap:8px;align-content:start}
-.caracteristicas-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:7px}
+.caracteristicas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:7px}
 .endereco-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;margin-top:7px}
 .endereco-grid .c-2{grid-column:span 2}
 .endereco-grid .c-3{grid-column:span 3}
