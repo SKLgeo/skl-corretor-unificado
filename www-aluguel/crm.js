@@ -14,6 +14,8 @@
     ];
     const ICONE_ATIVIDADE = { ligacao: "📞", whatsapp: "💬", visita: "🏠", email: "✉️", anotacao: "📝", etapa: "➜", sistema: "•" };
     const DIA = 86400000;
+    const PADROES = { economico: "Econômico", medio: "Médio padrão", alto: "Alto padrão" };
+    const FAIXAS_PADRAO = { venda: { medio: 350000, alto: 900000 }, locacao: { medio: 2500, alto: 7000 } };
 
     let ctx = null;
     let funis = [], etapas = [], motivos = [];
@@ -30,6 +32,7 @@
     let configEtapas = [];
     let configMotivos = [];
     let prop = { modo: null, imovel: null };
+    let faixas = JSON.parse(JSON.stringify(FAIXAS_PADRAO));
 
     // ------------------------------------------------------------------ utilidades
     const h = v => ctx.h(v);
@@ -115,6 +118,20 @@
         const fimHoje = new Date(); fimHoje.setHours(23, 59, 59, 999);
         return t <= fimHoje ? "hoje" : "futura";
     }
+    // Padrão do cliente pela faixa de valor que ele procura (ou o valor da negociação), conforme as faixas da carteira.
+    function padraoDe(n) {
+        const f = funil(n.funil_id);
+        if (!f || (f.finalidade !== "venda" && f.finalidade !== "locacao")) return null;
+        const fx = faixas[f.finalidade];
+        const p = n.perfil_busca || {};
+        const v = Number(p.valor_max || n.valor || p.valor_min || 0);
+        if (!v || !fx) return null;
+        return v >= Number(fx.alto) ? "alto" : v >= Number(fx.medio) ? "medio" : "economico";
+    }
+    function seloPadrao(n) {
+        const p = padraoDe(n);
+        return p ? `<span class="crm-selo crm-selo-${p}">${PADROES[p]}</span>` : "";
+    }
     function corretorDe(id) {
         return id ? ctx.nomeDoUsuario(id) : "Sem corretor";
     }
@@ -144,12 +161,13 @@
         if (!ctx || !ctx.carteiraId()) return;
         const cid = ctx.carteiraId();
         const sb = ctx.sb;
-        const [ f, e, m, c, n ] = await Promise.all([
+        const [ f, e, m, c, n, cfg ] = await Promise.all([
             sb.from("crm_funis").select("*").eq("carteira_id", cid).eq("ativo", true).order("ordem"),
             sb.from("crm_etapas").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_motivos_perda").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_clientes").select("*").eq("carteira_id", cid).order("nome").limit(5000),
-            sb.from("crm_negociacoes").select("*").eq("carteira_id", cid).order("updated_at", { ascending: false }).limit(5000)
+            sb.from("crm_negociacoes").select("*").eq("carteira_id", cid).order("updated_at", { ascending: false }).limit(5000),
+            sb.from("carteiras_aluguel").select("faixas_padrao").eq("id", cid).maybeSingle()
         ]);
         const falha = [ f, e, m, c, n ].find(r => r.error);
         if (falha) { console.warn("CRM:", falha.error); return; }
@@ -158,7 +176,9 @@
         motivos = m.data || [];
         clientes.clear(); (c.data || []).forEach(x => clientes.set(x.id, x));
         negs.clear(); (n.data || []).forEach(x => negs.set(x.id, x));
+        if (cfg && cfg.data && cfg.data.faixas_padrao) faixas = cfg.data.faixas_padrao;
         if (!funilAtual || !funil(funilAtual)) funilAtual = funis[0] ? funis[0].id : null;
+        if (window.SKLCRMPainel) window.SKLCRMPainel.invalidar();
         renderTudo();
     }
     function agendarRecarga() {
@@ -191,6 +211,7 @@
         if (pagina === "agenda") renderAgenda();
         if (pagina === "clientes") renderClientes();
         if (pagina === "settings" && central()) renderConfig();
+        if (pagina === "indicadores" && window.SKLCRMPainel) window.SKLCRMPainel.render();
     }
     function renderTudo() {
         renderFiltrosCorretor();
@@ -199,6 +220,8 @@
         renderAgenda();
         renderClientes();
         if (central()) renderConfig();
+        const pg = document.getElementById("page-indicadores");
+        if (pg && pg.classList.contains("active-page") && window.SKLCRMPainel) window.SKLCRMPainel.render();
     }
 
     // ------------------------------------------------------------------ eventos
@@ -243,6 +266,15 @@
             if (c) $("crmNegValor").value = dinheiro(f && f.finalidade === "venda" ? c.valor_venda : c.valor_aluguel);
         });
         $("crmAtSalvar").addEventListener("click", registrarAtendimento);
+        $("crmNovoCompromisso").addEventListener("click", abrirCompromisso);
+        $("crmCompSalvar").addEventListener("click", salvarCompromisso);
+        $("crmCompTipos").innerHTML = [ [ "ligacao", "📞 Ligar" ], [ "visita", "🏠 Visita" ], [ "whatsapp", "💬 WhatsApp" ], [ "email", "✉️ E-mail" ], [ "anotacao", "📝 Outro" ] ]
+            .map(([ v, t ]) => `<button type="button" data-comp-tipo="${v}">${t}</button>`).join("");
+        $("crmCompTipos").querySelectorAll("[data-comp-tipo]").forEach(b => b.addEventListener("click", () => {
+            $("crmCompTipos").querySelectorAll("[data-comp-tipo]").forEach(x => x.classList.toggle("ativo", x === b));
+        }));
+        [ "crmPerfilBairros", "crmPerfilTipo", "crmPerfilMin", "crmPerfilMax", "crmPerfilQuartos", "crmPerfilVagas", "crmNegImovel", "crmNegCliente" ]
+            .forEach(id => { $(id).addEventListener("input", renderCompativeis); $(id).addEventListener("change", renderCompativeis); });
         $("crmMotConfirmar").addEventListener("click", confirmarMovimento);
         $("crmAddEtapa").addEventListener("click", () => {
             const abertas = configEtapas.filter(e => e.tipo === "aberta");
@@ -253,6 +285,8 @@
         $("crmConfigFunil").addEventListener("change", () => { carregarConfigEtapas(); desenharConfigEtapas(); });
         $("crmAddMotivo").addEventListener("click", () => { configMotivos.push({ id: null, nome: "", ativo: true }); desenharConfigMotivos(); });
         $("crmSalvarMotivos").addEventListener("click", salvarMotivos);
+        $("crmSalvarFaixas").addEventListener("click", salvarFaixas);
+        [ "crmFaixaVendaMedio", "crmFaixaVendaAlto", "crmFaixaLocacaoMedio", "crmFaixaLocacaoAlto" ].forEach(id => $(id).addEventListener("input", previaFaixas));
         $("exclusividadeInput").addEventListener("change", () => { $("exclusividadeAteLabel").hidden = !$("exclusividadeInput").checked; });
         $("proprietarioSelect").addEventListener("change", atualizarProprietarioSelect);
         $("crmAtTipos").innerHTML = TIPOS_ATENDIMENTO.map(([ v, i, t ]) => `<button type="button" data-at-tipo="${v}">${i} ${t}</button>`).join("");
@@ -353,7 +387,7 @@
         const perda = n.situacao === "perdida" ? `<div class="crm-card-perda">${h((motivos.find(m => m.id === n.motivo_perda_id) || {}).nome || "Perdida")}</div>` : "";
         const corretor = central() ? `<div class="crm-card-corretor">${ctx.fotoDoUsuario(n.corretor_id, 20)}<span>${h(corretorDe(n.corretor_id))}</span></div>` : "";
         return `<article class="crm-card" draggable="true" data-neg="${h(n.id)}">
-          <strong>${h(c ? c.nome : "Cliente")}</strong>
+          <strong>${h(c ? c.nome : "Cliente")}</strong>${seloPadrao(n)}
           ${n.titulo || n.construcao_id ? `<small>${h(n.titulo || imovelNome(n.construcao_id))}</small>` : ""}
           <div class="crm-card-linha"><span class="crm-valor">${h(dinheiro(n.valor))}</span><span class="crm-dias" title="Tempo nesta etapa">${et && et.tipo === "aberta" ? (dias ? dias + " d" : "hoje") : h(dataCurta(n.fechado_em))}</span></div>
           ${acao}${perda}${corretor}
@@ -472,6 +506,43 @@
             }).join("")}</section>`;
         }).join("") || `<div class="empty-state">Nenhuma negociação em aberto. Crie uma em Negociações.</div>`;
         lista.querySelectorAll("[data-abrir]").forEach(b => b.addEventListener("click", () => abrirNegociacao(b.closest("[data-neg]").dataset.neg)));
+    }
+
+    // Novo compromisso direto pela Agenda: escolhe a negociação e grava como próxima ação dela.
+    function abrirCompromisso() {
+        const abertas = [ ...negs.values() ].filter(n => n.situacao === "aberta")
+            .sort((a, b) => normal((clientes.get(a.cliente_id) || {}).nome).localeCompare(normal((clientes.get(b.cliente_id) || {}).nome)));
+        $("crmCompNeg").innerHTML = abertas.map(n => { const c = clientes.get(n.cliente_id); const et = etapa(n.etapa_id); const f = funil(n.funil_id);
+            return `<option value="${h(n.id)}">${h(c ? c.nome : "Cliente")} — ${h(f ? f.nome : "")}, ${h(et ? et.nome : "")}${n.titulo ? " · " + h(n.titulo) : ""}</option>`; }).join("");
+        $("crmCompSemNeg").hidden = abertas.length > 0;
+        $("crmCompNeg").closest("label").hidden = !abertas.length;
+        $("crmCompSalvar").disabled = !abertas.length;
+        const amanha = new Date(); amanha.setDate(amanha.getDate() + 1); amanha.setHours(9, 0, 0, 0);
+        $("crmCompEm").value = paraInputLocal(amanha.toISOString());
+        $("crmCompTexto").value = "";
+        $("crmCompTipos").querySelectorAll("[data-comp-tipo]").forEach((x, i) => x.classList.toggle("ativo", i === 0));
+        $("crmCompMsg").hidden = true;
+        $("crmCompromissoDialog").showModal();
+    }
+    async function salvarCompromisso() {
+        const negId = $("crmCompNeg").value;
+        const em = deInputLocal($("crmCompEm").value);
+        const texto = $("crmCompTexto").value.trim();
+        const tipoBtn = $("crmCompTipos").querySelector(".ativo");
+        const rotulo = tipoBtn ? tipoBtn.textContent.replace(/^\S+\s/, "") : "Compromisso";
+        if (!negId) return;
+        if (!em) { msg($("crmCompMsg"), "Escolha a data e a hora."); return; }
+        if (!texto) { msg($("crmCompMsg"), "Descreva o compromisso."); return; }
+        $("crmCompSalvar").disabled = true;
+        const { error } = await ctx.sb.rpc("crm_registrar_atividade", {
+            p_negociacao: negId, p_tipo: "anotacao", p_texto: `Compromisso agendado (${rotulo}) para ${dataHora(em)}: ${texto}`,
+            p_proxima_acao_em: em, p_proxima_acao_texto: `${rotulo}: ${texto}`
+        });
+        $("crmCompSalvar").disabled = false;
+        if (error) { msg($("crmCompMsg"), erro(error)); return; }
+        $("crmCompromissoDialog").close();
+        await carregar();
+        ctx.toast("Compromisso agendado.");
     }
 
     // ------------------------------------------------------------------ clientes
@@ -703,7 +774,7 @@
         $("crmNegFunil").innerHTML = funis.map(f => `<option value="${h(f.id)}">${h(f.nome)}</option>`).join("");
         $("crmNegFunil").value = base.funil_id || (funis[0] && funis[0].id) || "";
         $("crmNegFunil").disabled = !!n;
-        $("crmNegFunil").onchange = () => preencherSelectImoveis($("crmNegFunil").value, $("crmNegImovel").value);
+        $("crmNegFunil").onchange = () => { preencherSelectImoveis($("crmNegFunil").value, $("crmNegImovel").value); renderCompativeis(); };
         preencherSelectClientes(base.cliente_id);
         $("crmNegCliente").disabled = !!n;
         $("crmNegNovoCli").hidden = !!n;
@@ -742,6 +813,7 @@
         } else {
             $("crmNegSituacao").hidden = true;
         }
+        renderCompativeis();
         if (!$("crmNegDialog").open) $("crmNegDialog").showModal();
     }
     function desenharSituacao(n) {
@@ -779,7 +851,7 @@
         if (negAberta !== id) return;
         box.innerHTML = `<span class="eyebrow">HISTÓRICO</span>` + (error ? `<p class="muted-text">${h(erro(error))}</p>` : linhaDoTempo(data || []));
     }
-    function coletarNegociacao() {
+    function lerPerfilDoFormulario() {
         const bairros = $("crmPerfilBairros").value.split(",").map(b => b.trim()).filter(Boolean).slice(0, 10);
         const perfil = {};
         if (bairros.length) perfil.bairros = bairros;
@@ -789,6 +861,177 @@
         if (max != null) perfil.valor_max = max;
         if ($("crmPerfilQuartos").value !== "") perfil.quartos_min = Number($("crmPerfilQuartos").value);
         if ($("crmPerfilVagas").value !== "") perfil.vagas_min = Number($("crmPerfilVagas").value);
+        return perfil;
+    }
+
+    // ------------------------------------------------------------------ imóveis compatíveis
+    // Compara o que o cliente procura com um imóvel. Finalidade, aprovação e disponibilidade são obrigatórias;
+    // os demais critérios (bairros, tipo, valor, quartos, vagas) contam só se foram preenchidos no perfil.
+    function valorNaFinalidade(imovel, finalidade) {
+        const v = finalidade === "venda" ? imovel.valor_venda : imovel.valor_aluguel;
+        return v == null || v === "" ? null : Number(v);
+    }
+    function serveParaFinalidade(imovel, finalidade) {
+        if ((imovel.aprovacao || "aprovado") !== "aprovado" || imovel.status !== "disponivel") return false;
+        if (finalidade === "venda") return !!imovel.para_venda;
+        if (finalidade === "locacao") return imovel.para_aluguel !== false;
+        return true;
+    }
+    function compatibilidade(perfil, finalidade, imovel) {
+        if (!serveParaFinalidade(imovel, finalidade)) return null;
+        const criterios = [];
+        const p = perfil || {};
+        if (p.bairros && p.bairros.length) {
+            const b = normal(imovel.bairro);
+            const ok = !!b && p.bairros.some(x => { const n = normal(x); return n && (b.includes(n) || n.includes(b)); });
+            criterios.push([ ok, ok ? "" : `fica em ${imovel.bairro || "bairro não informado"}` ]);
+        }
+        if (p.tipo) {
+            const ok = normal(imovel.tipo_imovel) === normal(p.tipo);
+            criterios.push([ ok, ok ? "" : `é ${imovel.tipo_imovel || "outro tipo"}` ]);
+        }
+        const valor = valorNaFinalidade(imovel, finalidade);
+        if (p.valor_max != null || p.valor_min != null) {
+            let ok = valor != null;
+            let falta = valor == null ? "sem valor informado" : "";
+            if (ok && p.valor_max != null && valor > p.valor_max) { ok = false; falta = `${dinheiro(valor - p.valor_max)} acima do máximo`; }
+            if (ok && p.valor_min != null && valor < p.valor_min) { ok = false; falta = `abaixo do valor mínimo`; }
+            criterios.push([ ok, falta ]);
+        }
+        if (p.quartos_min != null) {
+            const ok = Number(imovel.quartos) >= p.quartos_min;
+            criterios.push([ ok, ok ? "" : `${imovel.quartos ?? 0} quarto(s)` ]);
+        }
+        if (p.vagas_min != null) {
+            const ok = Number(imovel.vagas) >= p.vagas_min;
+            criterios.push([ ok, ok ? "" : `${imovel.vagas ?? 0} vaga(s)` ]);
+        }
+        if (!criterios.length) return null;
+        const certos = criterios.filter(([ ok ]) => ok).length;
+        return { pct: Math.round(certos * 100 / criterios.length), faltas: criterios.filter(([ ok ]) => !ok).map(([ , f ]) => f), valor };
+    }
+    function perfilVazio(perfil) {
+        return !perfil || !Object.keys(perfil).length;
+    }
+    function resumoImovel(c) {
+        const partes = [];
+        if (Number(c.area_m2) > 0) partes.push(`${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
+        if (Number(c.quartos) > 0) partes.push(`${c.quartos} quarto${c.quartos == 1 ? "" : "s"}${Number(c.suites) > 0 ? ` (${c.suites} suíte${c.suites == 1 ? "" : "s"})` : ""}`);
+        if (Number(c.salas) > 0) partes.push(`${c.salas} sala${c.salas == 1 ? "" : "s"}`);
+        if (Number(c.banheiros) > 0) partes.push(`${c.banheiros} banheiro${c.banheiros == 1 ? "" : "s"}`);
+        if (Number(c.vagas) > 0) partes.push(`${c.vagas} vaga${c.vagas == 1 ? "" : "s"}`);
+        return partes.join(" · ");
+    }
+    // Texto pronto para o WhatsApp (sem link: as fotos são privadas até existir a página pública do imóvel)
+    function textoWhatsApp(cliente, imovel, finalidade) {
+        const primeiro = String(cliente && cliente.nome || "").split(" ")[0];
+        const valor = valorNaFinalidade(imovel, finalidade);
+        const custo = (tipo, v, rotulo) => tipo === "valor" && v != null ? `${rotulo}: ${dinheiro(v)}` : tipo === "incluso" ? `${rotulo}: incluso` : "";
+        const linhas = [
+            `Olá${primeiro ? ", " + primeiro : ""}! Separei este imóvel para você:`,
+            "",
+            `🏠 ${imovel.nome}${imovel.codigo ? ` (cód. ${imovel.codigo})` : ""}`,
+            [ imovel.bairro, imovel.cidade ].filter(Boolean).length ? `📍 ${[ imovel.bairro, imovel.cidade ].filter(Boolean).join(", ")}` : "",
+            valor != null ? `💰 ${finalidade === "venda" ? "Venda" : "Aluguel"}: ${dinheiro(valor)}${finalidade === "venda" ? "" : "/mês"}` : "",
+            resumoImovel(imovel) ? `📐 ${resumoImovel(imovel)}` : "",
+            [ custo(imovel.condominio_tipo, imovel.valor_condominio, "Condomínio"), custo(imovel.iptu_tipo, imovel.valor_iptu, "IPTU") ].filter(Boolean).join(" · "),
+            imovel.descricao ? "\n" + String(imovel.descricao).slice(0, 280) + (String(imovel.descricao).length > 280 ? "…" : "") : "",
+            "",
+            "Quer agendar uma visita?"
+        ];
+        return linhas.filter((l, i) => l !== "" || i === 1 || i === linhas.length - 2).join("\n");
+    }
+    function renderCompativeis() {
+        const box = $("crmCompat");
+        if (!box || !ctx) return;
+        const f = funil($("crmNegFunil").value);
+        const perfil = lerPerfilDoFormulario();
+        box.hidden = false;
+        if (perfilVazio(perfil)) {
+            box.innerHTML = `<span class="eyebrow">IMÓVEIS QUE COMBINAM</span><p class="muted-text">Preencha "O que o cliente procura" para ver os imóveis compatíveis.</p>`;
+            return;
+        }
+        const lista = ctx.imoveis()
+            .map(i => ({ i, r: compatibilidade(perfil, f ? f.finalidade : "", i) }))
+            .filter(x => x.r && x.r.pct >= 50)
+            .sort((a, b) => b.r.pct - a.r.pct || (a.r.valor ?? 0) - (b.r.valor ?? 0))
+            .slice(0, 8);
+        const atual = $("crmNegImovel").value;
+        const cli = clientes.get($("crmNegCliente").value);
+        const temFone = cli && digitos(cli.telefone).length >= 10;
+        box.innerHTML = `<span class="eyebrow">IMÓVEIS QUE COMBINAM <em>${lista.length ? lista.length : "nenhum"}</em></span>`
+            + (lista.length ? lista.map(({ i, r }) => `<div class="crm-compat-item${i.id === atual ? " escolhido" : ""}">
+                <span class="crm-compat-pct ${r.pct === 100 ? "total" : ""}">${r.pct}%</span>
+                <div class="crm-compat-info">
+                  <strong>${h(i.codigo ? i.codigo + " · " : "")}${h(i.nome)}</strong>
+                  <small>${h([ i.bairro, dinheiro(r.valor), resumoImovel(i) ].filter(Boolean).join(" · "))}</small>
+                  ${r.faltas.length ? `<small class="crm-compat-falta">Não bate: ${h(r.faltas.join("; "))}</small>` : ""}
+                </div>
+                <div class="crm-compat-acoes">
+                  <button type="button" class="secondary-button" data-ver="${h(i.id)}">Ver</button>
+                  ${i.id === atual ? `<span class="crm-compat-marca">✓ desta negociação</span>` : `<button type="button" class="secondary-button" data-usar="${h(i.id)}">Usar este</button>`}
+                  <button type="button" class="crm-btn-contato whats" data-whats="${h(i.id)}" ${temFone ? "" : "disabled title=\"Cliente sem celular\""}>WhatsApp</button>
+                </div>
+              </div>`).join("")
+            : `<p class="muted-text">Nenhum imóvel disponível combina com esse perfil. Esse pedido entra na "demanda sem estoque" do painel.</p>`);
+        box.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.ver)));
+        box.querySelectorAll("[data-usar]").forEach(b => b.addEventListener("click", () => {
+            const i = ctx.imoveis().find(x => x.id === b.dataset.usar);
+            $("crmNegImovel").value = b.dataset.usar;
+            const valor = i && valorNaFinalidade(i, f ? f.finalidade : "");
+            if (valor != null) $("crmNegValor").value = dinheiro(valor);
+            if (i && !$("crmNegTituloInput").value.trim()) $("crmNegTituloInput").value = i.nome;
+            renderCompativeis();
+            ctx.toast("Imóvel escolhido. Clique em Salvar para gravar.");
+        }));
+        box.querySelectorAll("[data-whats]").forEach(b => b.addEventListener("click", () => enviarImovelWhatsApp(b.dataset.whats)));
+    }
+    async function enviarImovelWhatsApp(imovelId) {
+        const cli = clientes.get($("crmNegCliente").value);
+        const i = ctx.imoveis().find(x => x.id === imovelId);
+        const f = funil($("crmNegFunil").value);
+        if (!cli || !i) return;
+        const d = digitos(cli.telefone);
+        if (d.length < 10) { ctx.toast("Este cliente não tem celular cadastrado."); return; }
+        window.open(`https://wa.me/55${d}?text=${encodeURIComponent(textoWhatsApp(cli, i, f ? f.finalidade : ""))}`, "_blank", "noopener");
+        if (!negAberta) return;
+        // registra no histórico da negociação que o imóvel foi enviado
+        const { error } = await ctx.sb.rpc("crm_registrar_atividade", {
+            p_negociacao: negAberta, p_tipo: "whatsapp", p_texto: `Imóvel enviado pelo WhatsApp: ${i.codigo ? i.codigo + " · " : ""}${i.nome}`
+        });
+        if (!error) carregarHistoricoNeg(negAberta);
+    }
+    // Na ficha do imóvel: negociações em aberto que procuram algo parecido (o corretor só vê as dele, pela RLS).
+    function renderInteressados(imovel) {
+        const box = $("crmInteressados");
+        if (!box) return;
+        if (!ctx || !imovel || (imovel.aprovacao || "aprovado") !== "aprovado") { box.hidden = true; return; }
+        const itens = [];
+        negs.forEach(n => {
+            if (n.situacao !== "aberta") return;
+            const f = funil(n.funil_id);
+            if (n.construcao_id === imovel.id) { itens.push({ n, pct: null }); return; }
+            if (perfilVazio(n.perfil_busca)) return;
+            const r = compatibilidade(n.perfil_busca, f ? f.finalidade : "", imovel);
+            if (r && r.pct >= 75) itens.push({ n, pct: r.pct });
+        });
+        if (!itens.length) { box.hidden = true; return; }
+        itens.sort((a, b) => (a.pct == null ? -1 : 0) - (b.pct == null ? -1 : 0) || (b.pct || 0) - (a.pct || 0));
+        box.hidden = false;
+        box.innerHTML = `<span class="eyebrow">CLIENTES QUE PROCURAM ISTO <em>${itens.length}</em></span>` + itens.map(({ n, pct }) => {
+            const c = clientes.get(n.cliente_id);
+            const et = etapa(n.etapa_id), f = funil(n.funil_id);
+            return `<button type="button" class="crm-sub-item" data-neg="${h(n.id)}">
+              <span class="crm-pill" style="--cor:${h(et && et.cor || "#64748b")}">${h(et ? et.nome : "")}</span>
+              <strong>${h(c ? c.nome : "Cliente")}</strong> ${h(f ? f.nome : "")}${central() ? " · " + h(corretorDe(n.corretor_id)) : ""}
+              <em>${pct == null ? "já negociando este" : pct + "% compatível"}</em>
+            </button>`;
+        }).join("");
+        box.querySelectorAll("[data-neg]").forEach(b => b.addEventListener("click", () => abrirNegociacao(b.dataset.neg)));
+    }
+
+    function coletarNegociacao() {
+        const perfil = lerPerfilDoFormulario();
         const valor = ctx.parseValor($("crmNegValor").value);
         const dados = {
             cliente_id: $("crmNegCliente").value,
@@ -889,6 +1132,30 @@
         desenharConfigEtapas();
         configMotivos = motivos.filter(m => m.ativo).map(m => ({ id: m.id, nome: m.nome, ativo: true }));
         desenharConfigMotivos();
+        [ [ "venda", "Venda" ], [ "locacao", "Locacao" ] ].forEach(([ k, sufixo ]) => {
+            $("crmFaixa" + sufixo + "Medio").value = dinheiro(faixas[k] && faixas[k].medio);
+            $("crmFaixa" + sufixo + "Alto").value = dinheiro(faixas[k] && faixas[k].alto);
+        });
+        previaFaixas();
+    }
+    function lerFaixasDoFormulario() {
+        const v = id => ctx.parseValor($(id).value);
+        return { venda: { medio: v("crmFaixaVendaMedio"), alto: v("crmFaixaVendaAlto") }, locacao: { medio: v("crmFaixaLocacaoMedio"), alto: v("crmFaixaLocacaoAlto") } };
+    }
+    function previaFaixas() {
+        const fx = lerFaixasDoFormulario();
+        const linha = (rotulo, f, suf) => f.medio && f.alto ? `<li><strong>${rotulo}:</strong> econômico até ${dinheiro(f.medio)}${suf} · médio até ${dinheiro(f.alto)}${suf} · alto padrão acima disso</li>` : "";
+        $("crmFaixasPrevia").innerHTML = `<ul>${linha("Venda", fx.venda, "")}${linha("Locação", fx.locacao, "/mês")}</ul>`;
+    }
+    async function salvarFaixas() {
+        const fx = lerFaixasDoFormulario();
+        $("crmSalvarFaixas").disabled = true;
+        const { data, error } = await ctx.sb.rpc("crm_configurar_faixas", { p_carteira: ctx.carteiraId(), p_faixas: fx });
+        $("crmSalvarFaixas").disabled = false;
+        if (error) { ctx.toast(erro(error)); return; }
+        faixas = data;
+        renderTudo();
+        ctx.toast("Faixas de padrão salvas.");
     }
     function carregarConfigEtapas() {
         configEtapas = etapasDoFunil($("crmConfigFunil").value).map(e => ({ id: e.id, nome: e.nome, tipo: e.tipo, cor: e.cor || "#64748b" }));
@@ -947,6 +1214,7 @@
     // ------------------------------------------------------------------ proprietário no cadastro do imóvel
     // modo: "central" | "corretor" | "leitura" (mesmos modos do diálogo do imóvel no app.js)
     function proprietarioPreencher(imovel, modo) {
+        renderInteressados(imovel);
         prop = { modo, imovel, clienteVisivel: null };
         const bloco = $("proprietarioBloco");
         bloco.hidden = modo === "leitura" || !ctx;
@@ -1028,5 +1296,11 @@
         return data;
     }
 
-    window.SKLCRM = { iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, abrirNegociacao, abrirCliente };
+    // Acesso de leitura para o painel de indicadores (crm-painel.js)
+    const interno = {
+        ctx: () => ctx, negs, clientes, funis: () => funis, etapas: () => etapas, motivos: () => motivos, faixas: () => faixas,
+        etapa, funil, etapasDoFunil, compatibilidade, perfilVazio, padraoDe, PADROES, situacaoAcao, corretorDe, dinheiro, dinheiroCurto,
+        normal, dataCurta, abrirNegociacao: id => abrirNegociacao(id)
+    };
+    window.SKLCRM = { interno, iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, abrirNegociacao, abrirCliente };
 })();

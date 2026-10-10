@@ -49,6 +49,7 @@
         <button class="nav-button active" data-page="dashboard"><span>◫</span> Visão geral</button>
         <button class="nav-button" data-page="negociacoes"><span>▤</span> Negociações</button>
         <button class="nav-button" data-page="agenda"><span>◷</span> <em class="nav-texto">Agenda</em><b id="navAgendaBadge" class="nav-badge" hidden>0</b></button>
+        <button class="nav-button" data-page="indicadores"><span>▥</span> Indicadores</button>
         <button class="nav-button" data-page="clientes"><span>☺</span> <em class="nav-texto">Clientes</em><b id="navClientesBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
         <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
@@ -135,8 +136,49 @@
       </section>
 
       <section id="page-agenda" class="page">
-        <p class="muted-text" style="margin:0 0 14px">Próximas ações das negociações em aberto. Registre o atendimento e já agende o próximo passo.</p>
+        <div class="crm-toolbar"><p class="muted-text" style="margin:0;flex:1 1 300px">Próximas ações das negociações em aberto. Registre o atendimento e já agende o próximo passo.</p><button id="crmNovoCompromisso" type="button" class="primary-button">+ Novo compromisso</button></div>
         <div id="crmAgenda" class="crm-agenda"></div>
+      </section>
+
+      <section id="page-indicadores" class="page">
+        <div class="crm-toolbar painel-filtros">
+          <select id="painelPeriodo">
+            <option value="mes">Este mês</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90" selected>Últimos 90 dias</option>
+            <option value="ano">Este ano</option>
+            <option value="tudo">Todo o período</option>
+          </select>
+          <select id="painelFunil"><option value="">Venda e locação</option><option value="venda">Só venda</option><option value="locacao">Só locação</option></select>
+          <select id="painelCorretor"></select>
+          <select id="painelPadrao"><option value="">Todos os padrões</option><option value="economico">Econômico</option><option value="medio">Médio padrão</option><option value="alto">Alto padrão</option></select>
+          <span id="painelAtualizado" class="crm-contagem"></span>
+          <button id="painelExportar" type="button" class="secondary-button">Excel (CSV)</button>
+          <button id="painelImprimir" type="button" class="primary-button">Imprimir / PDF</button>
+        </div>
+        <div id="painelKpis" class="crm-resumo painel-kpis"></div>
+        <div id="painelFunis" class="painel-grade"></div>
+        <div class="painel-grade">
+          <article class="panel painel-bloco"><h3>Origem dos contatos</h3><div id="painelOrigem"></div></article>
+          <article class="panel painel-bloco"><h3>Motivos de perda</h3><div id="painelPerdas"></div></article>
+        </div>
+        <article class="panel painel-bloco"><h3>Equipe</h3><div id="painelEquipe"></div></article>
+        <article class="panel painel-bloco">
+          <h3>Estoque de imóveis</h3>
+          <div id="painelEstoqueNumeros" class="crm-resumo painel-kpis"></div>
+          <div class="painel-duas">
+            <div><h4>Disponíveis por tipo</h4><div id="painelEstoqueTipo"></div></div>
+            <div><h4>Disponíveis por bairro</h4><div id="painelEstoqueBairro"></div></div>
+          </div>
+          <div class="painel-duas">
+            <div><h4>Disponíveis sem nenhuma negociação</h4><ul id="painelSemNegociacao" class="painel-lista"></ul></div>
+            <div><h4>Exclusividades vencendo</h4><ul id="painelExclusividades" class="painel-lista"></ul></div>
+          </div>
+        </article>
+        <div class="painel-grade">
+          <article class="panel painel-bloco"><h3>Demanda sem estoque</h3><div id="painelDemanda"></div></article>
+          <article class="panel painel-bloco"><h3>Padrão dos clientes em negociação</h3><div id="painelPadraoBloco" class="crm-resumo painel-padroes"></div></article>
+        </div>
       </section>
 
       <section id="page-clientes" class="page">
@@ -247,6 +289,21 @@
             <p>Lista que o corretor escolhe ao marcar uma negociação como perdida. Motivo já usado é desativado, não apagado.</p>
             <div id="crmConfigMotivos" class="crm-config-lista"></div>
             <div class="crm-config-acoes"><button id="crmAddMotivo" type="button" class="secondary-button">+ Motivo</button><button id="crmSalvarMotivos" type="button" class="primary-button">Salvar motivos</button></div>
+          </div>
+          <div id="crmFaixasPanel" class="panel form-panel crm-config" data-so-central>
+            <span class="eyebrow">CRM — PADRÃO DO CLIENTE</span>
+            <h2>Faixas de padrão</h2>
+            <p>Define quando um cliente é econômico, médio ou alto padrão pelo valor que ele procura. Aparece como selo no quadro de negociações e como filtro nos indicadores.</p>
+            <div class="form-row">
+              <label><span>Venda: médio a partir de</span><input id="crmFaixaVendaMedio" inputmode="decimal" /></label>
+              <label><span>Venda: alto padrão a partir de</span><input id="crmFaixaVendaAlto" inputmode="decimal" /></label>
+            </div>
+            <div class="form-row">
+              <label><span>Locação: médio a partir de</span><input id="crmFaixaLocacaoMedio" inputmode="decimal" /></label>
+              <label><span>Locação: alto padrão a partir de</span><input id="crmFaixaLocacaoAlto" inputmode="decimal" /></label>
+            </div>
+            <div id="crmFaixasPrevia" class="crm-faixas-previa"></div>
+            <button id="crmSalvarFaixas" type="button" class="primary-button">Salvar faixas</button>
           </div>
           <div class="panel form-panel"><span class="eyebrow">SOBRE</span><h2>Versão instalada</h2><p id="appVersionText">—</p></div>
         </div>
@@ -402,6 +459,8 @@
         </div>
       </details>
 
+      <div id="crmInteressados" class="crm-sublista crm-interessados" hidden></div>
+
       <div class="dialog-actions">
         <button id="deleteConstrucaoButton" type="button" class="danger-button" hidden>Excluir</button>
         <button id="recusarCadastroButton" type="button" class="danger-button" hidden>Recusar</button>
@@ -493,6 +552,7 @@
           <label><span>Vagas (no mínimo)</span><input id="crmPerfilVagas" type="number" min="0" /></label>
         </div>
       </details>
+      <div id="crmCompat" class="crm-compat" hidden></div>
       <div class="crm-proxima">
         <span class="eyebrow">PRÓXIMA AÇÃO</span>
         <div class="form-row">
@@ -529,6 +589,24 @@
       <label><span id="crmMotTextoRotulo">Motivo</span><textarea id="crmMotTexto" rows="3"></textarea></label>
       <button id="crmMotConfirmar" type="button" class="primary-button">Confirmar</button>
       <div id="crmMotMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="crmCompromissoDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">AGENDA</span>
+      <h2>Novo compromisso</h2>
+      <label><span>Com qual cliente / negociação</span><select id="crmCompNeg"></select></label>
+      <p id="crmCompSemNeg" class="muted-text" hidden>Nenhuma negociação em aberto. Crie uma em Negociações (+ Nova negociação) e volte aqui.</p>
+      <div class="crm-at-tipos" id="crmCompTipos"></div>
+      <div class="form-row">
+        <label><span>Quando</span><input id="crmCompEm" type="datetime-local" /></label>
+        <label><span>O que fazer</span><input id="crmCompTexto" placeholder="ex.: visita ao imóvel com o cliente" autocomplete="off" /></label>
+      </div>
+      <p class="muted-text">O compromisso vira a próxima ação da negociação e aparece na Agenda (e no cartão do quadro).</p>
+      <button id="crmCompSalvar" type="button" class="primary-button">Agendar</button>
+      <div id="crmCompMsg" class="form-message" hidden></div>
     </form>
   </dialog>
 
@@ -713,6 +791,7 @@
   <script src="vendor/supabase/supabase.js"></script>
   <script src="avatar.js"></script>
   <script src="crm.js"></script>
+  <script src="crm-painel.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>
