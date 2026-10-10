@@ -42,7 +42,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.4.2";
+    const APP_VERSION = "0.4.3";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -490,6 +490,22 @@
         };
     }
 
+    // Tela do corretor (corretor-ui.js): mesma base, apresentação para o celular, escolhida pelo papel.
+    function contextoTela() {
+        return {
+            h, toast, showPage, logout, trocarCarteira, precoCurto, preencherFotoCapa,
+            usuario: () => currentUser,
+            central: () => podeGerenciar(),
+            carteiraNome: () => carteiraNomeAtual || "",
+            papelTexto: () => ROLE[currentUser.papel] || currentUser.papel,
+            versao: () => `v${APP_VERSION}`,
+            imoveis: () => [ ...construcoes.values() ],
+            fotoHtml: (id, tamanho) => fotoDoUsuario(id, tamanho) || (window.SKLAvatar && currentUser ? window.SKLAvatar.html(currentUser.display_name, currentUser.foto_path, tamanho) : ""),
+            abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); },
+            novoCadastro: () => openConstrucaoDialog(null)
+        };
+    }
+
     async function enterApp() {
         $("loginView").hidden = true;
         $("appView").hidden = false;
@@ -523,11 +539,12 @@
         }
         connectRealtime();
         if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
-        showPage("dashboard");
+        showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
     function logout() {
         if (window.SKLCRM) window.SKLCRM.sair();
+        if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         sb.auth.signOut();
         carteiraId = null;
         currentUser = null;
@@ -553,16 +570,18 @@
     }
 
     function showPage(page) {
+        if (page === "dashboard" && window.SKLModoCorretor && window.SKLModoCorretor.ativo()) page = "hoje";
         document.querySelectorAll(".nav-button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
         document.querySelectorAll(".page").forEach(section => section.classList.remove("active-page"));
         $(`page-${page}`).classList.add("active-page");
         const titles = {
-            dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
+            hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
             settings: "Configurações", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
         if (window.SKLCRM) window.SKLCRM.aoMostrar(page);
+        if (window.SKLModoCorretor) window.SKLModoCorretor.aoMostrar(page);
     }
 
     // ===== Dados =====
@@ -607,6 +626,7 @@
         renderConstrucoes();
         renderDashboardRecentes();
         renderCadastros();
+        if (window.SKLModoCorretor) window.SKLModoCorretor.render();
     }
 
     // No Android, com o app em segundo plano o WebView "adormece" o Realtime e perde avisos (cadastro enviado,

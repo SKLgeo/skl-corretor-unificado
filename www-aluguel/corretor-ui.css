@@ -1,0 +1,114 @@
+/* Tela do corretor (corretor-ui.js): body.modo-corretor. Celular: abas embaixo; computador: abas no topo. */
+body.modo-corretor .sidebar{display:none}
+body.modo-corretor .workspace{margin:0 auto;max-width:1180px;padding:0 16px calc(86px + env(safe-area-inset-bottom))}
+body.modo-corretor .topbar{height:auto;min-height:0;padding:14px 0 10px;border-bottom:2px solid var(--navy-deep);gap:10px;flex-wrap:nowrap}
+body.modo-corretor .topbar h1{font-size:24px}
+body.modo-corretor .topbar .eyebrow{margin-top:0}
+body.modo-corretor #topbarSwitchCarteiraButton,body.modo-corretor #syncTime{display:none}
+body.modo-corretor .connection-area{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+body.modo-corretor .connection-badge{font-size:11px;padding:5px 9px}
+body.modo-corretor #modoCorretorButton{padding:8px 11px;font-size:12.5px;white-space:nowrap}
+body.modo-corretor .toast{left:16px;right:16px;max-width:none;bottom:calc(86px + env(safe-area-inset-bottom))}
+
+/* abas — celular */
+.corretor-tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(6,27,46,.08);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.corretor-tabs button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:7px 2px 6px;color:var(--muted);border-radius:12px;min-width:0}
+.corretor-tabs .ct-ico{font-size:21px;line-height:1}
+.corretor-tabs em{font-style:normal;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.corretor-tabs button.ativo{color:var(--navy-deep);background:#e8f6fc}
+.corretor-tabs button.ativo em{font-weight:900}
+.ct-badge{background:var(--gold);color:var(--navy-deep);border-radius:99px;font-size:10.5px;font-weight:900;padding:1px 6px;min-width:18px;text-align:center;font-style:normal}
+.corretor-tabs .ct-badge{position:absolute;top:3px;left:calc(50% + 6px)}
+
+/* abas — computador e tablet deitado */
+@media(min-width:900px){
+  body.modo-corretor .workspace{padding-bottom:40px}
+  body.modo-corretor .toast{left:auto;right:25px;max-width:420px;bottom:25px}
+  .corretor-tabs{position:sticky;top:0;bottom:auto;display:flex;gap:6px;margin:12px 0 18px;padding:6px;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 25px rgba(20,59,76,.07)}
+  .corretor-tabs button{flex-direction:row;gap:8px;padding:10px 16px}
+  .corretor-tabs .ct-ico{font-size:17px}
+  .corretor-tabs em{font-size:14px}
+  .corretor-tabs button.ativo{background:var(--navy);color:#fff}
+  .corretor-tabs .ct-badge{position:static}
+}
+
+/* Hoje */
+.hoje-topo,.conta-topo{display:flex;align-items:center;gap:14px;margin:16px 0 12px}
+.hoje-topo h2,.conta-topo h2{margin:0;font-family:Georgia,serif;color:var(--navy-deep);font-size:23px}
+.hoje-topo p,.conta-topo p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
+.hoje-avatar .skl-avatar,.conta-topo .skl-avatar{box-shadow:0 0 0 3px #fff,0 4px 14px rgba(6,27,46,.18)}
+.hoje-aviso-central{margin:0 0 12px;font-size:12.5px;color:#5b4500;background:#fff6d9;border-radius:10px;padding:8px 11px}
+.hoje-atalhos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.hoje-atalhos button{display:flex;flex-direction:column;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 4px;font-size:12px;font-weight:800;color:var(--navy-deep);line-height:1.2;text-align:center}
+.hoje-atalhos button span{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#e8f6fc;color:var(--navy);font-size:19px}
+.hoje-atalhos button:active{transform:scale(.97)}
+.hoje-avisos{display:grid;gap:8px;margin-bottom:14px}
+.hoje-aviso{font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;text-align:left;border:0;border-radius:12px;padding:12px 14px;background:#fff6d9;color:#5b4500}
+.hoje-aviso span{font-size:12.5px;font-weight:800;margin-left:auto}
+.hoje-aviso.erro{background:#fbecea;color:#8e352e}
+.hoje-aviso.neutro{background:#e8f6fc;color:var(--navy-deep)}
+.hoje-bloco{background:#fff;border-radius:17px;padding:14px 16px;box-shadow:0 8px 25px rgba(20,59,76,.07);margin-bottom:14px}
+.hoje-bloco>header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.hoje-bloco>header h3{margin:0;font-size:16px;color:var(--navy-deep)}
+.hoje-bloco>header>span{font-size:12px;color:var(--muted);font-weight:700}
+.hoje-bloco>header .text-button{margin-left:auto}
+.hoje-agenda{display:grid;gap:8px}
+.hoje-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:12px;padding:10px 12px;cursor:pointer}
+.hoje-item.atrasada{border-left-color:var(--danger);background:#fff8f7}
+.hoje-item-quando{font-weight:900;font-size:13px;color:var(--navy-deep);white-space:nowrap}
+.hoje-item.atrasada .hoje-item-quando{color:var(--danger);font-size:12px;white-space:normal;max-width:96px}
+.hoje-item-info{display:grid;gap:2px;min-width:0}
+.hoje-item-info small{color:var(--muted);font-size:12.5px}
+.hoje-item-contato{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.hoje-item-contato:empty{display:none}
+.hoje-vazio{display:grid;gap:4px;padding:12px;border-radius:12px;background:#f3f8f5;color:#2f6b47;font-size:13px}
+.hoje-mais{justify-self:start}
+.hoje-numeros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.hoje-numero{display:grid;gap:3px;text-align:left;border:1px solid var(--line);background:#fbfdfe;border-radius:12px;padding:10px 12px}
+.hoje-numero span{font-size:12px;color:var(--muted);font-weight:700}
+.hoje-numero strong{font-size:24px;color:var(--navy-deep)}
+.hoje-numero small{font-size:11.5px;color:var(--muted)}
+.hoje-numero.alerta{border-color:#f0d58a;background:#fffaf0}
+.hoje-novidades{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+.hoje-imovel{flex:0 0 200px;scroll-snap-align:start;display:grid;gap:3px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:14px;padding:0 0 10px;overflow:hidden}
+.hoje-imovel-foto{display:flex;align-items:center;justify-content:center;height:120px;background:#e6edef center/cover no-repeat;margin-bottom:5px}
+.hoje-imovel-foto .sem-foto{font-size:12px;color:var(--muted)}
+.hoje-imovel strong,.hoje-imovel small,.hoje-imovel em{padding:0 11px}
+.hoje-imovel strong{font-size:13.5px;color:var(--navy-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hoje-imovel small{font-size:12px;color:var(--muted)}
+.hoje-imovel em{font-style:normal;font-weight:900;color:var(--navy);font-size:13px}
+
+/* Conta */
+.conta-menu{display:grid;background:#fff;border-radius:17px;box-shadow:0 8px 25px rgba(20,59,76,.07);overflow:hidden}
+.conta-menu button{display:flex;align-items:center;gap:12px;border:0;border-bottom:1px solid var(--line);background:none;padding:15px 16px;text-align:left;font-size:15px;color:var(--ink)}
+.conta-menu button:last-child{border-bottom:0}
+.conta-menu button>span{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:#e8f6fc;color:var(--navy);font-size:17px;flex:none}
+.conta-menu em{font-style:normal;font-weight:700;flex:1}
+.conta-menu i{font-style:normal;color:var(--muted);font-size:20px}
+.conta-menu .conta-sair{color:var(--danger)}
+.conta-menu .conta-sair>span{background:#fbecea;color:var(--danger)}
+.conta-versao{text-align:center;color:var(--muted);font-size:12px;margin:14px 0}
+
+/* celular: listas em cartões, menos texto de computador */
+@media(max-width:780px){
+  .hoje-atalhos{gap:6px}
+  .hoje-atalhos button{font-size:11.5px;padding:10px 2px}
+  .hoje-atalhos button span{width:34px;height:34px;font-size:17px}
+  .hoje-numeros{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.modo-corretor .topbar h1{font-size:21px}
+  body.modo-corretor .topbar .eyebrow{display:none}
+  body.modo-corretor .crm-tabela thead{display:none}
+  body.modo-corretor .crm-tabela,body.modo-corretor .crm-tabela tbody,body.modo-corretor .crm-tabela tr,body.modo-corretor .crm-tabela td{display:block;width:auto}
+  body.modo-corretor .crm-tabela tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
+  body.modo-corretor .crm-tabela td{border:0;padding:2px 0;font-size:13px}
+  body.modo-corretor .crm-tabela td:empty,body.modo-corretor .crm-tabela td[hidden]{display:none}
+  body.modo-corretor #page-clientes .table-panel{background:none;box-shadow:none;padding:0}
+  body.modo-corretor #crmResumoFunil{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory}
+  body.modo-corretor #crmResumoFunil .crm-resumo-item{flex:0 0 132px;scroll-snap-align:start;padding:9px 11px}
+  body.modo-corretor #crmResumoFunil .crm-resumo-item strong{font-size:18px}
+  body.modo-corretor #crmClientesBody td:nth-child(5)::before{content:"Negociações: ";color:var(--muted)}
+  body.modo-corretor #crmClientesBody td:nth-child(6)::before{content:"Cliente desde ";color:var(--muted)}
+  body.modo-corretor #crmClientesBody td:nth-child(6){font-size:12px;color:var(--muted)}
+}
+@media(pointer:coarse){body.modo-corretor .crm-dica{display:none}}
+@media print{.corretor-tabs{display:none!important}}

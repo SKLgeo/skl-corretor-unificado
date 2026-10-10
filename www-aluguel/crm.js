@@ -222,6 +222,7 @@
         if (central()) renderConfig();
         const pg = document.getElementById("page-indicadores");
         if (pg && pg.classList.contains("active-page") && window.SKLCRMPainel) window.SKLCRMPainel.render();
+        document.dispatchEvent(new Event("skl-crm-render"));
     }
 
     // ------------------------------------------------------------------ eventos
@@ -1300,7 +1301,7 @@
     const interno = {
         ctx: () => ctx, negs, clientes, funis: () => funis, etapas: () => etapas, motivos: () => motivos, faixas: () => faixas,
         etapa, funil, etapasDoFunil, compatibilidade, perfilVazio, padraoDe, PADROES, situacaoAcao, corretorDe, dinheiro, dinheiroCurto,
-        normal, dataCurta, abrirNegociacao: id => abrirNegociacao(id)
+        normal, dataCurta, dataHora, linksContato, abrirNegociacao: id => abrirNegociacao(id)
     };
     window.SKLCRM = { interno, iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, abrirNegociacao, abrirCliente };
 })();

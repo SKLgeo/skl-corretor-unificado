@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="avatar.css" />
   <link rel="stylesheet" href="crm.css" />
+  <link rel="stylesheet" href="corretor-ui.css" />
 </head>
 <body>
   <section id="loginView" class="login-view">
@@ -65,10 +66,63 @@
       <header class="topbar">
         <div><span class="eyebrow">SKL SOLUÇÕES DIGITAIS</span><h1 id="pageTitle">Visão geral</h1></div>
         <div class="connection-area">
+          <button id="modoCorretorButton" type="button" class="secondary-button" hidden>📱 Modo corretor</button>
           <button id="topbarSwitchCarteiraButton" type="button" class="secondary-button">Trocar carteira</button>
           <span id="syncTime">Ainda não sincronizado</span><span id="connectionBadge" class="connection-badge offline">Desconectado</span>
         </div>
       </header>
+
+      <nav id="corretorTabs" class="corretor-tabs" aria-label="Menu" hidden>
+        <button type="button" data-ct-page="hoje"><span class="ct-ico">☀</span><em>Hoje</em><b id="ctBadgeHoje" class="ct-badge" hidden>0</b></button>
+        <button type="button" data-ct-page="construcoes"><span class="ct-ico">⌂</span><em>Imóveis</em></button>
+        <button type="button" data-ct-page="clientes"><span class="ct-ico">☺</span><em>Clientes</em></button>
+        <button type="button" data-ct-page="negociacoes"><span class="ct-ico">▤</span><em>Negócios</em></button>
+        <button type="button" data-ct-page="conta"><span class="ct-ico">◉</span><em>Conta</em><b id="ctBadgeConta" class="ct-badge" hidden>0</b></button>
+      </nav>
+
+      <section id="page-hoje" class="page">
+        <div class="hoje-topo">
+          <span id="hojeAvatar" class="hoje-avatar"></span>
+          <div><h2 id="hojeSaudacao">Olá</h2><p id="hojeData">—</p></div>
+        </div>
+        <p id="hojeAvisoCentral" class="hoje-aviso-central" hidden>Modo corretor com acesso de Central: você vê os clientes e negócios de toda a equipe.</p>
+        <div class="hoje-atalhos">
+          <button type="button" data-hoje-acao="cliente"><span>☺</span>Novo cliente</button>
+          <button type="button" data-hoje-acao="negocio"><span>▤</span>Novo negócio</button>
+          <button type="button" data-hoje-acao="compromisso"><span>◷</span>Agendar</button>
+          <button type="button" data-hoje-acao="imovel"><span>⌂</span>Cadastrar imóvel</button>
+        </div>
+        <div id="hojeCadastros" class="hoje-avisos" hidden></div>
+        <section class="hoje-bloco">
+          <header><h3>Para fazer hoje</h3><span id="hojeAgendaContagem"></span><button type="button" class="text-button" data-go="agenda">Agenda completa</button></header>
+          <div id="hojeAgenda" class="hoje-agenda"></div>
+        </section>
+        <section class="hoje-bloco">
+          <header><h3>Meus números</h3></header>
+          <div id="hojeNumeros" class="hoje-numeros"></div>
+        </section>
+        <section id="hojeNovidadesBloco" class="hoje-bloco" hidden>
+          <header><h3>Imóveis mais recentes</h3><button type="button" class="text-button" data-go="construcoes">Ver todos</button></header>
+          <div id="hojeNovidades" class="hoje-novidades"></div>
+        </section>
+      </section>
+
+      <section id="page-conta" class="page">
+        <div class="conta-topo">
+          <span id="contaAvatar"></span>
+          <div><h2 id="contaNome">—</h2><p id="contaPapel">—</p></div>
+        </div>
+        <div class="conta-menu">
+          <button type="button" data-go="cadastros"><span>✚</span><em id="contaCadastrosTexto">Meus cadastros de imóveis</em><b id="contaCadastrosBadge" class="ct-badge" hidden>0</b><i>›</i></button>
+          <button type="button" data-go="agenda"><span>◷</span><em>Agenda completa</em><i>›</i></button>
+          <button type="button" data-go="indicadores"><span>▥</span><em>Indicadores</em><i>›</i></button>
+          <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
+          <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
+          <button type="button" id="contaVoltarCentral" hidden><span>↩</span><em>Voltar para a tela da Central</em><i>›</i></button>
+          <button type="button" id="contaSair" class="conta-sair"><span>⏻</span><em>Sair</em></button>
+        </div>
+        <p id="contaVersao" class="conta-versao">—</p>
+      </section>
 
       <section id="page-dashboard" class="page active-page">
         <div class="metric-grid">
@@ -792,6 +846,7 @@
   <script src="avatar.js"></script>
   <script src="crm.js"></script>
   <script src="crm-painel.js"></script>
+  <script src="corretor-ui.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>
