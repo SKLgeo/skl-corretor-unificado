@@ -42,7 +42,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.2.2";
+    const APP_VERSION = "0.3.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -475,6 +475,20 @@
         await enterApp();
     }
 
+    // O CRM (crm.js) recebe daqui o que precisa; ele mesmo cuida de clientes, negociações e agenda.
+    function contextoCrm() {
+        return {
+            sb, h, toast, traduzErro, parseValor, nomeDoUsuario, fotoDoUsuario,
+            carteiraId: () => carteiraId,
+            usuario: () => currentUser,
+            central: () => podeGerenciar(),
+            imoveis: () => [ ...construcoes.values() ],
+            equipe: () => corretores,
+            tiposImovel: () => [ ...$("construcaoTipoInput").options ].map(o => o.value),
+            abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); }
+        };
+    }
+
     async function enterApp() {
         $("loginView").hidden = true;
         $("appView").hidden = false;
@@ -507,10 +521,12 @@
             await loadComissoesAluguel();
         }
         connectRealtime();
+        if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
         showPage("dashboard");
     }
 
     function logout() {
+        if (window.SKLCRM) window.SKLCRM.sair();
         sb.auth.signOut();
         carteiraId = null;
         currentUser = null;
@@ -540,11 +556,12 @@
         document.querySelectorAll(".page").forEach(section => section.classList.remove("active-page"));
         $(`page-${page}`).classList.add("active-page");
         const titles = {
-            dashboard: "Visão geral", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
+            dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
             settings: "Configurações", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
+        if (window.SKLCRM) window.SKLCRM.aoMostrar(page);
     }
 
     // ===== Dados =====
@@ -605,6 +622,7 @@
         sincronizarDeNovo();
         if (podeGerenciar()) loadInteresses();
         connectRealtime();
+        if (window.SKLCRM) window.SKLCRM.recarregar();
     }
 
     function connectRealtime() {
@@ -1090,6 +1108,7 @@
         $("enviarCadastroButton").textContent = construcao?.aprovacao === "pendente" ? "Salvar e manter na fila" : "Enviar para aprovação";
         $("registrarInteresseButton").hidden = !leitura;
 
+        if (window.SKLCRM) window.SKLCRM.proprietarioPreencher(construcao, modoDialogo);
         renderGaleria();
         $("construcaoDialog").showModal();
         setTimeout(() => {
@@ -1524,6 +1543,12 @@
             fotosNovas = [];
             fotosRemovidas = [];
             salvo = true;
+            // proprietário e exclusividade (dados que só a Central vê) — antes de enviar/aprovar,
+            // para o proprietário ser aprovado junto com o imóvel
+            if (window.SKLCRM) {
+                const comProprietario = await window.SKLCRM.proprietarioSalvar(imovel);
+                if (comProprietario) { imovel = comProprietario; construcoes.set(imovel.id, imovel); }
+            }
             if (enviar && imovel.aprovacao !== "pendente") {
                 const { data, error } = await sb.rpc("enviar_cadastro_imovel", { p_id: imovel.id });
                 if (error) throw error;

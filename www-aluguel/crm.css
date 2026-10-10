@@ -1,0 +1,136 @@
+/* CRM da imobiliária — quadro de negociações, agenda, clientes, diálogos */
+.crm-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.crm-toolbar input[type="search"]{flex:1 1 240px;min-width:0;max-width:420px}
+.crm-toolbar select{flex:0 1 220px;min-width:0}
+.crm-toolbar .primary-button{margin-left:auto}
+.crm-contagem{color:var(--muted);font-size:13px;white-space:nowrap}
+.crm-dica{margin:0 0 10px}
+
+.crm-resumo{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.crm-resumo-item{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(20,59,76,.06);display:grid;gap:2px}
+.crm-resumo-item span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.crm-resumo-item strong{font-size:24px;color:var(--navy-deep)}
+.crm-resumo-item small{font-size:12px;color:var(--muted)}
+
+.crm-quadro{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start;scroll-snap-type:x proximity;min-height:360px}
+.crm-coluna{flex:0 0 260px;background:#e8eef0;border-radius:14px;display:flex;flex-direction:column;max-height:calc(100vh - 300px);min-height:200px;scroll-snap-align:start;border-top:4px solid var(--cor)}
+.crm-coluna.alvo{outline:3px dashed var(--cor);outline-offset:-3px;background:#dde7ea}
+.crm-coluna header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:11px 12px 8px}
+.crm-coluna header strong{font-size:13px;color:var(--navy-deep)}
+.crm-coluna header span{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap}
+.crm-coluna-corpo{display:grid;gap:8px;padding:0 8px 10px;overflow-y:auto}
+.crm-coluna-ganho{background:#e3f1e8}
+.crm-coluna-perdido{background:#f3e7e5}
+.crm-vazio{color:var(--muted);text-align:center;margin:8px 0;font-size:12px}
+.crm-card{background:#fff;border-radius:11px;padding:10px 11px;box-shadow:0 2px 8px rgba(20,59,76,.08);cursor:pointer;display:grid;gap:4px;border-left:4px solid var(--cor,#64748b)}
+.crm-coluna .crm-card{border-left-color:var(--cor)}
+.crm-card:hover{box-shadow:0 6px 16px rgba(20,59,76,.16)}
+.crm-card.arrastando{opacity:.45}
+.crm-card strong{font-size:14px;color:var(--ink)}
+.crm-card small{color:var(--muted);font-size:12px;line-height:1.3}
+.crm-card-linha{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.crm-valor{font-weight:800;color:var(--navy-deep)}
+.crm-dias{color:var(--muted)}
+.crm-card-acao{font-size:11.5px;font-weight:700;border-radius:7px;padding:4px 7px;background:#eef3f5;color:#45535a}
+.crm-card-acao.atrasada{background:#f7e3e1;color:#9a3b34}
+.crm-card-acao.hoje{background:#fff1cf;color:#7a520c}
+.crm-card-acao.futura{background:#e3f1fb;color:#1c5d86}
+.crm-card-acao.sem{background:transparent;color:#a0aab0;padding:0;font-weight:600}
+.crm-card-perda{font-size:11.5px;color:#9a3b34;font-weight:700}
+.crm-card-corretor{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#4e626b}
+
+.crm-pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;color:#fff;background:var(--cor)}
+.crm-tipo{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;margin:1px 3px 1px 0;background:#e6edef;color:var(--navy-deep)}
+.crm-tipo-proprietario{background:#efe6fb;color:#5b2d96}
+.crm-tipo-inquilino{background:#e3f1fb;color:#1c5d86}
+.crm-tipo-comprador{background:#e3f4ea;color:#247346}
+.crm-tabela tr.crm-linha{cursor:pointer}
+.crm-tabela tr.crm-linha:hover td{background:#f6f9fa}
+
+/* agenda */
+.crm-agenda{display:grid;gap:18px}
+.crm-agenda-grupo h3{margin:0 0 8px;font-size:15px;color:var(--navy-deep);display:flex;gap:8px;align-items:center}
+.crm-agenda-grupo h3 span{background:#e6edef;border-radius:99px;padding:1px 9px;font-size:12px}
+.crm-agenda-grupo.atrasada h3{color:#9a3b34}
+.crm-agenda-grupo.atrasada h3 span{background:#f7e3e1}
+.crm-agenda-grupo.hoje h3 span{background:#fff1cf}
+.crm-agenda-item{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;background:#fff;border-radius:12px;padding:11px 14px;box-shadow:0 4px 14px rgba(20,59,76,.06);margin-bottom:8px}
+.crm-agenda-quando{font-weight:800;color:var(--navy-deep);font-size:13px}
+.crm-agenda-info{display:grid;gap:3px;min-width:0}
+.crm-agenda-info small{color:var(--muted)}
+.crm-agenda-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crm-agenda-acoes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+
+/* contato rápido */
+.crm-contato-rapido{display:flex;gap:8px;flex-wrap:wrap}
+.crm-btn-contato{display:inline-block;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:800;text-decoration:none;background:#e6edef;color:var(--navy-deep)}
+.crm-btn-contato.whats{background:#25d366;color:#fff}
+
+/* diálogos */
+dialog.crm-dialog .dialog-card{background:#fff}
+dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
+.crm-dialog .dialog-card{max-height:calc(100vh - 40px);overflow-y:auto}
+.crm-com-botao{display:flex;gap:8px;align-items:stretch}
+.crm-com-botao select{flex:1;min-width:0}
+.crm-com-botao .secondary-button{padding:8px 12px;white-space:nowrap}
+.crm-tipos{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+.crm-rotulo{font-size:13px;font-weight:700;color:#4e626b;width:100%}
+.crm-lgpd{font-size:12px;color:var(--muted);margin:0}
+.crm-perfil{border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.crm-perfil summary{cursor:pointer;font-weight:800;color:var(--navy-deep);font-size:13px}
+.crm-perfil[open] summary{margin-bottom:10px}
+.crm-proxima{display:grid;gap:8px;background:#f6f9fa;border-radius:12px;padding:12px 14px}
+.crm-stepper{display:flex;flex-wrap:wrap;gap:6px}
+.crm-step{border:1px solid var(--line);background:#fff;color:#4e626b;border-radius:99px;padding:7px 12px;font-size:12px;font-weight:800}
+.crm-step.feita{background:#eef3f5;color:var(--navy-deep);border-color:transparent}
+.crm-step.atual{background:var(--cor);color:#fff;border-color:var(--cor)}
+.crm-step-ganho:not(.atual){border-color:#9fd3b2;color:#247346}
+.crm-step-perdido:not(.atual){border-color:#e3b2ac;color:#9a3b34}
+.aprovacao-banner.crm-ganha{background:#dff4e8;color:#247346}
+.crm-atendimento{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.crm-at-tipos{display:flex;flex-wrap:wrap;gap:6px}
+.crm-at-tipos button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 12px;font-weight:700;font-size:12.5px;color:#4e626b}
+.crm-at-tipos button.ativo{background:var(--navy);border-color:var(--navy);color:#fff}
+.crm-timeline{display:grid;gap:8px}
+.crm-evento{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:start}
+.crm-evento-icone{width:28px;height:28px;border-radius:50%;background:#eef3f5;display:flex;align-items:center;justify-content:center;font-size:13px}
+.crm-evento p{margin:0;font-size:13px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.crm-evento small{font-size:11.5px;color:var(--muted)}
+.crm-evento-sistema p,.crm-evento-etapa p{color:#4e626b}
+.crm-sublista{display:grid;gap:6px}
+.crm-sub-item{display:flex;flex-wrap:wrap;gap:6px;align-items:center;text-align:left;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-size:13px}
+.crm-sub-item em{margin-left:auto;font-style:normal;font-weight:800;color:var(--navy-deep)}
+
+/* proprietário no cadastro do imóvel */
+.proprietario-bloco{border:1px solid #d9cdee;background:#faf7ff;border-radius:14px;padding:12px 14px;display:grid;gap:10px;margin:0}
+.proprietario-bloco legend{font-weight:800;color:#5b2d96;font-size:13px;padding:0 6px}
+.proprietario-bloco legend small{font-weight:600;color:var(--muted)}
+.proprietario-novo{display:grid;gap:10px}
+.proprietario-resumo{display:grid;gap:8px;font-size:13px}
+.proprietario-exclusividade{align-items:end}
+
+/* configurações */
+.crm-config-lista{display:grid;gap:6px}
+.crm-config-linha{display:flex;gap:6px;align-items:center}
+.crm-config-linha input[type="color"]{width:42px;height:38px;padding:2px;flex:none}
+.crm-config-linha input:not([type="color"]){flex:1;min-width:0;padding:9px 11px}
+.crm-config-linha .text-button{padding:6px 8px}
+.crm-config-linha .text-button:disabled{opacity:.3;cursor:default}
+.crm-config-fixa{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;white-space:nowrap;padding:0 8px}
+.crm-remover{color:#9c3931!important}
+.crm-config-acoes{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+@media(max-width:1100px){
+  .crm-resumo{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:780px){
+  .crm-toolbar .primary-button{margin-left:0;flex:1 1 100%}
+  .crm-toolbar input[type="search"],.crm-toolbar select{flex:1 1 100%;max-width:none}
+  .crm-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .crm-resumo-item strong{font-size:20px}
+  .crm-coluna{flex-basis:82vw;max-height:none}
+  .crm-quadro{scroll-snap-type:x mandatory}
+  .crm-agenda-item{grid-template-columns:minmax(0,1fr)}
+  .crm-agenda-acoes{justify-content:flex-start}
+  .crm-tabela{min-width:0}
+}

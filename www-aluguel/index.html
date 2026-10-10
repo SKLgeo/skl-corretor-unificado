@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="avatar.css" />
+  <link rel="stylesheet" href="crm.css" />
 </head>
 <body>
   <section id="loginView" class="login-view">
@@ -46,6 +47,9 @@
       <div class="sidebar-brand"><img src="logo.png" alt="SKL" /><span>Aluguéis</span></div>
       <nav id="mainNav">
         <button class="nav-button active" data-page="dashboard"><span>◫</span> Visão geral</button>
+        <button class="nav-button" data-page="negociacoes"><span>▤</span> Negociações</button>
+        <button class="nav-button" data-page="agenda"><span>◷</span> <em class="nav-texto">Agenda</em><b id="navAgendaBadge" class="nav-badge" hidden>0</b></button>
+        <button class="nav-button" data-page="clientes"><span>☺</span> <em class="nav-texto">Clientes</em><b id="navClientesBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
         <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
@@ -116,6 +120,44 @@
         <div id="construcaoMapPanel" class="map-panel" hidden><div id="construcaoMap"></div><div id="mapLegend" class="map-legend"></div></div>
         <div id="construcaoGrid" class="construcao-grid"></div>
         <div id="construcaoGridEmpty" class="empty-state" hidden>Nenhum imóvel encontrado com esses filtros.</div>
+      </section>
+
+      <section id="page-negociacoes" class="page">
+        <div class="crm-toolbar">
+          <div id="crmFunilTabs" class="segmentado"></div>
+          <input id="crmBuscaNeg" type="search" placeholder="Buscar cliente, imóvel ou telefone" autocomplete="off" />
+          <select id="crmCorretorFiltro" data-so-central><option value="">Todos os corretores</option></select>
+          <button id="crmNovaNegButton" type="button" class="primary-button">+ Nova negociação</button>
+        </div>
+        <div id="crmResumoFunil" class="crm-resumo"></div>
+        <p class="muted-text crm-dica">Arraste o cartão para mudar de etapa, ou toque nele para abrir. Fechado e Perdido mostram os últimos 30 dias.</p>
+        <div id="crmQuadro" class="crm-quadro"></div>
+      </section>
+
+      <section id="page-agenda" class="page">
+        <p class="muted-text" style="margin:0 0 14px">Próximas ações das negociações em aberto. Registre o atendimento e já agende o próximo passo.</p>
+        <div id="crmAgenda" class="crm-agenda"></div>
+      </section>
+
+      <section id="page-clientes" class="page">
+        <div class="crm-toolbar">
+          <input id="crmBuscaCli" type="search" placeholder="Buscar por nome, celular, e-mail ou CPF" autocomplete="off" />
+          <select id="crmTipoCliFiltro">
+            <option value="">Todos os tipos</option>
+            <option value="comprador">Compradores</option>
+            <option value="inquilino">Inquilinos</option>
+            <option value="vendedor">Vendedores</option>
+            <option value="proprietario">Proprietários</option>
+            <option value="pendente">Aguardando aprovação</option>
+          </select>
+          <select id="crmCorretorCliFiltro" data-so-central><option value="">Todos os corretores</option><option value="__sem">Sem corretor</option></select>
+          <span id="crmCliContagem" class="crm-contagem"></span>
+          <button id="crmNovoCliButton" type="button" class="primary-button">+ Novo cliente</button>
+        </div>
+        <div class="panel table-panel">
+          <table class="crm-tabela"><thead><tr><th>Cliente</th><th>Contato</th><th>Tipo</th><th class="crm-col-central">Corretor</th><th>Negociações</th><th>Cadastro</th></tr></thead><tbody id="crmClientesBody"></tbody></table>
+          <div id="crmClientesVazio" class="empty-state" hidden>Nenhum cliente encontrado.</div>
+        </div>
       </section>
 
       <section id="page-cadastros" class="page">
@@ -190,6 +232,21 @@
               </select>
             </label>
             <button id="salvarNotaMinimaButton" type="button" class="primary-button">Salvar</button>
+          </div>
+          <div id="crmConfigPanel" class="panel form-panel crm-config" data-so-central>
+            <span class="eyebrow">CRM — FUNIS</span>
+            <h2>Etapas das negociações</h2>
+            <p>Renomeie, reordene ou crie etapas. "Fechado" e "Perdido" ficam sempre no fim. Para remover uma etapa, ela precisa estar vazia.</p>
+            <select id="crmConfigFunil"></select>
+            <div id="crmConfigEtapas" class="crm-config-lista"></div>
+            <div class="crm-config-acoes"><button id="crmAddEtapa" type="button" class="secondary-button">+ Etapa</button><button id="crmSalvarEtapas" type="button" class="primary-button">Salvar etapas</button></div>
+          </div>
+          <div id="crmMotivosPanel" class="panel form-panel crm-config" data-so-central>
+            <span class="eyebrow">CRM — PERDAS</span>
+            <h2>Motivos de perda</h2>
+            <p>Lista que o corretor escolhe ao marcar uma negociação como perdida. Motivo já usado é desativado, não apagado.</p>
+            <div id="crmConfigMotivos" class="crm-config-lista"></div>
+            <div class="crm-config-acoes"><button id="crmAddMotivo" type="button" class="secondary-button">+ Motivo</button><button id="crmSalvarMotivos" type="button" class="primary-button">Salvar motivos</button></div>
           </div>
           <div class="panel form-panel"><span class="eyebrow">SOBRE</span><h2>Versão instalada</h2><p id="appVersionText">—</p></div>
         </div>
@@ -307,6 +364,26 @@
           <label class="check-inline"><input id="destaqueInput" type="checkbox" /> Destaque</label>
           <label class="check-inline"><input id="publicarSiteInput" type="checkbox" /> Publicar no site</label>
         </div>
+        <fieldset id="proprietarioBloco" class="proprietario-bloco" hidden>
+          <legend>Proprietário <small>— dados vistos só pela Central</small></legend>
+          <div id="proprietarioResumo" class="proprietario-resumo" hidden></div>
+          <label id="proprietarioEscolherLabel" hidden><span>Proprietário</span><select id="proprietarioSelect"></select></label>
+          <div id="proprietarioNovo" class="proprietario-novo">
+            <div class="form-row">
+              <label><span>Nome do proprietário</span><input id="propNomeInput" autocomplete="off" /></label>
+              <label><span>Celular / WhatsApp</span><input id="propTelefoneInput" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
+            </div>
+            <div class="form-row">
+              <label><span>E-mail</span><input id="propEmailInput" type="email" autocomplete="off" /></label>
+              <label><span>CPF</span><input id="propCpfInput" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" /></label>
+            </div>
+            <p id="propAvisoCorretor" class="muted-text" hidden>Depois de enviado, os dados do proprietário ficam só com a Central.</p>
+          </div>
+          <div class="form-row proprietario-exclusividade">
+            <label class="check-inline"><input id="exclusividadeInput" type="checkbox" /> Imóvel com exclusividade</label>
+            <label id="exclusividadeAteLabel" hidden><span>Exclusividade até</span><input id="exclusividadeAteInput" type="date" /></label>
+          </div>
+        </fieldset>
       </div>
 
       <details class="dialog-section coordenada-details">
@@ -334,6 +411,135 @@
         <button id="aprovarCadastroButton" type="button" class="primary-button" hidden>Aprovar e publicar</button>
       </div>
       <div id="construcaoDialogMessage" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="crmClienteDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span id="crmCliEyebrow" class="eyebrow">CLIENTE</span>
+      <h2 id="crmCliTitulo">Novo cliente</h2>
+      <div id="crmCliAprovacao" class="aprovacao-banner" hidden></div>
+      <div id="crmCliContato" class="crm-contato-rapido" hidden></div>
+      <label><span>Nome completo</span><input id="crmCliNome" autocomplete="off" /></label>
+      <div class="form-row">
+        <label><span>Celular / WhatsApp</span><input id="crmCliTelefone" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
+        <label><span>E-mail</span><input id="crmCliEmail" type="email" autocomplete="off" /></label>
+      </div>
+      <div class="form-row">
+        <label><span>CPF (opcional)</span><input id="crmCliCpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" /></label>
+        <label><span>Origem do contato</span><select id="crmCliOrigem"></select></label>
+      </div>
+      <div class="crm-tipos">
+        <span class="crm-rotulo">Tipo de cliente</span>
+        <label class="check-inline"><input type="checkbox" value="comprador" data-crm-tipo /> Comprador</label>
+        <label class="check-inline"><input type="checkbox" value="inquilino" data-crm-tipo /> Inquilino</label>
+        <label class="check-inline"><input type="checkbox" value="vendedor" data-crm-tipo /> Vendedor</label>
+        <label class="check-inline"><input type="checkbox" value="proprietario" data-crm-tipo /> Proprietário</label>
+      </div>
+      <p id="crmCliAvisoProp" class="muted-text" hidden>Proprietário cadastrado por corretor vai para a aprovação da Central. Depois disso, os dados ficam só com a Central.</p>
+      <label id="crmCliCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmCliCorretor"></select></label>
+      <label><span>Observações</span><textarea id="crmCliObs" rows="3"></textarea></label>
+      <p class="crm-lgpd">Aviso de privacidade: os dados do cliente são tratados conforme a LGPD (Lei nº 13.709/2018) e usados só para o atendimento imobiliário.</p>
+      <label class="check-inline"><input id="crmCliLgpd" type="checkbox" /> O cliente foi informado sobre o uso dos dados.</label>
+      <div class="dialog-actions">
+        <button id="crmCliExcluir" type="button" class="danger-button" hidden>Excluir</button>
+        <button id="crmCliRecusar" type="button" class="danger-button" hidden>Recusar</button>
+        <button id="crmCliNovaNeg" type="button" class="secondary-button" hidden>+ Negociação</button>
+        <button id="crmCliAprovar" type="button" class="primary-button" hidden>Aprovar cadastro</button>
+        <button id="crmCliSalvar" type="button" class="primary-button">Salvar</button>
+      </div>
+      <div id="crmCliMsg" class="form-message" hidden></div>
+      <div id="crmCliNegociacoes" class="crm-sublista" hidden></div>
+      <div id="crmCliImoveis" class="crm-sublista" hidden></div>
+      <div id="crmCliHistorico" class="crm-timeline" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="crmNegDialog" class="crm-dialog crm-dialog-larga">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span id="crmNegEyebrow" class="eyebrow">NEGOCIAÇÃO</span>
+      <h2 id="crmNegTitulo">Nova negociação</h2>
+      <div id="crmNegContato" class="crm-contato-rapido" hidden></div>
+      <div id="crmNegEtapas" class="crm-stepper" hidden></div>
+      <div id="crmNegSituacao" class="aprovacao-banner" hidden></div>
+      <div class="form-row">
+        <label><span>Cliente</span>
+          <span class="crm-com-botao"><select id="crmNegCliente"></select><button id="crmNegNovoCli" type="button" class="secondary-button" title="Cadastrar cliente novo">+ Novo</button></span>
+        </label>
+        <label><span>Funil</span><select id="crmNegFunil"></select></label>
+      </div>
+      <div class="form-row">
+        <label><span>Imóvel de interesse</span><select id="crmNegImovel"></select></label>
+        <label><span>Valor da negociação</span><input id="crmNegValor" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+      </div>
+      <div class="form-row">
+        <label><span>Resumo</span><input id="crmNegTituloInput" placeholder="ex.: casa 3 quartos perto da escola" autocomplete="off" /></label>
+        <label id="crmNegCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmNegCorretor"></select></label>
+      </div>
+      <details class="crm-perfil">
+        <summary>O que o cliente procura</summary>
+        <div class="form-row">
+          <label><span>Bairros (separe por vírgula)</span><input id="crmPerfilBairros" autocomplete="off" /></label>
+          <label><span>Tipo de imóvel</span><select id="crmPerfilTipo"></select></label>
+        </div>
+        <div class="form-row">
+          <label><span>Valor mínimo</span><input id="crmPerfilMin" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+          <label><span>Valor máximo</span><input id="crmPerfilMax" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+        </div>
+        <div class="form-row">
+          <label><span>Quartos (no mínimo)</span><input id="crmPerfilQuartos" type="number" min="0" /></label>
+          <label><span>Vagas (no mínimo)</span><input id="crmPerfilVagas" type="number" min="0" /></label>
+        </div>
+      </details>
+      <div class="crm-proxima">
+        <span class="eyebrow">PRÓXIMA AÇÃO</span>
+        <div class="form-row">
+          <label><span>Quando</span><input id="crmNegAcaoEm" type="datetime-local" /></label>
+          <label><span>O que fazer</span><input id="crmNegAcaoTexto" placeholder="ex.: ligar para confirmar a visita" autocomplete="off" /></label>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="crmNegExcluir" type="button" class="danger-button" hidden>Excluir</button>
+        <button id="crmNegSalvar" type="button" class="primary-button">Salvar</button>
+      </div>
+      <div id="crmNegMsg" class="form-message" hidden></div>
+      <section id="crmNegAtendimento" class="crm-atendimento" hidden>
+        <span class="eyebrow">REGISTRAR ATENDIMENTO</span>
+        <div id="crmAtTipos" class="crm-at-tipos"></div>
+        <textarea id="crmAtTexto" rows="2" placeholder="O que foi conversado?"></textarea>
+        <div class="form-row">
+          <label><span>Agendar próxima ação (opcional)</span><input id="crmAtProxEm" type="datetime-local" /></label>
+          <label><span>O que fazer</span><input id="crmAtProxTexto" placeholder="ex.: enviar a proposta" autocomplete="off" /></label>
+        </div>
+        <label id="crmAtConcluirLabel" class="check-inline" hidden><input id="crmAtConcluir" type="checkbox" /> Concluí a próxima ação que estava agendada</label>
+        <button id="crmAtSalvar" type="button" class="primary-button">Registrar atendimento</button>
+        <div id="crmNegHistorico" class="crm-timeline"></div>
+      </section>
+    </form>
+  </dialog>
+
+  <dialog id="crmMotivoDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span id="crmMotEyebrow" class="eyebrow">MUDAR ETAPA</span>
+      <h2 id="crmMotTitulo">—</h2>
+      <label id="crmMotPerdaLabel"><span>Motivo da perda</span><select id="crmMotPerda"></select></label>
+      <label><span id="crmMotTextoRotulo">Motivo</span><textarea id="crmMotTexto" rows="3"></textarea></label>
+      <button id="crmMotConfirmar" type="button" class="primary-button">Confirmar</button>
+      <div id="crmMotMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="crmRecusarCliDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">RECUSAR CADASTRO</span>
+      <h2>Por que este cadastro foi recusado?</h2>
+      <label><span>Motivo</span><textarea id="crmRecusarCliMotivo" rows="3"></textarea></label>
+      <button id="crmRecusarCliConfirmar" type="button" class="danger-button">Recusar cadastro</button>
+      <div id="crmRecusarCliMsg" class="form-message" hidden></div>
     </form>
   </dialog>
 
@@ -506,6 +712,7 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
   <script src="avatar.js"></script>
+  <script src="crm.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

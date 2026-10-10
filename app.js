@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.5.2-web";
+    const APP_VERSION = "0.6.0-web";
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
