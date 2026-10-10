@@ -1114,7 +1114,8 @@
         $("crmNegFunil").innerHTML = funis.map(f => `<option value="${h(f.id)}">${h(f.nome)}</option>`).join("");
         $("crmNegFunil").value = base.funil_id || (funis[0] && funis[0].id) || "";
         $("crmNegFunil").disabled = !!n;
-        $("crmNegFunil").onchange = () => { preencherSelectImoveis($("crmNegFunil").value, $("crmNegImovel").value); renderCompativeis(); };
+        $("crmNegFunil").onchange = () => { preencherSelectImoveis($("crmNegFunil").value, $("crmNegImovel").value); renderCompativeis(); mostrarPrazo(); };
+        $("crmNegPrazo").value = n && n.contrato_meses ? n.contrato_meses : "";
         preencherSelectClientes(base.cliente_id);
         $("crmNegCliente").disabled = !!n;
         $("crmNegNovoCli").hidden = !!n;
@@ -1142,6 +1143,7 @@
         if (n) {
             desenharStepper(n);
             desenharSituacao(n);
+            if (window.SKLComissoes) window.SKLComissoes.desenharNaNegociacao(n, $("crmNegComissoes"));
             tipoAtendimento = "ligacao";
             marcarTipoAtendimento();
             $("crmAtTexto").value = "";
@@ -1153,10 +1155,17 @@
             desenharVisitas(n);
         } else {
             $("crmNegSituacao").hidden = true;
+            $("crmNegComissoes").hidden = true;
             $("crmNegVisitas").hidden = true;
         }
         renderCompativeis();
+        mostrarPrazo();
         if (!$("crmNegDialog").open) $("crmNegDialog").showModal();
+    }
+    // prazo do contrato: só na locação (base das parcelas mensais de comissão "enquanto durar o contrato")
+    function mostrarPrazo() {
+        const f = funil($("crmNegFunil").value);
+        $("crmNegPrazoLabel").hidden = !(f && f.finalidade === "locacao");
     }
     function desenharSituacao(n) {
         const box = $("crmNegSituacao");
@@ -1395,7 +1404,8 @@
             valor: valor == null ? "" : String(valor),
             perfil_busca: perfil,
             proxima_acao_em: deInputLocal($("crmNegAcaoEm").value) || "",
-            proxima_acao_texto: $("crmNegAcaoTexto").value.trim()
+            proxima_acao_texto: $("crmNegAcaoTexto").value.trim(),
+            contrato_meses: $("crmNegPrazoLabel").hidden ? "" : ($("crmNegPrazo").value || "")
         };
         if (central()) dados.corretor_id = $("crmNegCorretor").value || null;
         return dados;

@@ -1,0 +1,53 @@
+/* Regras de comissão, simulador e lista de comissões (comissoes.js) */
+.com-regras-panel{grid-column:1/-1}
+.com-regras-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.com-regra{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff;display:grid;gap:8px;align-content:start}
+.com-regra.padrao{border-color:var(--navy);box-shadow:0 0 0 2px rgba(41,171,226,.15)}
+.com-regra header{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.com-regra header strong{font-size:15px;color:var(--navy-deep)}
+.com-regra p{margin:0;font-size:12.5px}
+.com-regra ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13px}
+.com-regra em{font-style:normal;color:var(--muted)}
+.com-selo{background:var(--navy);color:#fff;border-radius:99px;font-size:11px;font-weight:800;padding:2px 9px}
+.com-uso{background:#eef2f3;color:var(--muted);border-radius:99px;font-size:11px;font-weight:700;padding:2px 9px}
+.com-regra-acoes{display:flex;gap:6px;flex-wrap:wrap}
+.com-regra-acoes .secondary-button{padding:7px 11px;font-size:12.5px}
+.com-partes{display:grid;gap:10px}
+.com-parte{border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:12px;padding:10px 12px;background:#fbfdfe;display:grid;gap:8px}
+.com-parte-topo{display:flex;gap:8px;align-items:center}
+.com-parte-topo input{flex:1;min-width:0;font-weight:700}
+.com-parte-num{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:13px;flex:none}
+.com-parte-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.com-parte-grade label{display:grid;gap:3px}
+.com-parte-grade label span{font-size:11.5px;color:var(--muted);font-weight:700}
+.com-parte-grade input,.com-parte-grade select{min-width:0}
+.com-parte-cond summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--navy)}
+.com-parte-cond .com-parte-grade{margin-top:8px}
+.com-tipos{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12.5px}
+.com-tipos .crm-rotulo{flex-basis:100%}
+.com-parte-resumo{margin:0;font-size:12.5px;background:#eef7fc;border-radius:8px;padding:6px 9px}
+.com-parte-resumo em{font-style:normal;color:var(--muted)}
+.com-padrao{align-self:end}
+.com-simulador{display:grid;gap:10px;border:1px dashed #9fd4ee;border-radius:12px;padding:12px 14px;background:#f5fbff;margin-top:6px}
+.com-sim-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;align-items:end}
+.com-sim-campos label{display:grid;gap:3px}
+.com-sim-campos label span{font-size:11.5px;color:var(--muted);font-weight:700}
+.com-sim-tabela{width:100%;border-collapse:collapse;font-size:13px;min-width:0!important}
+.com-sim-tabela th,.com-sim-tabela td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.com-sim-tabela th{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.com-sim-totais{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:13.5px}
+.com-sim-totais span{background:#fff;border:1px solid var(--line);border-radius:99px;padding:5px 12px}
+.com-regra-select{max-width:220px}
+.com-resumo{grid-template-columns:repeat(4,minmax(0,1fr))}
+.com-tabela td{vertical-align:top}
+.com-acoes{display:flex;gap:6px;flex-wrap:wrap}
+.com-negocio .secondary-button{justify-self:start}
+.crm-prazo{max-width:320px}
+@media(max-width:780px){
+  .com-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .com-regras-lista{grid-template-columns:1fr}
+  body.modo-corretor .com-tabela thead{display:none}
+  body.modo-corretor .com-tabela,body.modo-corretor .com-tabela tbody,body.modo-corretor .com-tabela tr,body.modo-corretor .com-tabela td{display:block;width:auto}
+  body.modo-corretor .com-tabela tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
+  body.modo-corretor .com-tabela td{border:0;padding:2px 0}
+}

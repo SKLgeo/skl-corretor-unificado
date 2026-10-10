@@ -10,7 +10,7 @@
     const ABA = {
         hoje: "hoje", dashboard: "hoje", agenda: "hoje",
         construcoes: "construcoes", clientes: "clientes", negociacoes: "negociacoes",
-        conta: "conta", cadastros: "conta", settings: "conta", indicadores: "conta"
+        conta: "conta", cadastros: "conta", settings: "conta", indicadores: "conta", comissoes: "conta"
     };
     const OCULTOS_CORRETOR = [ "alugado", "vendido", "indisponivel" ];
     let ctx = null;

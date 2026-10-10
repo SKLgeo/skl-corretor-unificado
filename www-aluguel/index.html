@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="avatar.css" />
   <link rel="stylesheet" href="crm.css" />
   <link rel="stylesheet" href="corretor-ui.css" />
+  <link rel="stylesheet" href="comissoes.css" />
 </head>
 <body>
   <section id="loginView" class="login-view">
@@ -125,6 +126,7 @@
         <div class="conta-menu">
           <button type="button" data-go="cadastros"><span>✚</span><em id="contaCadastrosTexto">Meus cadastros de imóveis</em><b id="contaCadastrosBadge" class="ct-badge" hidden>0</b><i>›</i></button>
           <button type="button" data-go="agenda"><span>◷</span><em>Agenda completa</em><i>›</i></button>
+          <button type="button" data-go="comissoes"><span>%</span><em>Minhas comissões</em><i>›</i></button>
           <button type="button" data-go="indicadores"><span>▥</span><em>Indicadores</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
           <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
@@ -301,7 +303,7 @@
           </div>
         </div>
         <div class="panel table-panel">
-          <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>% Comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
+          <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Regra de comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
         </div>
         <article class="panel">
           <div class="panel-heading"><h2>Convites aguardando ativação</h2></div>
@@ -310,13 +312,24 @@
       </section>
 
       <section id="page-comissoes" class="page">
-        <div class="page-actions">
-          <p>Controle de comissão por aluguel fechado. Cada corretor só enxerga a própria comissão.</p>
-          <button id="newComissaoAluguelButton" class="primary-button">Registrar comissão</button>
+        <div class="crm-toolbar">
+          <select id="comFiltroSituacao">
+            <option value="">Todas as situações</option>
+            <option value="apagar">A pagar</option>
+            <option value="previstas">Previstas (meses futuros)</option>
+            <option value="pagas">Pagas</option>
+            <option value="canceladas">Canceladas</option>
+          </select>
+          <select id="comFiltroPessoa"></select>
+          <select id="comFiltroMes"></select>
+          <span id="comContagem" class="crm-contagem"></span>
+          <button id="newComissaoAluguelButton" class="secondary-button">+ Lançamento manual</button>
         </div>
+        <div id="comResumo" class="crm-resumo com-resumo"></div>
+        <p class="muted-text crm-dica">As comissões são lançadas sozinhas quando a negociação vai para "Fechado", pela regra do corretor (ou a padrão da casa). Monte as regras em Configurações → Regras de comissão.</p>
         <div class="panel table-panel">
-          <table><thead><tr><th>Corretor</th><th>Valor do aluguel</th><th>%</th><th>Comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="comissaoAluguelTableBody"></tbody></table>
-          <div id="comissaoAluguelTableEmpty" class="empty-state" hidden>Nenhuma comissão registrada.</div>
+          <table class="crm-tabela com-tabela"><thead><tr><th>Quem recebe</th><th>Negócio</th><th>Parte</th><th>Base</th><th>Comissão</th><th>Mês</th><th>Situação</th><th></th></tr></thead><tbody id="comissaoAluguelTableBody"></tbody></table>
+          <div id="comissaoAluguelTableEmpty" class="empty-state" hidden>Nenhuma comissão nesta seleção.</div>
         </div>
       </section>
 
@@ -370,6 +383,13 @@
             </div>
             <div id="crmFaixasPrevia" class="crm-faixas-previa"></div>
             <button id="crmSalvarFaixas" type="button" class="primary-button">Salvar faixas</button>
+          </div>
+          <div id="comRegrasPanel" class="panel form-panel com-regras-panel" data-comissao hidden>
+            <span class="eyebrow">COMISSÕES</span>
+            <h2>Regras de comissão</h2>
+            <p>Monte do jeito que a imobiliária paga: 1º aluguel, % do aluguel todo mês, % da venda, captação, parceria, bônus fixo e metas do mês. A regra "padrão da casa" vale para todos; em Corretores dá para dar uma regra diferente a alguém. Ao fechar um negócio, as comissões são lançadas sozinhas.</p>
+            <div id="comRegrasLista" class="com-regras-lista"></div>
+            <div class="crm-config-acoes"><button id="comNovaRegra" type="button" class="primary-button">+ Nova regra</button></div>
           </div>
           <div id="crmRoletaPanel" class="panel form-panel crm-config" data-gestao hidden>
             <span class="eyebrow">CRM — DISTRIBUIÇÃO DE CONTATOS</span>
@@ -615,6 +635,7 @@
         <label><span>Resumo</span><input id="crmNegTituloInput" placeholder="ex.: casa 3 quartos perto da escola" autocomplete="off" /></label>
         <label id="crmNegCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmNegCorretor"></select></label>
       </div>
+      <label id="crmNegPrazoLabel" class="crm-prazo" hidden><span>Prazo do contrato de locação (meses)</span><input id="crmNegPrazo" type="number" min="1" max="120" placeholder="30" /></label>
       <details class="crm-perfil">
         <summary>O que o cliente procura</summary>
         <div class="form-row">
@@ -643,6 +664,7 @@
         <button id="crmNegSalvar" type="button" class="primary-button">Salvar</button>
       </div>
       <div id="crmNegMsg" class="form-message" hidden></div>
+      <section id="crmNegComissoes" class="crm-visitas com-negocio" hidden></section>
       <section id="crmNegVisitas" class="crm-visitas" hidden></section>
       <section id="crmNegAtendimento" class="crm-atendimento" hidden>
         <span class="eyebrow">REGISTRAR ATENDIMENTO</span>
@@ -659,6 +681,50 @@
     </form>
   </dialog>
 
+  <dialog id="comRegraDialog" class="crm-dialog crm-dialog-larga">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">REGRA DE COMISSÃO</span>
+      <h2 id="comRegraTitulo">Nova regra de comissão</h2>
+      <div class="form-row">
+        <label><span>Nome da regra</span><input id="comRegraNome" placeholder="ex.: 1º aluguel + 2% ao mês" autocomplete="off" /></label>
+        <label><span>Começar de um modelo</span><select id="comModelo">
+          <option value="">Escolha um modelo…</option>
+          <option value="aluguel_integral">1º aluguel integral do corretor</option>
+          <option value="aluguel_mais_mensal">1º aluguel + 2% do aluguel todo mês</option>
+          <option value="venda_captador">Venda: quem fechou + quem captou</option>
+          <option value="parceria">Venda em parceria 50/50</option>
+          <option value="meta">Venda escalonada por meta do mês</option>
+          <option value="bonus">Bônus fixo por locação</option>
+        </select></label>
+      </div>
+      <label><span>Descrição (opcional)</span><input id="comRegraDescricao" placeholder="Explica a regra para a equipe" autocomplete="off" /></label>
+      <div class="form-row">
+        <label><span>Comissão da imobiliária na venda (%)</span><input id="comRegraHonorarios" inputmode="decimal" placeholder="6" /></label>
+        <label class="check-inline com-padrao"><input id="comRegraPadrao" type="checkbox" /> Regra padrão da casa (vale para quem não tem regra própria)</label>
+      </div>
+      <span class="eyebrow">PARTES DA REGRA</span>
+      <p class="muted-text">Cada parte é um pagamento: quem recebe, sobre o quê, quanto e quando. Some quantas partes precisar.</p>
+      <div id="comPartes" class="com-partes"></div>
+      <button id="comAddParte" type="button" class="secondary-button">+ Adicionar parte</button>
+      <section class="com-simulador">
+        <span class="eyebrow">TESTAR A REGRA</span>
+        <div class="com-sim-campos">
+          <label><span>Tipo de negócio</span><select id="comSimFinalidade"><option value="locacao">Locação</option><option value="venda">Venda</option></select></label>
+          <label><span id="comSimValorRotulo">Aluguel mensal</span><input id="comSimValor" inputmode="decimal" value="2.500" /></label>
+          <label id="comSimPrazoLabel"><span>Prazo do contrato (meses)</span><input id="comSimPrazo" type="number" min="1" max="120" value="30" /></label>
+          <label id="comSimMetaLabel" hidden><span>Já fechado pelo corretor no mês</span><input id="comSimMeta" inputmode="decimal" placeholder="R$ 0" /></label>
+          <button id="comSimular" type="button" class="primary-button">Simular</button>
+        </div>
+        <div id="comSimResultado" class="com-sim-resultado"></div>
+      </section>
+      <div class="dialog-actions">
+        <button id="comRegraExcluir" type="button" class="danger-button" hidden>Excluir</button>
+        <button id="comRegraSalvar" type="button" class="primary-button">Salvar regra</button>
+      </div>
+      <div id="comRegraMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
   <dialog id="crmVisitaDialog" class="crm-dialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
@@ -893,6 +959,7 @@
   <script src="crm.js"></script>
   <script src="crm-painel.js"></script>
   <script src="corretor-ui.js"></script>
+  <script src="comissoes.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

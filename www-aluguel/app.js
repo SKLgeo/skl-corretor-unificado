@@ -44,7 +44,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.5.0";
+    const APP_VERSION = "0.6.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -545,6 +545,21 @@
         };
     }
 
+    function contextoComissoes() {
+        return {
+            sb, h, toast, traduzErro, parseValor,
+            carteiraId: () => carteiraId,
+            usuario: () => currentUser,
+            podeGerir: () => !!currentUser && [ "administrador", "central_vendas", "financeiro" ].includes(currentUser.papel),
+            equipe: () => corretores,
+            imoveis: () => [ ...construcoes.values() ],
+            tiposImovel: () => [ ...$("construcaoTipoInput").options ].map(o => o.value).filter(Boolean),
+            comissoes: () => comissoesAluguel,
+            recarregarComissoes: () => loadComissoesAluguel(),
+            recarregarEquipe: async () => { if (veTudo()) await loadCorretores(); }
+        };
+    }
+
     async function enterApp() {
         $("loginView").hidden = true;
         $("appView").hidden = false;
@@ -576,10 +591,12 @@
         bairrosFiltro = [];
         faixaValor = null;
         await carregarConfigCarteira();
+        if (window.SKLComissoes) await window.SKLComissoes.iniciar(contextoComissoes());
         if (veTudo()) await loadCorretores();
         await loadConstrucoes();
         if (gerencia) await loadInteresses();
-        if (gerencia || financeiro) await loadComissoesAluguel();
+        if (window.SKLComissoes) window.SKLComissoes.renderRegras();
+        await loadComissoesAluguel();
         connectRealtime();
         if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
@@ -619,7 +636,7 @@
         document.querySelectorAll(".page").forEach(section => section.classList.remove("active-page"));
         $(`page-${page}`).classList.add("active-page");
         const titles = {
-            hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: "Comissões",
+            hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
             settings: "Configurações", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
@@ -1798,7 +1815,7 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, perfis(nome_exibicao, foto_path)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis(nome_exibicao, foto_path)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
@@ -1809,7 +1826,8 @@
             papel: v.papel,
             active: v.ativo,
             expires_at: v.expira_em,
-            percentual_comissao: v.percentual_comissao
+            percentual_comissao: v.percentual_comissao,
+            regra_comissao_id: v.regra_comissao_id
         }));
         const { data: conviteRows } = await sb.from("convites_aluguel")
             .select("id, email, papel, percentual_comissao, token, expira_em")
@@ -1880,13 +1898,14 @@
     }
     function renderCorretores() {
         $("corretorTableBody").innerHTML = corretores.map(user => {
-            const percentualTexto = user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—";
+            const percentualTexto = window.SKLComissoes ? window.SKLComissoes.celulaRegra(user, canManageCorretor(user)) : (user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—");
             if (!canManageCorretor(user)) {
                 return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button>` : "—"}</td></tr>`;
             }
             const toggleLabel = user.active ? "Desativar" : "Reativar";
             return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
         }).join("");
+        if (window.SKLComissoes) window.SKLComissoes.ligarCelulas($("corretorTableBody"));
         $("corretorTableBody").querySelectorAll("[data-user-foto]").forEach(button => button.addEventListener("click", () => trocarFotoUsuario(button.dataset.userFoto)));
         $("corretorTableBody").querySelectorAll("[data-corretor-percentual]").forEach(button => button.addEventListener("click", () => openEditPercentual(button.dataset.corretorPercentual)));
         $("corretorTableBody").querySelectorAll("[data-corretor-reset]").forEach(button => button.addEventListener("click", () => openResetPasswordAluguel(button.dataset.corretorReset)));
@@ -2032,6 +2051,7 @@
     }
 
     function renderComissoesAluguel() {
+        if (window.SKLComissoes) { window.SKLComissoes.renderLista(); return; }
         $("comissaoAluguelTableEmpty").hidden = comissoesAluguel.length > 0;
         $("comissaoAluguelTableBody").innerHTML = comissoesAluguel.map(c => `<tr>
         <td><strong>${h(c.corretor_nome || "—")}</strong></td>
