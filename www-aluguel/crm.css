@@ -214,3 +214,7 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
   body.imprimindo-painel .painel-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
   body.imprimindo-painel{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* botão de câmera no cadastro do imóvel: só em tela de toque (celular/tablet) */
+.foto-camera-button{display:none!important}
+@media (pointer:coarse){.foto-camera-button:not([hidden]){display:flex!important}}

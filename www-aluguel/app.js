@@ -42,7 +42,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.4.1";
+    const APP_VERSION = "0.4.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -171,6 +171,7 @@
         $("registrarInteresseButton").addEventListener("click", () => abrirInteresseDialog(construcoes.get(editandoId)));
         $("submitInteresseButton").addEventListener("click", enviarInteresse);
         $("construcaoFotosInput").addEventListener("change", onFotosInputChange);
+        $("construcaoCameraInput").addEventListener("change", onFotosInputChange);
         $("construcaoLatInput").addEventListener("change", syncPickerFromInputs);
         $("construcaoLngInput").addEventListener("change", syncPickerFromInputs);
         $("construcaoLinkMapaInput").addEventListener("change", aplicarLinkMapa);
@@ -1091,8 +1092,9 @@
         $("codigoLabel").hidden = modoDialogo !== "central";
         $("opcoesCentralRow").hidden = modoDialogo !== "central";
         $("construcaoLinkMapaInput").closest("label").hidden = leitura;
-        document.querySelector(".foto-add-button").hidden = leitura;
+        document.querySelectorAll(".foto-add-button").forEach(botao => { botao.hidden = leitura; });
         $("construcaoFotosInput").disabled = leitura;
+        $("construcaoCameraInput").disabled = leitura;
         renderAprovacaoBanner(construcao);
         renderAutoria(construcao);
 
