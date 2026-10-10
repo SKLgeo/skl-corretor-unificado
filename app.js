@@ -4,18 +4,22 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.7.3-web";
+    const APP_VERSION = "0.9.0-web";
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: { storageKey: "sklu-auth", persistSession: true, autoRefreshToken: true }
     });
 
+    // App único: a tela é escolhida pelo papel. Vendas tem duas telas — a da Central (www-vendas/)
+    // e a do corretor (www-vendas-corretor/, mapa e pedidos de reserva); Aluguéis é uma só
+    // (www-aluguel/ troca sozinha para a tela do corretor quando o papel é corretor).
     // Versão web: shell (esta página, na raiz), www-vendas/ e www-aluguel/ ficam lado a lado na
     // MESMA origem, então uma navegação comum (location.href) leva a sessão do Supabase junto via
     // localStorage. Endereços relativos — o site pode ficar em qualquer subpasta (GitHub Pages).
     const LINE_TARGETS = {
         vendas: "www-vendas/index.html",
+        "vendas-corretor": "www-vendas-corretor/index.html",
         aluguel: "www-aluguel/index.html"
     };
 
@@ -75,7 +79,7 @@
             erroSessao = error;
         }
         if (!data?.session) {
-            if ((erroSessao || !navigator.onLine) && temAcessoOfflineSalvo()) return abrirLinha("vendas");
+            if ((erroSessao || !navigator.onLine) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
             mostrarLogin();
             if (!navigator.onLine) showMessage($("loginMessage"), MSG_SEM_INTERNET);
             return;
@@ -83,24 +87,26 @@
         try {
             await detectarLinhasEEntrar();
         } catch (error) {
-            if (ehErroDeRede(error) && temAcessoOfflineSalvo()) return abrirLinha("vendas");
+            if (ehErroDeRede(error) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
             mostrarLogin();
             showMessage($("loginMessage"), navigator.onLine ? traduzErro(error.message) : MSG_SEM_INTERNET);
         }
     }
 
-    // Mesmo filtro que online.js usa hoje: só papel "corretor" enxerga
-    // Vendas por aqui (administrador/central_vendas usam o Central Unificado).
+    // Vendas: administrador/central_vendas abrem a tela da Central; corretor abre a do corretor.
+    // Devolve "vendas", "vendas-corretor" ou null (sem acesso).
     async function temAcessoVendas() {
         const { data: userData } = await sb.auth.getUser();
-        if (!userData?.user) return false;
+        if (!userData?.user) return null;
         const { data, error } = await sb.from("empreendimento_usuarios")
             .select("papel, expira_em, empreendimentos(ativo)")
             .eq("usuario_id", userData.user.id)
-            .eq("papel", "corretor");
+            .in("papel", ["administrador", "central_vendas", "corretor"]);
         if (error) throw new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.");
         const agora = Date.now();
-        return (data || []).some(v => v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora));
+        const validos = (data || []).filter(v => v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora));
+        if (validos.some(v => v.papel !== "corretor")) return "vendas";
+        return validos.length ? "vendas-corretor" : null;
     }
 
     // Mesmo filtro do Central Unificado: qualquer papel ativo — a própria
@@ -118,21 +124,23 @@
     }
 
     let acesso = { vendas: false, aluguel: false };
+    let alvoVendas = "vendas";
 
     async function detectarLinhasEEntrar() {
         const limite = new Promise((_, rejeita) => setTimeout(() => rejeita(new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.")), 25000));
         const [vendas, aluguel] = await Promise.race([Promise.all([temAcessoVendas(), temAcessoAluguel()]), limite]);
-        acesso = { vendas, aluguel };
+        acesso = { vendas: Boolean(vendas), aluguel };
         // usado por trocar-linha.js (Vendas/Aluguéis) para só mostrar o atalho a quem tem as duas linhas
         try { localStorage.setItem("sklu_linhas", [vendas && "vendas", aluguel && "aluguel"].filter(Boolean).join(",")); } catch {}
+        alvoVendas = vendas || "vendas";
         if (!vendas && !aluguel) {
-            throw new Error("Este usuário ainda não tem acesso de corretor a nenhuma linha de negócio (Vendas ou Aluguéis).");
+            throw new Error("Este usuário ainda não tem acesso a nenhuma linha de negócio (Vendas ou Aluguéis).");
         }
         if (vendas && aluguel) {
             mostrarEscolha();
             return;
         }
-        abrirLinha(vendas ? "vendas" : "aluguel");
+        abrirLinha(vendas ? alvoVendas : "aluguel");
     }
 
     function mostrarLogin() {
@@ -149,6 +157,7 @@
     }
 
     function abrirLinha(linha) {
+        if (linha === "vendas") linha = alvoVendas;
         const alvo = LINE_TARGETS[linha];
         if (!alvo) return;
         location.href = alvo;

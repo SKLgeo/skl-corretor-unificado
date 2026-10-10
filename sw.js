@@ -4,7 +4,7 @@
 // ("skl-unificado-") e a limpeza só apaga caches com esse prefixo — nunca mexe
 // nos caches de outros sites da mesma conta (que usam outros nomes).
 const CACHE_PREFIX = "skl-unificado-";
-const CACHE_NAME = CACHE_PREFIX + "v11";
+const CACHE_NAME = CACHE_PREFIX + "v12";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -18,17 +18,17 @@ const CORE_ASSETS = [
   "./assets/icons/apple-touch-icon.png",
   "./vendor/supabase/supabase.js",
   // Vendas guardado já na instalação: o corretor abre o mapa sem internet no empreendimento.
-  "./www-vendas/index.html",
-  "./www-vendas/styles.css",
-  "./www-vendas/app.js",
-  "./www-vendas/online.js",
-  "./www-vendas/vertical.js",
-  "./www-vendas/simulador.js",
-  "./www-vendas/data/lotes.js",
-  "./www-vendas/data/status-config.js",
-  "./www-vendas/vendor/leaflet/leaflet.css",
-  "./www-vendas/vendor/leaflet/leaflet.js",
-  "./www-vendas/vendor/supabase/supabase.js",
+  "./www-vendas-corretor/index.html",
+  "./www-vendas-corretor/styles.css",
+  "./www-vendas-corretor/app.js",
+  "./www-vendas-corretor/online.js",
+  "./www-vendas-corretor/vertical.js",
+  "./www-vendas-corretor/simulador.js",
+  "./www-vendas-corretor/data/lotes.js",
+  "./www-vendas-corretor/data/status-config.js",
+  "./www-vendas-corretor/vendor/leaflet/leaflet.css",
+  "./www-vendas-corretor/vendor/leaflet/leaflet.js",
+  "./www-vendas-corretor/vendor/supabase/supabase.js",
 ];
 
 self.addEventListener("install", (event) => {

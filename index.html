@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://xigwlofqkmiibzbongkn.supabase.co wss://xigwlofqkmiibzbongkn.supabase.co; font-src 'self' data:;" />
-  <title>SKL Corretor</title>
+  <title>SKL Unificado</title>
   <meta name="theme-color" content="#06202f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="SKL Corretor" />
+  <meta name="apple-mobile-web-app-title" content="SKL Unificado" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="assets/icons/icon-192.png" />
@@ -20,7 +20,7 @@
     <div class="chooser-brand"><img src="logo.png" alt="SKL Soluções Digitais" /></div>
     <form id="loginForm" class="chooser-card">
       <span class="eyebrow">SKL SOLUÇÕES DIGITAIS</span>
-      <h1>Acesso do Corretor</h1>
+      <h1>Acesso ao sistema</h1>
       <p>Entre com sua conta autorizada. Depois do login, a gente já mostra as linhas de negócio que você tem acesso.</p>
       <label class="field-label"><span>E-mail</span><input id="loginEmailInput" type="email" autocomplete="username" required /></label>
       <label class="field-label"><span>Senha</span><input id="loginPasswordInput" type="password" autocomplete="current-password" required /></label>
@@ -31,7 +31,7 @@
         <p class="install-hint"></p>
       </div>
     </form>
-    <p class="chooser-footer">SKL SOLUÇÕES DIGITAIS — CORRETOR <span class="appVersionText"></span></p>
+    <p class="chooser-footer">SKL SOLUÇÕES DIGITAIS <span class="appVersionText"></span></p>
   </section>
 
   <section id="chooserView" class="chooser-view" hidden>
@@ -43,11 +43,11 @@
       <div class="chooser-options">
         <button id="chooseVendasButton" type="button" class="chooser-option" hidden>
           <span class="chooser-option-title">Vendas</span>
-          <span class="chooser-option-desc">Lotes, unidades, disponibilidade</span>
+          <span class="chooser-option-desc">Lotes, unidades, reservas</span>
         </button>
         <button id="chooseAluguelButton" type="button" class="chooser-option" hidden>
           <span class="chooser-option-title">Aluguéis</span>
-          <span class="chooser-option-desc">Imóveis, registrar interesse</span>
+          <span class="chooser-option-desc">Imóveis, clientes, negócios</span>
         </button>
       </div>
       <div class="install-box" hidden>
@@ -56,7 +56,7 @@
       </div>
       <button id="chooserLogoutButton" type="button" class="text-button">Sair</button>
     </div>
-    <p class="chooser-footer">SKL SOLUÇÕES DIGITAIS — CORRETOR <span class="appVersionText"></span></p>
+    <p class="chooser-footer">SKL SOLUÇÕES DIGITAIS <span class="appVersionText"></span></p>
   </section>
 
   <script src="vendor/supabase/supabase.js"></script>

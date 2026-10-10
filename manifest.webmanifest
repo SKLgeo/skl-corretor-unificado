@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "SKL Corretor — Vendas e Aluguéis",
-  "short_name": "SKL Corretor",
+  "name": "SKL Unificado — Vendas e Aluguéis",
+  "short_name": "SKL Unificado",
   "description": "App do corretor: consulte lotes, unidades e imóveis, peça reservas e acompanhe comissões — Vendas e Aluguéis num só acesso.",
   "lang": "pt-BR",
   "start_url": "./",

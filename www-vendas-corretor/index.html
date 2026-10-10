@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#063f50" />
+    <meta name="description" content="Localizador comercial de quadras e lotes do Empreendimento Imobiliário Demonstrativo." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SKL Corretor" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://xigwlofqkmiibzbongkn.supabase.co wss://xigwlofqkmiibzbongkn.supabase.co; font-src 'self' data:;" />
+    <title>SKL Corretores Demo</title>
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="avatar.css" />
+  </head>
+  <body>
+    <div class="demo-ribbon">DEMONSTRAÇÃO SKL • dados comerciais simulados</div>
+    <section id="authView" class="auth-view">
+      <div class="auth-brand"><img src="assets/logo-full.png" alt="SKL Soluções Digitais" /></div>
+      <form id="brokerLoginForm" class="auth-card">
+        <span class="eyebrow">ACESSO DO CORRETOR</span>
+        <h1>Entrar na demonstração</h1>
+        <p>Consulte as informações oficiais atualizadas pela Central de Vendas.</p>
+        <label><span>E-mail</span><input id="brokerEmailInput" type="email" autocomplete="username" required /></label>
+        <label><span>Senha</span><input id="brokerPasswordInput" type="password" autocomplete="current-password" required /></label>
+        <button class="primary-button" type="submit">Entrar</button>
+        <button id="showBrokerActivation" class="text-button" type="button">Primeiro acesso com convite</button>
+        <div id="brokerLoginMessage" class="auth-message" hidden></div>
+        <p class="auth-offline-hint">📶 Vai usar no empreendimento sem internet? Abra o aplicativo e entre na sua conta antes, ainda com internet — o mapa, os lotes e a última situação ficam salvos no aparelho.</p>
+      </form>
+      <form id="brokerActivationForm" class="auth-card" hidden>
+        <span class="eyebrow">PRIMEIRO ACESSO</span><h1>Crie seu acesso</h1>
+        <label><span>Código do convite</span><input id="brokerInviteInput" autocomplete="one-time-code" required /></label>
+        <label><span>Seu e-mail</span><input id="brokerNewEmail" type="email" autocomplete="username" required /></label>
+        <label><span>Crie sua senha</span><input id="brokerNewPassword" type="password" autocomplete="new-password" required minlength="6" /></label>
+        <button class="primary-button" type="submit">Ativar conta</button>
+        <button class="text-button back-auth" type="button">Voltar</button>
+        <div id="brokerActivationMessage" class="auth-message" hidden></div>
+      </form>
+      <p class="auth-footer">EMPREENDIMENTO IMOBILIÁRIO - BASE DEMONSTRATIVA</p>
+    </section>
+
+    <section id="empreendimentoPicker" class="auth-view" hidden>
+      <div class="picker-card">
+        <span class="eyebrow">SELECIONE UM EMPREENDIMENTO</span>
+        <h1>Onde você quer trabalhar agora?</h1>
+        <p>Sua conta tem acesso a mais de um empreendimento. Escolha um para continuar — você pode trocar depois, a qualquer momento.</p>
+        <div id="empreendimentoList" class="empreendimento-list"></div>
+      </div>
+    </section>
+
+    <div id="app">
+      <header class="app-header">
+        <div class="brand">
+          <img src="assets/logo-symbol.png" alt="Símbolo SKL Soluções Digitais" />
+          <div>
+            <span class="brand-kicker">SKL</span>
+            <strong>SOLUÇÕES</strong>
+            <span class="brand-subtitle">DIGITAIS</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="savedButton" class="header-button" type="button" aria-label="Abrir favoritos e histórico">
+            <span aria-hidden="true">★</span><span class="header-button-label">Salvos</span>
+          </button>
+          <button id="mapa3dButton" class="header-button" type="button" aria-label="Ver planta 3D interativa" hidden>
+            <span aria-hidden="true">◈</span><span class="header-button-label">Planta 3D</span><span class="header-button-label-compact" aria-hidden="true">3D</span>
+          </button>
+          <button id="commercialButton" class="header-button" type="button" aria-label="Abrir minha conta">
+            <span aria-hidden="true">👤</span><span class="header-button-label">Conta</span>
+          </button>
+          <button id="installButton" class="header-button" type="button" hidden aria-label="Instalar aplicativo">
+            <span aria-hidden="true">↓</span><span class="header-button-label">Instalar</span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <div id="map" role="application" aria-label="Mapa dos lotes"></div>
+
+        <div class="map-legend" aria-hidden="true">
+          <span><i class="dot disponivel"></i>Disponível</span>
+          <span><i class="dot reservado"></i>Reservado</span>
+          <span><i class="dot vendido"></i>Vendido</span>
+          <span><i class="dot bloqueado"></i>Bloqueado</span>
+        </div>
+
+        <button id="searchToggleButton" class="search-toggle-button" type="button" aria-label="Abrir localizador de lote" title="Localizador do Corretor">
+          <span aria-hidden="true">⌖</span><span>Buscar lote</span>
+        </button>
+
+        <section id="searchCard" class="search-card" aria-label="Pesquisa de lote" hidden>
+          <div class="search-heading">
+            <div>
+              <span class="eyebrow">LOCALIZADOR DO CORRETOR</span>
+              <h1>Encontre um lote</h1>
+            </div>
+            <div class="search-heading-actions">
+              <button id="showAllButton" class="text-button" type="button">Ver todos</button>
+              <button id="closeSearchButton" class="search-close-button" type="button" aria-label="Fechar localizador">×</button>
+            </div>
+          </div>
+
+          <form id="lotSearchForm" class="search-form">
+            <label>
+              <span>Quadra</span>
+              <select id="quadraSelect" required aria-label="Selecione a quadra">
+                <option value="">Selecione</option>
+              </select>
+            </label>
+            <label>
+              <span>Lote</span>
+              <select id="loteSelect" required disabled aria-label="Selecione o lote">
+                <option value="">Selecione</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit"><span aria-hidden="true">⌖</span>Localizar</button>
+          </form>
+        </section>
+
+        <div class="map-actions" aria-label="Controles do mapa">
+          <button id="basemapButton" class="map-button" type="button" title="Alternar fundo do mapa" aria-label="Alternar fundo do mapa: satélite, ruas ou planta (sem internet)">▦</button>
+          <button id="locateButton" class="map-button" type="button" title="Minha localização" aria-label="Mostrar minha localização">◎</button>
+          <button id="zoomInButton" class="map-button compact" type="button" aria-label="Aumentar zoom">+</button>
+          <button id="zoomOutButton" class="map-button compact" type="button" aria-label="Diminuir zoom">−</button>
+        </div>
+
+        <div id="connectionBadge" class="connection-badge" aria-live="polite">Imagem de satélite</div>
+
+        <div class="campo-status">
+          <button id="gpsChip" class="gps-chip" type="button" aria-live="polite" hidden></button>
+          <div id="offlineBanner" class="offline-banner" hidden>Sem internet. Lotes e memoriais continuam disponíveis, mas o satélite e a sincronização podem não carregar.</div>
+        </div>
+
+        <div id="offlineReadyNotice" class="offline-ready-notice" role="status" hidden>
+          <strong>✓ Pronto para usar sem internet</strong>
+          <span>O mapa, os lotes e a situação atual ficaram salvos neste aparelho. No empreendimento, mesmo sem sinal, você abre o app, vê os lotes e sua posição pelo GPS (botão ◎). Antes de ir a campo, abra o app com internet para atualizar a situação dos lotes. Reservas só são enviadas com internet.</span>
+          <button id="offlineReadyClose" class="primary-button" type="button">Entendi</button>
+        </div>
+
+        <article id="lotCard" class="lot-card" aria-live="polite" hidden>
+          <button id="closeLotCard" class="close-button" type="button" aria-label="Fechar informações">×</button>
+          <div class="lot-title-row">
+            <div>
+              <span class="eyebrow">LOTE SELECIONADO</span>
+              <h2 id="lotTitle">Quadra — · Lote —</h2>
+              <span id="statusBadge" class="status-badge status-nao_informado">Situação não informada</span>
+            </div>
+            <button id="favoriteButton" class="favorite-button" type="button" aria-label="Adicionar aos favoritos">☆</button>
+          </div>
+
+          <div class="metrics-grid">
+            <div><span>Área</span><strong id="lotArea">— m²</strong></div>
+            <div><span>Perímetro</span><strong id="lotPerimeter">— m</strong></div>
+            <div><span>Testada viária</span><strong id="lotFrontage">— m</strong></div>
+          </div>
+
+          <div class="info-row access-row">
+            <span>Ponto de navegação</span>
+            <strong id="lotAccess">—</strong>
+          </div>
+          <div class="info-row">
+            <span>Coordenada de destino</span>
+            <strong id="lotCoordinates">—</strong>
+          </div>
+          <div id="distanceRow" class="info-row" hidden>
+            <span>Distância da sua posição</span>
+            <strong id="lotDistance">—</strong>
+          </div>
+          <div id="commercialInfo" class="commercial-info" hidden></div>
+          <button id="technicalReviewButton" class="review-alert" type="button" hidden>⚠ Dados sinalizados para conferência técnica</button>
+
+          <div id="reservaBannerLote" class="reserva-banner" hidden></div>
+          <div class="card-actions">
+            <a id="googleMapsButton" class="primary-button" href="#" target="_blank" rel="noopener">Ir pelo Google Maps</a>
+            <a id="wazeButton" class="secondary-button" href="#" target="_blank" rel="noopener">Abrir no Waze</a>
+            <button id="memorialButton" class="secondary-button" type="button">Memorial PDF</button>
+            <button id="detailsButton" class="secondary-button" type="button">Medidas e divisas</button>
+            <button id="paymentInfoButton" class="secondary-button" type="button" hidden>Formas de pagamento</button>
+            <button id="simLotButton" class="secondary-button" type="button" hidden>Simular financiamento</button>
+            <button id="requestLotButton" class="request-button" type="button">Solicitar reserva ou indicar venda</button>
+            <button id="shareCardButton" class="share-card-button" type="button">Compartilhar ficha comercial</button>
+          </div>
+
+          <p class="technical-notice"><strong>Aviso técnico:</strong> a localização é para orientação comercial e navegação, não substituindo demarcação física ou levantamento técnico dos limites.</p>
+        </article>
+
+      </main>
+    </div>
+
+    <div id="verticalApp" hidden>
+      <header class="vt-hero" id="vtHero">
+        <div class="vt-hero-overlay">
+          <button id="vtAccountButton" class="vt-icon-button" type="button" aria-label="Minha conta">☰</button>
+          <div class="vt-hero-title"></div>
+          <button id="vtSwitchButton" class="vt-icon-button" type="button" aria-label="Trocar empreendimento">⇄</button>
+        </div>
+      </header>
+
+      <main class="vt-main">
+        <span class="eyebrow">RESIDENCIAL</span>
+        <h1 class="vt-map-title" id="vtEmpreendimentoNome">—</h1>
+        <p class="vt-map-sub" id="vtMapSub">Selecione uma unidade</p>
+
+        <div class="vt-filter-row">
+          <label class="vt-filter">
+            <span class="vt-filter-icon">▤</span>
+            <span class="vt-filter-text"><small>Andar</small><select id="vtFloorFilter"><option value="">Todos</option></select></small></span>
+          </label>
+          <label class="vt-filter">
+            <span class="vt-filter-icon vt-filter-icon-status"><i class="vt-dot vt-dot-disponivel"></i><i class="vt-dot vt-dot-reservado"></i><i class="vt-dot vt-dot-vendido"></i></span>
+            <span class="vt-filter-text"><small>Status</small><select id="vtStatusFilter"><option value="">Todos</option><option value="disponivel">Disponível</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option><option value="bloqueado">Bloqueado</option></select></small></span>
+          </label>
+          <label class="vt-filter">
+            <span class="vt-filter-icon">▦</span>
+            <span class="vt-filter-text"><small>Tipo</small><select id="vtTipoFilter"><option value="">Todos</option></select></small></span>
+          </label>
+        </div>
+
+        <div class="vt-map-frame">
+          <div id="vtConnectionBadge" class="connection-badge vt-map-badge">Sincronizado com a Central</div>
+          <div class="vt-map-legend">
+            <span class="vt-legend-item"><i class="vt-dot vt-dot-disponivel"></i>Disponível</span>
+            <span class="vt-legend-item"><i class="vt-dot vt-dot-reservado"></i>Reservado</span>
+            <span class="vt-legend-item"><i class="vt-dot vt-dot-vendido"></i>Vendido</span>
+            <span class="vt-legend-item"><i class="vt-dot vt-dot-bloqueado"></i>Bloqueado</span>
+          </div>
+          <div id="vtBuildingMap" class="vt-building-map"></div>
+        </div>
+      </main>
+    </div>
+
+    <dialog id="unitDialog" class="sheet-dialog unit-dialog">
+      <div class="dialog-body unit-dialog-body">
+        <div class="unit-hero-photo" id="unitHeroPhoto">
+          <button class="unit-hero-back dialog-close" type="button" aria-label="Fechar">‹</button>
+          <div class="unit-hero-actions">
+            <button id="unitFavoriteButton" class="unit-hero-icon-btn" type="button" aria-label="Favoritar">♡</button>
+            <button id="unitShareButton" class="unit-hero-icon-btn" type="button" aria-label="Compartilhar">⤴</button>
+          </div>
+          <div class="unit-hero-bullets" id="unitHeroBullets"></div>
+          <div class="unit-hero-brand">
+            <span class="eyebrow">RESIDENCIAL</span>
+            <h1 id="unitEyebrow">—</h1>
+          </div>
+          <div class="unit-hero-tagline" id="unitHeroTagline"></div>
+        </div>
+
+        <div class="unit-body-pad">
+          <div class="unit-title-row-v2">
+            <div>
+              <h1 id="unitTitle">Apto 804</h1>
+              <span class="unit-subtitle" id="unitTipoNome">—</span>
+            </div>
+            <span id="unitStatusBadge" class="status-badge-lg status-nao_informado">—</span>
+          </div>
+
+          <div class="unit-price-location-row">
+            <strong id="unitValor" class="unit-price-v2">R$ —</strong>
+            <div class="unit-price-divider"></div>
+            <div class="unit-location-block">
+              <span class="unit-location-icon">📍</span>
+              <div><strong id="unitCidade">—</strong><small id="unitCidadeDescricao">—</small></div>
+            </div>
+          </div>
+
+          <div class="unit-specs-card" id="unitSpecsCard"></div>
+
+          <p id="unitDescricao" class="unit-descricao"></p>
+
+          <div class="unit-two-col">
+            <div class="unit-plant-block">
+              <span class="eyebrow">PLANTA DO APARTAMENTO</span>
+              <div class="unit-plant-frame-v2" id="unitPlantFrame">
+                <img id="unitPlantImage" src="" alt="Planta da unidade" />
+              </div>
+              <button id="unitPlantExpandButton" class="unit-plant-link" type="button">⤢ Abrir planta em tela cheia</button>
+            </div>
+            <div class="unit-gallery-block">
+              <div class="unit-gallery-heading"><span class="eyebrow">GALERIA DE IMAGENS</span><small id="unitGalleryLabel">Áreas comuns</small></div>
+              <div class="unit-gallery-main">
+                <img id="unitGalleryMainImage" src="" alt="" />
+                <span class="unit-gallery-counter" id="unitGalleryCounter">1/5</span>
+              </div>
+              <div class="unit-gallery-thumbs" id="unitGalleryThumbs"></div>
+            </div>
+          </div>
+
+          <div id="unitAcabamentoSection" class="unit-acabamento" hidden>
+            <span class="eyebrow" id="unitAcabamentoNome">ACABAMENTO</span>
+            <div id="unitAcabamentoList" class="acabamento-list"></div>
+          </div>
+
+          <div class="unit-vagas-row">
+            <span>Vagas de garagem vinculadas</span>
+            <strong id="unitVagasIds">—</strong>
+          </div>
+
+          <div id="reservaBannerUnidade" class="reserva-banner" hidden></div>
+          <div class="unit-action-row">
+            <button id="unitRequestButton" class="unit-action-btn unit-action-primary" type="button"><span class="unit-action-icon">📅</span><span><strong>Reservar</strong><small>Garanta este apartamento</small></span></button>
+            <button id="unitShareButton2" class="unit-action-btn" type="button"><span class="unit-action-icon">🔗</span><span><strong>Compartilhar</strong><small>Envie para alguém</small></span></button>
+            <button id="unitPlantExpandButton2" class="unit-action-btn" type="button"><span class="unit-action-icon">▦</span><span><strong>Abrir planta</strong><small>Ver em detalhes</small></span></button>
+            <button id="simUnitButton" class="unit-action-btn unit-action-wide" type="button" hidden><span class="unit-action-icon">🧮</span><span><strong>Simular financiamento</strong><small>Parcela, entrada e prazo</small></span></button>
+          </div>
+
+          <p class="unit-footer-tag" id="unitFooterTag"></p>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="unitPlantLightbox" class="lightbox-dialog">
+      <div class="lightbox-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <img id="unitPlantLightboxImage" src="" alt="Planta ampliada" />
+      </div>
+    </dialog>
+
+    <dialog id="vtAccountDialog" class="sheet-dialog commercial-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">MINHA CONTA</span>
+        <h2 id="vtAccountName">Corretor</h2>
+        <section class="admin-card"><div id="vtFotoPainel"></div></section>
+        <p class="dialog-intro">As disponibilidades, reservas, vendas e valores são publicados pela Central de Vendas.</p>
+
+        <section class="admin-card account-summary">
+          <div><span>Situação da conexão</span><strong id="vtConnectionText">Aguardando conexão</strong></div>
+          <div><span>Versão do app</span><strong id="vtAppVersion">—</strong></div>
+          <button id="vtMyRequestsButton" class="secondary-button full-width" type="button">Minhas solicitações</button>
+          <button id="vtMyCommissionsButton" class="secondary-button full-width" type="button">Minhas vendas e comissões</button>
+          <button id="vtSwitchAccountButton" class="secondary-button full-width" type="button">Trocar empreendimento</button>
+        </section>
+
+        <section class="admin-card">
+          <h3>Alterar minha senha</h3>
+          <label><span>Nova senha</span><input id="vtChangedPassword" type="password" autocomplete="new-password" minlength="6" /></label>
+          <button id="vtChangePasswordButton" class="secondary-button full-width" type="button">Alterar senha</button>
+        </section>
+        <button id="vtLogoutButton" class="logout-button full-width" type="button">Sair deste aparelho</button>
+      </div>
+    </dialog>
+
+    <dialog id="savedDialog" class="sheet-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">ACESSO RÁPIDO</span>
+        <h2>Favoritos e histórico</h2>
+        <section>
+          <h3>Favoritos</h3>
+          <div id="favoritesList" class="lot-list"></div>
+        </section>
+        <section>
+          <div class="section-title-row">
+            <h3>Consultados recentemente</h3>
+            <button id="clearHistoryButton" class="text-button" type="button">Limpar</button>
+          </div>
+          <div id="historyList" class="lot-list"></div>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="detailsDialog" class="sheet-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">DADOS DO MEMORIAL</span>
+        <h2 id="detailsTitle">Medidas e confrontações</h2>
+        <div id="dimensionsList" class="dimensions-list"></div>
+        <div id="reviewSection" class="review-section" hidden>
+          <h3>Conferência técnica</h3>
+          <ul id="reviewList"></ul>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="commercialDialog" class="sheet-dialog commercial-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">MINHA CONTA</span>
+        <h2 id="brokerAccountName">Corretor</h2>
+        <section class="admin-card"><div id="brokerFotoPainel"></div></section>
+        <p class="dialog-intro">As disponibilidades, reservas, vendas e valores são publicados pela Central de Vendas.</p>
+
+        <section class="admin-card account-summary">
+          <div><span>Situação da conexão</span><strong id="brokerConnectionText">Aguardando conexão</strong></div>
+          <div><span>Última atualização</span><strong id="brokerLastSync">—</strong></div>
+          <div><span>Versão do app</span><strong id="brokerAppVersion">—</strong></div>
+          <button id="myRequestsButton" class="secondary-button full-width" type="button">Minhas solicitações</button>
+          <button id="myCommissionsButton" class="secondary-button full-width" type="button">Minhas vendas e comissões</button>
+          <button id="brokerSwitchButton" class="secondary-button full-width" type="button">Trocar empreendimento</button>
+        </section>
+
+        <section class="admin-card">
+          <button id="syncStatusButton" class="primary-button full-width" type="button">Atualizar agora</button>
+          <p id="syncStatusText" class="sync-status">Ainda não sincronizado.</p>
+        </section>
+
+        <section class="admin-card">
+          <h3>Alterar minha senha</h3>
+          <label><span>Nova senha</span><input id="brokerChangedPassword" type="password" autocomplete="new-password" minlength="6" /></label>
+          <button id="brokerChangePasswordButton" class="secondary-button full-width" type="button">Alterar senha</button>
+        </section>
+        <button id="brokerLogoutButton" class="logout-button full-width" type="button">Sair deste aparelho</button>
+
+        <section hidden aria-hidden="true">
+          <h3 id="adminLotTitle">Lote</h3>
+          <select id="adminStatusSelect" disabled><option value="nao_informado">Não informado</option></select>
+          <input id="adminValueInput" disabled /><textarea id="adminNoteInput" disabled></textarea>
+          <button id="saveLocalStatusButton" type="button" disabled></button>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="requestDialog" class="sheet-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">ENVIAR PARA A CENTRAL</span><h2 id="requestLotTitle">Solicitar lote</h2>
+        <p>A Central de Vendas receberá um alerta e decidirá a situação oficial do lote.</p>
+        <p style="font-size:12px;color:var(--muted);margin:-6px 0 4px">Aviso de privacidade: os dados do cliente informados abaixo são tratados conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018) e usados apenas para esta solicitação.</p>
+        <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input id="requestConsentInput" type="checkbox" required style="margin-top:3px;flex:none;width:auto" /><span style="text-transform:none;font-size:12px;font-weight:500;letter-spacing:normal;color:var(--text,#1a1a1a)">Expliquei ao cliente como os dados serão usados, conforme o aviso acima.</span></label>
+        <label><span>O que deseja informar?</span><select id="requestTypeInput"><option value="reserva">Solicitar reserva</option><option value="indicacao_venda">Indicar possível venda</option></select></label>
+        <label><span>Nome do cliente</span><input id="requestCustomerInput" required /></label>
+        <label><span>Telefone do cliente, se disponível</span><input id="requestPhoneInput" inputmode="tel" /></label>
+        <label><span>CPF do cliente, se disponível</span><input id="requestCpfInput" inputmode="numeric" placeholder="000.000.000-00" /></label>
+        <label><span>E-mail do cliente, se disponível</span><input id="requestEmailInput" type="email" placeholder="cliente@email.com" /></label>
+        <label><span>Endereço do cliente, se disponível</span><input id="requestAddressInput" placeholder="Rua, número, bairro, cidade" /></label>
+        <div id="requestSimBloco" hidden></div>
+        <label><span>Forma de pagamento</span><select id="requestPaymentPlanInput"><option value="">Nenhuma forma cadastrada ainda</option></select></label>
+        <label><span>Descrição ou observação</span><textarea id="requestNoteInput" rows="4"></textarea></label>
+        <button id="submitRequestButton" class="primary-button full-width" type="button">Enviar solicitação</button>
+        <div id="requestMessage" class="auth-message" hidden></div>
+      </div>
+    </dialog>
+
+    <dialog id="myRequestsDialog" class="sheet-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">ACOMPANHAMENTO</span><h2>Minhas solicitações</h2>
+        <div id="myRequestsList" class="lot-list"></div>
+      </div>
+    </dialog>
+
+    <dialog id="myCommissionsDialog" class="sheet-dialog">
+      <div class="dialog-body">
+        <button class="close-button dialog-close" type="button" aria-label="Fechar">×</button>
+        <span class="eyebrow">DESEMPENHO</span><h2>Minhas vendas e comissões</h2>
+        <div id="myCommissionsList" class="lot-list"></div>
+      </div>
+    </dialog>
+
+    <dialog id="installDialog" class="install-dialog">
+      <form method="dialog">
+        <button class="close-button" aria-label="Fechar">×</button>
+        <img src="assets/icons/icon-192.png" alt="" />
+        <h2>Instalar SKL Corretores Demo</h2>
+        <p id="installInstructions"></p>
+        <button class="primary-button" value="close">Entendi</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <div id="mapa3dOverlay" class="mapa3d-overlay" hidden>
+      <div class="mapa3d-topbar">
+        <div class="mapa3d-heading"><span class="eyebrow">PLANTA INTERATIVA</span><h2>Toque e arraste para girar</h2></div>
+        <button id="mapa3dCloseButton" class="close-button" type="button" aria-label="Fechar planta 3D">×</button>
+      </div>
+      <div id="mapa3dContainer" class="mapa3d-container"></div>
+      <div id="mapa3dLoading" class="mapa3d-loading"><span class="mapa3d-spinner"></span>Carregando planta 3D…</div>
+      <div class="mapa3d-legend">
+        <span><i style="background:#2f8a56"></i>Disponível</span>
+        <span><i style="background:#d59a22"></i>Reservado</span>
+        <span><i style="background:#bd5147"></i>Vendido</span>
+        <span><i style="background:#477fa4"></i>Bloqueado</span>
+      </div>
+    </div>
+
+    <div id="paymentInfoOverlay" class="payment-info-overlay" hidden>
+      <div class="payment-info-topbar">
+        <div class="payment-info-heading"><span class="eyebrow">DADOS DO EMPREENDIMENTO</span><h2>Formas de pagamento</h2></div>
+        <button id="paymentInfoCloseButton" class="close-button" type="button" aria-label="Fechar formas de pagamento">×</button>
+      </div>
+      <div id="paymentInfoContent" class="payment-info-body"></div>
+      <div id="paymentInfoLoading" class="payment-info-loading"><span class="mapa3d-spinner"></span>Carregando…</div>
+    </div>
+
+    <noscript>Este aplicativo precisa do JavaScript ativado para exibir o mapa.</noscript>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/supabase/supabase.js"></script>
+    <script src="vendor/three/three.min.js"></script>
+    <script src="vendor/three/OrbitControls.js"></script>
+    <script src="vendor/three/mapa3d.js"></script>
+    <script src="data/lotes.js"></script>
+    <script src="data/status-config.js"></script>
+    <script src="app.js"></script>
+    <script src="vertical.js"></script>
+    <script src="simulador.js"></script>
+    <script src="avatar.js"></script>
+    <script src="online.js"></script>
+      <script src="../trocar-linha.js" defer></script>
+  </body>
+</html>

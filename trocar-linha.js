@@ -7,7 +7,7 @@
   try { linhas = localStorage.getItem("sklu_linhas") || ""; } catch {}
   if (!(linhas.includes("vendas") && linhas.includes("aluguel"))) return;
 
-  const ancoras = ["brokerSwitchButton", "vtSwitchAccountButton", "topbarSwitchCarteiraButton"];
+  const ancoras = ["brokerSwitchButton", "vtSwitchAccountButton", "topbarSwitchCarteiraButton", "switchEmpreendimentoButton"];
   ancoras.forEach((id) => {
     const referencia = document.getElementById(id);
     if (!referencia) return;
