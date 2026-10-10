@@ -26,7 +26,8 @@
     function iniciar(contexto) {
         ctx = contexto;
         if (!ligado) { ligarEventos(); ligado = true; }
-        ativo = !ctx.central() || lerEscolha();
+        const papel = ctx.papel();
+        ativo = papel === "corretor" || (papel !== "financeiro" && lerEscolha());
         aplicar();
         return ativo ? "hoje" : "dashboard";
     }
@@ -38,14 +39,16 @@
         document.body.classList.toggle("modo-corretor", ativo);
         $("corretorTabs").hidden = !ativo;
         const central = !!ctx && ctx.central();
+        const papel = ctx && ctx.usuario() ? ctx.papel() : null;
         const botao = $("modoCorretorButton");
-        botao.hidden = !ctx || !ctx.usuario() || !central;
+        // corretor já está na tela dele; o financeiro não usa o CRM
+        botao.hidden = !papel || papel === "corretor" || papel === "financeiro";
         botao.textContent = ativo ? "↩ Tela da Central" : "📱 Modo corretor";
-        $("contaVoltarCentral").hidden = !central;
+        $("contaVoltarCentral").hidden = !papel || papel === "corretor";
         $("hojeAvisoCentral").hidden = !central;
     }
     function alternar() {
-        if (!ctx || !ctx.central()) return;
+        if (!ctx || !ctx.usuario() || ctx.papel() === "corretor" || ctx.papel() === "financeiro") return;
         ativo = !ativo;
         gravarEscolha(ativo);
         aplicar();
@@ -180,9 +183,18 @@
         const caixa = $("hojeCadastros");
         const imoveis = ctx.imoveis();
         let html = "";
+        const I = crm();
+        if (I && I.visitas) {
+            const agora = Date.now();
+            const semRetorno = [ ...I.visitas.values() ].filter(v => v.situacao === "agendada" && new Date(v.agendada_para).getTime() < agora).length;
+            const fimHoje = new Date(); fimHoje.setHours(23, 59, 59, 999);
+            const lembrHoje = [ ...I.lembretes.values() ].filter(l => !l.concluido_em && new Date(l.quando + "T12:00:00") <= fimHoje).length;
+            if (semRetorno) html += `<button type="button" class="hoje-aviso" data-ir="agenda"><strong>${semRetorno} visita${semRetorno === 1 ? "" : "s"} aguardando o retorno</strong><span>Registrar como foi ›</span></button>`;
+            if (lembrHoje) html += `<button type="button" class="hoje-aviso neutro" data-ir="agenda"><strong>${lembrHoje} lembrete${lembrHoje === 1 ? "" : "s"} de pós-venda para hoje</strong><span>Ver na agenda ›</span></button>`;
+        }
         if (central) {
             const pend = imoveis.filter(c => c.aprovacao === "pendente").length;
-            if (pend) html = `<button type="button" class="hoje-aviso" data-ir="cadastros"><strong>${pend} cadastro${pend === 1 ? "" : "s"} aguardando aprovação</strong><span>Revisar agora ›</span></button>`;
+            if (pend) html += `<button type="button" class="hoje-aviso" data-ir="cadastros"><strong>${pend} cadastro${pend === 1 ? "" : "s"} aguardando aprovação</strong><span>Revisar agora ›</span></button>`;
         } else {
             const meus = imoveis.filter(c => c.cadastrado_por === eu.id);
             const recusados = meus.filter(c => c.aprovacao === "recusado").length;

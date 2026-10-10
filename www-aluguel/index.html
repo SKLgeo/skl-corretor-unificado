@@ -29,7 +29,17 @@
       <label><span>E-mail</span><input id="emailInput" type="email" autocomplete="username" required /></label>
       <label><span>Senha</span><input id="passwordInput" type="password" autocomplete="current-password" required /></label>
       <button class="primary-button" type="submit">Entrar</button>
+      <button id="showRecoverButton" class="text-button" type="button">Esqueci minha senha</button>
       <div id="loginMessage" class="form-message" hidden></div>
+    </form>
+    <form id="recoverForm" class="login-card" hidden>
+      <span class="eyebrow">RECUPERAR SENHA</span>
+      <h1>Esqueci minha senha</h1>
+      <p>Informe o e-mail da sua conta. Vamos enviar um link para você definir uma senha nova.</p>
+      <label><span>E-mail</span><input id="recoverEmailInput" type="email" autocomplete="username" required /></label>
+      <button id="recoverSubmitButton" class="primary-button" type="submit">Enviar link de recuperação</button>
+      <button id="backFromRecoverButton" class="text-button" type="button">Voltar ao login</button>
+      <div id="recoverMessage" class="form-message" hidden></div>
     </form>
     <p class="login-footer">SKL SOLUÇÕES DIGITAIS — CONTROLE DE ALUGUÉIS</p>
   </section>
@@ -229,6 +239,7 @@
             <div><h4>Exclusividades vencendo</h4><ul id="painelExclusividades" class="painel-lista"></ul></div>
           </div>
         </article>
+        <article class="panel painel-bloco"><h3>Indicações</h3><div id="painelIndicacoes"></div></article>
         <div class="painel-grade">
           <article class="panel painel-bloco"><h3>Demanda sem estoque</h3><div id="painelDemanda"></div></article>
           <article class="panel painel-bloco"><h3>Padrão dos clientes em negociação</h3><div id="painelPadraoBloco" class="crm-resumo painel-padroes"></div></article>
@@ -248,6 +259,7 @@
           </select>
           <select id="crmCorretorCliFiltro" data-so-central><option value="">Todos os corretores</option><option value="__sem">Sem corretor</option></select>
           <span id="crmCliContagem" class="crm-contagem"></span>
+          <button id="crmDistribuirRoleta" type="button" class="secondary-button" hidden>🎲 Distribuir pela roleta</button>
           <button id="crmNovoCliButton" type="button" class="primary-button">+ Novo cliente</button>
         </div>
         <div class="panel table-panel">
@@ -329,7 +341,7 @@
             </label>
             <button id="salvarNotaMinimaButton" type="button" class="primary-button">Salvar</button>
           </div>
-          <div id="crmConfigPanel" class="panel form-panel crm-config" data-so-central>
+          <div id="crmConfigPanel" class="panel form-panel crm-config" data-so-config>
             <span class="eyebrow">CRM — FUNIS</span>
             <h2>Etapas das negociações</h2>
             <p>Renomeie, reordene ou crie etapas. "Fechado" e "Perdido" ficam sempre no fim. Para remover uma etapa, ela precisa estar vazia.</p>
@@ -337,14 +349,14 @@
             <div id="crmConfigEtapas" class="crm-config-lista"></div>
             <div class="crm-config-acoes"><button id="crmAddEtapa" type="button" class="secondary-button">+ Etapa</button><button id="crmSalvarEtapas" type="button" class="primary-button">Salvar etapas</button></div>
           </div>
-          <div id="crmMotivosPanel" class="panel form-panel crm-config" data-so-central>
+          <div id="crmMotivosPanel" class="panel form-panel crm-config" data-so-config>
             <span class="eyebrow">CRM — PERDAS</span>
             <h2>Motivos de perda</h2>
             <p>Lista que o corretor escolhe ao marcar uma negociação como perdida. Motivo já usado é desativado, não apagado.</p>
             <div id="crmConfigMotivos" class="crm-config-lista"></div>
             <div class="crm-config-acoes"><button id="crmAddMotivo" type="button" class="secondary-button">+ Motivo</button><button id="crmSalvarMotivos" type="button" class="primary-button">Salvar motivos</button></div>
           </div>
-          <div id="crmFaixasPanel" class="panel form-panel crm-config" data-so-central>
+          <div id="crmFaixasPanel" class="panel form-panel crm-config" data-so-config>
             <span class="eyebrow">CRM — PADRÃO DO CLIENTE</span>
             <h2>Faixas de padrão</h2>
             <p>Define quando um cliente é econômico, médio ou alto padrão pelo valor que ele procura. Aparece como selo no quadro de negociações e como filtro nos indicadores.</p>
@@ -358,6 +370,15 @@
             </div>
             <div id="crmFaixasPrevia" class="crm-faixas-previa"></div>
             <button id="crmSalvarFaixas" type="button" class="primary-button">Salvar faixas</button>
+          </div>
+          <div id="crmRoletaPanel" class="panel form-panel crm-config" data-gestao hidden>
+            <span class="eyebrow">CRM — DISTRIBUIÇÃO DE CONTATOS</span>
+            <h2>Roleta de leads</h2>
+            <p>Com a roleta ligada, cada cliente novo sem corretor vai para o próximo da fila, um de cada vez. Desmarque quem estiver de folga ou de férias.</p>
+            <label class="check-inline"><input id="crmRoletaAtiva" type="checkbox" /> Roleta ligada</label>
+            <div id="crmRoletaLista" class="crm-config-lista crm-roleta-lista"></div>
+            <p id="crmRoletaProximo" class="muted-text"></p>
+            <button id="crmSalvarRoleta" type="button" class="primary-button">Salvar roleta</button>
           </div>
           <div class="panel form-panel"><span class="eyebrow">SOBRE</span><h2>Versão instalada</h2><p id="appVersionText">—</p></div>
         </div>
@@ -543,6 +564,7 @@
         <label><span>CPF (opcional)</span><input id="crmCliCpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" /></label>
         <label><span>Origem do contato</span><select id="crmCliOrigem"></select></label>
       </div>
+      <label id="crmCliIndicadoLabel" hidden><span>Quem indicou (cliente da carteira)</span><select id="crmCliIndicado"></select></label>
       <div class="crm-tipos">
         <span class="crm-rotulo">Tipo de cliente</span>
         <label class="check-inline"><input type="checkbox" value="comprador" data-crm-tipo /> Comprador</label>
@@ -565,6 +587,8 @@
       <div id="crmCliMsg" class="form-message" hidden></div>
       <div id="crmCliNegociacoes" class="crm-sublista" hidden></div>
       <div id="crmCliImoveis" class="crm-sublista" hidden></div>
+      <div id="crmCliIndicou" class="crm-sublista" hidden></div>
+      <div id="crmCliLembretes" class="crm-sublista crm-lembretes" hidden></div>
       <div id="crmCliHistorico" class="crm-timeline" hidden></div>
     </form>
   </dialog>
@@ -619,6 +643,7 @@
         <button id="crmNegSalvar" type="button" class="primary-button">Salvar</button>
       </div>
       <div id="crmNegMsg" class="form-message" hidden></div>
+      <section id="crmNegVisitas" class="crm-visitas" hidden></section>
       <section id="crmNegAtendimento" class="crm-atendimento" hidden>
         <span class="eyebrow">REGISTRAR ATENDIMENTO</span>
         <div id="crmAtTipos" class="crm-at-tipos"></div>
@@ -634,6 +659,23 @@
     </form>
   </dialog>
 
+  <dialog id="crmVisitaDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">VISITA</span>
+      <h2>Como foi a visita?</h2>
+      <p id="crmVisInfo" class="muted-text">—</p>
+      <div id="crmVisSituacao" class="crm-at-tipos"></div>
+      <div id="crmVisResultadoBox"><span class="crm-rotulo">O que o cliente achou</span><div id="crmVisResultado" class="crm-at-tipos"></div></div>
+      <label><span>Comentário</span><textarea id="crmVisComentario" rows="2" placeholder="ex.: gostou da área, achou o valor alto"></textarea></label>
+      <div class="form-row">
+        <label><span>Próximo passo (opcional)</span><input id="crmVisProxEm" type="datetime-local" /></label>
+        <label><span>O que fazer</span><input id="crmVisProxTexto" placeholder="ex.: enviar a proposta" autocomplete="off" /></label>
+      </div>
+      <div class="dialog-actions"><button id="crmVisSalvar" type="button" class="primary-button">Registrar</button></div>
+      <div id="crmVisMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
   <dialog id="crmMotivoDialog" class="crm-dialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
@@ -743,6 +785,8 @@
             <option value="corretor">Corretor</option>
             <option value="central_vendas">Controle de aluguéis</option>
             <option value="administrador">Administrador</option>
+            <option value="gestor">Gestor (acompanha e conduz a equipe)</option>
+            <option value="financeiro">Financeiro (comissões e indicadores)</option>
           </select>
         </label>
         <label><span>% de comissão (opcional)</span><input id="inviteAluguelPercentualInput" type="number" step="0.01" min="0" max="100" placeholder="ex.: 10" /></label>
@@ -769,6 +813,8 @@
             <option value="corretor">Corretor</option>
             <option value="central_vendas">Controle de aluguéis</option>
             <option value="administrador">Administrador</option>
+            <option value="gestor">Gestor (acompanha e conduz a equipe)</option>
+            <option value="financeiro">Financeiro (comissões e indicadores)</option>
           </select>
         </label>
         <label><span>% de comissão (opcional)</span><input id="directAluguelPercentualInput" type="number" step="0.01" min="0" max="100" placeholder="ex.: 10" /></label>

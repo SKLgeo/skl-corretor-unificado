@@ -36,13 +36,15 @@
     };
     const ROLE = {
         corretor: "Corretor",
+        gestor: "Gestor",
+        financeiro: "Financeiro",
         central_vendas: "Controle de aluguéis",
         administrador: "Administrador"
     };
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.4.3";
+    const APP_VERSION = "0.5.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -125,6 +127,9 @@
 
     function bindEvents() {
         $("loginForm").addEventListener("submit", login);
+        $("showRecoverButton").addEventListener("click", () => mostrarRecuperarSenha(true));
+        $("backFromRecoverButton").addEventListener("click", () => mostrarRecuperarSenha(false));
+        $("recoverForm").addEventListener("submit", enviarRecuperarSenha);
         $("logoutButton").addEventListener("click", logout);
         document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
         document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.go)));
@@ -259,6 +264,14 @@
     function podeGerenciar() {
         return !!currentUser && [ "administrador", "central_vendas" ].includes(currentUser.papel);
     }
+    // Gestor e financeiro enxergam a carteira inteira (imóveis alugados/vendidos, equipe, indicadores), mas não configuram nada.
+    function veTudo() {
+        return !!currentUser && [ "administrador", "central_vendas", "gestor", "financeiro" ].includes(currentUser.papel);
+    }
+    // Quem conduz o CRM da equipe: Central, administrador e gestor (o financeiro só consulta).
+    function gestaoCrm() {
+        return !!currentUser && [ "administrador", "central_vendas", "gestor" ].includes(currentUser.papel);
+    }
     function formatMoney(valor, casas = 2) {
         if (valor == null || valor === "") return "—";
         return "R$ " + Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
@@ -344,6 +357,28 @@
         element.style.background = success ? "#dff4e8" : "#f7e8e6";
         element.style.color = success ? "#247346" : "#9a3b34";
         element.hidden = false;
+    }
+    // Esqueci minha senha: o e-mail traz um link que abre o link web do SKL Unificado, onde a pessoa define a senha nova
+    // (vale para qualquer conta — o login é o mesmo em todos os apps da SKL).
+    const LINK_RECUPERAR_SENHA = "https://sklgeo.github.io/skl-corretor-unificado/";
+    function mostrarRecuperarSenha(mostrar) {
+        $("loginForm").hidden = mostrar;
+        $("recoverForm").hidden = !mostrar;
+        $("recoverMessage").hidden = true;
+        if (mostrar) $("recoverEmailInput").value = $("emailInput").value.trim();
+    }
+    async function enviarRecuperarSenha(event) {
+        event.preventDefault();
+        $("recoverSubmitButton").disabled = true;
+        try {
+            const { error } = await sb.auth.resetPasswordForEmail($("recoverEmailInput").value.trim(), { redirectTo: LINK_RECUPERAR_SENHA });
+            if (error) throw error;
+            showMessage($("recoverMessage"), "Se esse e-mail tiver uma conta, chega nele em alguns instantes um link para definir a senha nova. Confira também o spam.", true);
+        } catch (error) {
+            showMessage($("recoverMessage"), /rate limit|security purposes/i.test(error.message || "") ? "Aguarde um minuto antes de pedir outro link." : traduzErro(error.message));
+        } finally {
+            $("recoverSubmitButton").disabled = false;
+        }
     }
     function toast(message) {
         clearTimeout(toastTimer);
@@ -482,7 +517,9 @@
             sb, h, toast, traduzErro, parseValor, nomeDoUsuario, fotoDoUsuario,
             carteiraId: () => carteiraId,
             usuario: () => currentUser,
-            central: () => podeGerenciar(),
+            central: () => veTudo(),
+            gestao: () => gestaoCrm(),
+            papel: () => currentUser && currentUser.papel,
             imoveis: () => [ ...construcoes.values() ],
             equipe: () => corretores,
             tiposImovel: () => [ ...$("construcaoTipoInput").options ].map(o => o.value),
@@ -495,7 +532,9 @@
         return {
             h, toast, showPage, logout, trocarCarteira, precoCurto, preencherFotoCapa,
             usuario: () => currentUser,
-            central: () => podeGerenciar(),
+            central: () => veTudo(),
+            gestao: () => gestaoCrm(),
+            papel: () => currentUser && currentUser.papel,
             carteiraNome: () => carteiraNomeAtual || "",
             papelTexto: () => ROLE[currentUser.papel] || currentUser.papel,
             versao: () => `v${APP_VERSION}`,
@@ -516,7 +555,11 @@
         $("newConstrucaoButton").hidden = !gerencia;
         $("navInteresses").hidden = !gerencia;
         $("navCorretores").hidden = !gerencia;
-        $("navComissoes").hidden = !gerencia;
+        const financeiro = currentUser.papel === "financeiro";
+        $("navComissoes").hidden = !(gerencia || financeiro);
+        // gestor e financeiro não aprovam cadastros de imóveis; o financeiro não usa o CRM (só os indicadores)
+        $("navCadastros").hidden = veTudo() && !gerencia;
+        [ "negociacoes", "agenda", "clientes" ].forEach(p => { document.querySelector(`#mainNav [data-page="${p}"]`).hidden = financeiro; });
         $("navCadastrosTexto").textContent = gerencia ? "Cadastros" : "Meus cadastros";
         $("cadastrosFiltro").hidden = !gerencia;
         $("novoCadastroButton").hidden = gerencia;
@@ -524,19 +567,19 @@
             ? "Imóveis cadastrados pelos corretores. Revise, corrija o que precisar e aprove para o imóvel aparecer para toda a equipe."
             : "Cadastre imóveis para venda ou aluguel. A Central revisa e, depois de aprovado, o imóvel aparece para todos os corretores.";
         $("settingsCadastroPanel").hidden = !gerencia;
-        document.querySelectorAll("[data-so-central]").forEach(el => { el.hidden = !gerencia; });
+        document.querySelectorAll("[data-so-central]").forEach(el => { el.hidden = !veTudo(); });
+        document.querySelectorAll("[data-so-config]").forEach(el => { el.hidden = !gerencia; });
+        document.querySelectorAll("[data-gestao]").forEach(el => { el.hidden = !gestaoCrm(); });
         $("dashboardCarteiraNome").textContent = carteiraNomeAtual;
         $("settingsCarteiraNome").textContent = carteiraNomeAtual;
         finalidadeFiltro = "todos";
         bairrosFiltro = [];
         faixaValor = null;
         await carregarConfigCarteira();
-        if (gerencia) await loadCorretores();
+        if (veTudo()) await loadCorretores();
         await loadConstrucoes();
-        if (gerencia) {
-            await loadInteresses();
-            await loadComissoesAluguel();
-        }
+        if (gerencia) await loadInteresses();
+        if (gerencia || financeiro) await loadComissoesAluguel();
         connectRealtime();
         if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
@@ -554,6 +597,7 @@
         $("appView").hidden = true;
         $("carteiraPicker").hidden = true;
         $("loginView").hidden = false;
+        mostrarRecuperarSenha(false);
         $("loginForm").reset();
     }
 
@@ -671,7 +715,7 @@
     // Imóveis que entram na busca: só os aprovados; para o corretor, sem os que já saíram do mercado.
     function imovelVisivelNaBusca(c) {
         if ((c.aprovacao || "aprovado") !== "aprovado") return false;
-        return podeGerenciar() || !STATUS_OCULTOS_CORRETOR.includes(c.status);
+        return veTudo() || !STATUS_OCULTOS_CORRETOR.includes(c.status);
     }
     function baseBusca() {
         return [ ...construcoes.values() ].filter(imovelVisivelNaBusca);
@@ -722,7 +766,7 @@
     function montarOpcoesStatusFiltro() {
         const select = $("construcaoStatusFilter");
         const atual = select.value;
-        const lista = statusDaFinalidade(finalidadeFiltro).filter(s => podeGerenciar() || !STATUS_OCULTOS_CORRETOR.includes(s));
+        const lista = statusDaFinalidade(finalidadeFiltro).filter(s => veTudo() || !STATUS_OCULTOS_CORRETOR.includes(s));
         select.innerHTML = `<option value="">Todas as situações</option>` + lista.map(s => `<option value="${s}">${h(STATUS[s])}</option>`).join("");
         select.value = lista.includes(atual) ? atual : "";
         $("mapLegend").innerHTML = lista.map(s => `<span class="dot ${s}"></span>${h(STATUS[s])}`).join(" ");

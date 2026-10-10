@@ -172,6 +172,10 @@ html, body {
 .pw-wrap input{width:100%;box-sizing:border-box;padding-right:92px}
 .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:#e9eff1;color:#0B4F78;border-radius:8px;padding:9px 12px;font-weight:700;font-size:13px;cursor:pointer}
 
+/* recuperar senha */
+.form-message.ok { background: #dff4e8; color: #247346; }
+#showRecoverButton, #backFromRecoverButton { display: block; margin: 14px auto 0; }
+
 
 /* ---- acrescentado na versão web (link) ---- */
 .chooser-view { padding-top: max(32px, env(safe-area-inset-top)); padding-bottom: max(32px, env(safe-area-inset-bottom)); }

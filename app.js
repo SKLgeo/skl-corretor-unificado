@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.9.0-web";
+    const APP_VERSION = "0.10.0-web";
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -23,10 +23,63 @@
         aluguel: "www-aluguel/index.html"
     };
 
-    function showMessage(element, message) {
+    function showMessage(element, message, ok) {
         element.textContent = message;
+        element.classList.toggle("ok", Boolean(ok));
         element.hidden = false;
     }
+
+    // ===== Esqueci minha senha (mesmo fluxo da Acquaville) =====
+    // O e-mail traz um link que abre o LINK WEB (no app instalado não dá para abrir a tela do APK por link).
+    // Lá aparece "Defina sua nova senha"; depois a pessoa entra normalmente, no app ou no link.
+    const LINK_RECUPERAR_SENHA = "https://sklgeo.github.io/skl-corretor-unificado/";
+    let modoRecuperacao = /type=recovery/.test(location.hash);
+    function mostrarFormulario(id) {
+        ["loginForm", "recoverForm", "recoverNewPasswordForm"].forEach(f => { $(f).hidden = f !== id; });
+        $("loginView").hidden = false;
+        $("chooserView").hidden = true;
+    }
+    async function enviarRecuperacao(event) {
+        event.preventDefault();
+        $("recoverMessage").hidden = true;
+        $("recoverSubmitButton").disabled = true;
+        try {
+            const { error } = await sb.auth.resetPasswordForEmail($("recoverEmailInput").value.trim(), { redirectTo: LINK_RECUPERAR_SENHA });
+            if (error) throw error;
+            showMessage($("recoverMessage"), "Se esse e-mail tiver uma conta, chega nele em alguns instantes um link para definir a senha nova. Confira também o spam.", true);
+        } catch (error) {
+            showMessage($("recoverMessage"), /rate limit|security purposes/i.test(error.message || "")
+                ? "Aguarde um minuto antes de pedir outro link."
+                : traduzErro(error.message));
+        } finally {
+            $("recoverSubmitButton").disabled = false;
+        }
+    }
+    async function salvarNovaSenha(event) {
+        event.preventDefault();
+        const senha = $("recoverNewPasswordInput").value;
+        if (senha !== $("recoverNewPasswordInput2").value) return showMessage($("recoverNewPasswordMessage"), "As duas senhas não são iguais.");
+        $("recoverNewPasswordButton").disabled = true;
+        try {
+            const { error } = await sb.auth.updateUser({ password: senha });
+            if (error) throw error;
+            await sb.auth.signOut();
+            modoRecuperacao = false;
+            history.replaceState(null, "", location.pathname);
+            $("recoverNewPasswordForm").reset();
+            mostrarFormulario("loginForm");
+            showMessage($("loginMessage"), "Senha alterada. Entre com a senha nova.", true);
+        } catch (error) {
+            showMessage($("recoverNewPasswordMessage"), /different from the old|should be different/i.test(error.message || "")
+                ? "A senha nova precisa ser diferente da anterior."
+                : traduzErro(error.message));
+        } finally {
+            $("recoverNewPasswordButton").disabled = false;
+        }
+    }
+    sb.auth.onAuthStateChange(evento => {
+        if (evento === "PASSWORD_RECOVERY") { modoRecuperacao = true; mostrarFormulario("recoverNewPasswordForm"); }
+    });
 
     function traduzErro(message) {
         const mapa = { "Invalid login credentials": "E-mail ou senha incorretos." };
@@ -72,6 +125,7 @@
     }
 
     async function restoreSession() {
+        if (modoRecuperacao) return mostrarFormulario("recoverNewPasswordForm");
         let data = null, erroSessao = null;
         try {
             ({ data, error: erroSessao } = await sb.auth.getSession());
@@ -127,6 +181,7 @@
     let alvoVendas = "vendas";
 
     async function detectarLinhasEEntrar() {
+        if (modoRecuperacao) return mostrarFormulario("recoverNewPasswordForm");
         const limite = new Promise((_, rejeita) => setTimeout(() => rejeita(new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.")), 25000));
         const [vendas, aluguel] = await Promise.race([Promise.all([temAcessoVendas(), temAcessoAluguel()]), limite]);
         acesso = { vendas: Boolean(vendas), aluguel };
@@ -144,8 +199,7 @@
     }
 
     function mostrarLogin() {
-        $("loginView").hidden = false;
-        $("chooserView").hidden = true;
+        mostrarFormulario("loginForm");
         $("loginForm").reset();
     }
 
@@ -171,6 +225,14 @@
     }
 
     $("loginForm").addEventListener("submit", login);
+    $("showRecoverButton").addEventListener("click", () => {
+        $("recoverEmailInput").value = $("loginEmailInput").value.trim();
+        $("recoverMessage").hidden = true;
+        mostrarFormulario("recoverForm");
+    });
+    $("backFromRecoverButton").addEventListener("click", () => mostrarFormulario("loginForm"));
+    $("recoverForm").addEventListener("submit", enviarRecuperacao);
+    $("recoverNewPasswordForm").addEventListener("submit", salvarNovaSenha);
     $("chooseVendasButton").addEventListener("click", () => abrirLinha("vendas"));
     $("chooseAluguelButton").addEventListener("click", () => abrirLinha("aluguel"));
     $("chooserLogoutButton").addEventListener("click", sair);

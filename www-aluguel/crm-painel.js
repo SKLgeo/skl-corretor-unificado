@@ -163,20 +163,22 @@
         // ---------- equipe
         const ctx = x.ctx();
         const pessoas = new Map();
-        const pessoa = id => { const k = id || "__sem"; if (!pessoas.has(k)) pessoas.set(k, { id, novos: 0, atend: 0, ganhos: 0, perdidos: 0, valor: 0, atrasadas: 0 }); return pessoas.get(k); };
+        const pessoa = id => { const k = id || "__sem"; if (!pessoas.has(k)) pessoas.set(k, { id, novos: 0, atend: 0, ganhos: 0, perdidos: 0, valor: 0, atrasadas: 0, visitas: 0 }); return pessoas.get(k); };
         novas.forEach(n => pessoa(n.corretor_id).novos++);
         ganhas.forEach(n => { const p = pessoa(n.corretor_id); p.ganhos++; p.valor += Number(n.valor) || 0; });
         perdidas.forEach(n => pessoa(n.corretor_id).perdidos++);
         abertas.filter(n => x.situacaoAcao(n) === "atrasada").forEach(n => pessoa(n.corretor_id).atrasadas++);
         atividades.filter(a => [ "ligacao", "whatsapp", "visita", "email", "anotacao" ].includes(a.tipo) && (!filtroCorretor || a.autor_id === filtroCorretor)).forEach(a => pessoa(a.autor_id).atend++);
-        const listaEquipe = [ ...pessoas.values() ].filter(p => p.novos || p.atend || p.ganhos || p.perdidos || p.atrasadas)
+        [ ...(x.visitas ? x.visitas.values() : []) ].filter(v => v.situacao === "realizada" && noPeriodo(v.registrado_em || v.agendada_para)
+            && (!filtroCorretor || v.corretor_id === filtroCorretor)).forEach(v => pessoa(v.corretor_id).visitas++);
+        const listaEquipe = [ ...pessoas.values() ].filter(p => p.novos || p.atend || p.ganhos || p.perdidos || p.atrasadas || p.visitas)
             .sort((a, b) => b.ganhos - a.ganhos || b.valor - a.valor || b.atend - a.atend);
-        $("painelEquipe").innerHTML = tabela([ "Corretor", "Novos", "Atendimentos", "Fechados", "Conversão", "Valor fechado", "Ações atrasadas" ],
-            listaEquipe.map(p => [ { html: `<span class="crm-card-corretor">${ctx.fotoDoUsuario(p.id, 22)}<span>${h(x.corretorDe(p.id))}</span></span>` }, p.novos, p.atend, p.ganhos,
+        $("painelEquipe").innerHTML = tabela([ "Corretor", "Novos", "Atendimentos", "Visitas", "Fechados", "Conversão", "Valor fechado", "Ações atrasadas" ],
+            listaEquipe.map(p => [ { html: `<span class="crm-card-corretor">${ctx.fotoDoUsuario(p.id, 22)}<span>${h(x.corretorDe(p.id))}</span></span>` }, p.novos, p.atend, p.visitas, p.ganhos,
                 p.ganhos + p.perdidos ? pct(p.ganhos, p.ganhos + p.perdidos) + "%" : "—", p.valor ? x.dinheiro(p.valor) : "—",
                 p.atrasadas ? { html: `<span class="painel-alerta">${p.atrasadas}</span>` } : 0 ]));
-        ultimoCsv.push([ "Corretor", "Novos", "Atendimentos", "Fechados", "Conversão", "Valor fechado", "Ações atrasadas" ],
-            ...listaEquipe.map(p => [ x.corretorDe(p.id), String(p.novos), String(p.atend), String(p.ganhos), p.ganhos + p.perdidos ? pct(p.ganhos, p.ganhos + p.perdidos) + "%" : "", String(p.valor), String(p.atrasadas) ]), []);
+        ultimoCsv.push([ "Corretor", "Novos", "Atendimentos", "Visitas", "Fechados", "Conversão", "Valor fechado", "Ações atrasadas" ],
+            ...listaEquipe.map(p => [ x.corretorDe(p.id), String(p.novos), String(p.atend), String(p.visitas), String(p.ganhos), p.ganhos + p.perdidos ? pct(p.ganhos, p.ganhos + p.perdidos) + "%" : "", String(p.valor), String(p.atrasadas) ]), []);
 
         // ---------- estoque
         const imoveis = ctx.imoveis().filter(i => (i.aprovacao || "aprovado") === "aprovado");
@@ -224,6 +226,23 @@
                <ul class="painel-lista">${semEstoque.slice(0, 8).map(n => { const c = x.clientes.get(n.cliente_id); const p = n.perfil_busca; return `<li><a href="#" data-neg="${h(n.id)}">${h(c ? c.nome : "Cliente")}</a> — ${h([ p.tipo, (p.bairros || []).join("/"), p.valor_max ? "até " + x.dinheiro(p.valor_max) : "", p.quartos_min ? p.quartos_min + "+ quartos" : "" ].filter(Boolean).join(", "))}</li>`; }).join("")}</ul>`
             : `<p class="muted-text">Toda a procura dos clientes em negociação tem imóvel compatível na carteira.</p>`;
         $("painelDemanda").querySelectorAll("[data-neg]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); x.abrirNegociacao(a.dataset.neg); }));
+
+        // ---------- indicações
+        const indicados = [ ...x.clientes.values() ].filter(c => c.indicado_por && noPeriodo(c.created_at));
+        const porIndicador = new Map();
+        indicados.forEach(c => {
+            const r = porIndicador.get(c.indicado_por) || { qtd: 0, fechados: 0 };
+            r.qtd++;
+            if ([ ...x.negs.values() ].some(n => n.cliente_id === c.id && n.situacao === "ganha")) r.fechados++;
+            porIndicador.set(c.indicado_por, r);
+        });
+        const listaInd = [ ...porIndicador.entries() ].sort((a, b) => b[1].qtd - a[1].qtd || b[1].fechados - a[1].fechados).slice(0, 10);
+        const nomeCli = id => { const c = x.clientes.get(id); return c ? c.nome : "Cliente"; };
+        if ($("painelIndicacoes")) $("painelIndicacoes").innerHTML = indicados.length
+            ? `<p class="muted-text">${indicados.length} cliente(s) novo(s) chegaram por indicação (${h(rotuloPeriodo(periodo).toLowerCase())}).</p>`
+              + tabela([ "Quem indicou", "Indicações", "Viraram negócio" ], listaInd.map(([ id, r ]) => [ nomeCli(id), r.qtd, r.fechados ]))
+            : `<p class="muted-text">Nenhum cliente marcado como indicação no período. No cadastro do cliente, escolha a origem "Indicação" e quem indicou.</p>`;
+        ultimoCsv.push([ "Quem indicou", "Indicações", "Viraram negócio" ], ...listaInd.map(([ id, r ]) => [ nomeCli(id), String(r.qtd), String(r.fechados) ]), []);
 
         // ---------- padrão dos clientes em negociação
         const porPadrao = { economico: [], medio: [], alto: [] };
