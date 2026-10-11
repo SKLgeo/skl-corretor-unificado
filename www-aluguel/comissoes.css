@@ -51,3 +51,4 @@
   body.modo-corretor .com-tabela tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
   body.modo-corretor .com-tabela td{border:0;padding:2px 0}
 }
+.com-parte-nota{margin:0;font-size:12px;color:var(--muted);align-self:end;grid-column:span 2}

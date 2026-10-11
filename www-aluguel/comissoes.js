@@ -9,7 +9,8 @@
         aluguel_mensal: "Aluguel do mês",
         valor_venda: "Valor da venda",
         comissao_imobiliaria: "Comissão da imobiliária",
-        fixo: "Valor fixo em R$"
+        fixo: "Valor fixo em R$",
+        taxa_administracao: "Taxa de administração (aluguel recebido)"
     };
     const QUEM = {
         corretor: "Quem fechou o negócio",
@@ -35,6 +36,9 @@
         meta: { nome: "Escalonada por meta", partes: [
             { rotulo: "Até a meta", beneficiario: "corretor", base: "comissao_imobiliaria", percentual: 30, recorrencia: "unica", finalidade: "venda", meta_max: 1000000 },
             { rotulo: "Acima da meta", beneficiario: "corretor", base: "comissao_imobiliaria", percentual: 40, recorrencia: "unica", finalidade: "venda", meta_min: 1000000 }] },
+        taxa_adm: { nome: "1º aluguel + % da taxa de administração", partes: [
+            { rotulo: "1º aluguel integral", beneficiario: "corretor", base: "primeiro_aluguel", percentual: 100, recorrencia: "unica", finalidade: "locacao" },
+            { rotulo: "10% da taxa de administração", beneficiario: "corretor", base: "taxa_administracao", percentual: 10, recorrencia: "mensal", finalidade: "locacao" }] },
         bonus: { nome: "Bônus fixo por locação", partes: [
             { rotulo: "Bônus por locação", beneficiario: "corretor", base: "fixo", valor_fixo: 200, recorrencia: "unica", finalidade: "locacao" }] }
     };
@@ -99,6 +103,7 @@
             $("comSimValorRotulo").textContent = venda ? "Valor da venda" : "Aluguel mensal";
             $("comSimValor").value = venda ? "500.000" : "2.500";
             $("comSimPrazoLabel").hidden = venda;
+            $("comSimTaxaLabel").hidden = venda;
             $("comSimMetaLabel").hidden = !venda;
             simular();
         });
@@ -110,12 +115,12 @@
     // ------------------------------------------------------------------ texto das partes (para listas e conferência)
     function resumoParte(p) {
         const quem = p.beneficiario === "pessoa" ? nomePessoa(p.pessoa_id) : p.beneficiario === "parceiro" ? (p.parceiro_nome || "parceiro") : { corretor: "quem fechou", captador: "quem captou" }[p.beneficiario] || "quem fechou";
-        const quanto = p.base === "fixo" ? dinheiro(p.valor_fixo) : `${String(p.percentual ?? 0).replace(".", ",")}% ${{ primeiro_aluguel: "do 1º aluguel", aluguel_mensal: "do aluguel", valor_venda: "do valor da venda", comissao_imobiliaria: "da comissão da imobiliária" }[p.base] || ""}`;
-        let quando = p.recorrencia === "mensal"
+        const quanto = p.base === "fixo" ? dinheiro(p.valor_fixo) : `${String(p.percentual ?? 0).replace(".", ",")}% ${{ primeiro_aluguel: "do 1º aluguel", aluguel_mensal: "do aluguel", valor_venda: "do valor da venda", comissao_imobiliaria: "da comissão da imobiliária", taxa_administracao: "da taxa de administração" }[p.base] || ""}`;
+        let quando = p.base === "taxa_administracao" ? "a cada aluguel recebido (Financeiro)" : p.recorrencia === "mensal"
             ? `todo mês${Number(p.inicio_mes) > 1 ? ` a partir do ${p.inicio_mes}º mês` : ""}${p.meses ? `, por ${p.meses} meses` : ", durante o contrato"}`
             : "uma vez, no fechamento";
         const cond = [];
-        if (p.finalidade) cond.push(p.finalidade === "venda" ? "só venda" : "só locação");
+        if (p.finalidade && p.base !== "taxa_administracao") cond.push(p.finalidade === "venda" ? "só venda" : "só locação");
         if (p.valor_min) cond.push("valor a partir de " + dinheiro(p.valor_min));
         if (p.valor_max) cond.push("valor até " + dinheiro(p.valor_max));
         if (p.meta_min) cond.push("quando o corretor já fechou " + dinheiro(p.meta_min) + " no mês");
@@ -180,10 +185,10 @@
               ${p.base === "fixo"
                 ? `<label><span>Valor (R$)</span><input data-k="valor_fixo" inputmode="decimal" value="${h(p.valor_fixo ?? "")}" /></label>`
                 : `<label><span>Percentual (%)</span><input data-k="percentual" inputmode="decimal" value="${h(String(p.percentual ?? "").replace(".", ","))}" /></label>`}
-              <label><span>Quando paga</span><select data-k="recorrencia">${opcoes({ unica: "Uma vez, no fechamento", mensal: "Todo mês" }, p.recorrencia || "unica")}</select></label>
-              ${p.recorrencia === "mensal" ? `<label><span>A partir do mês</span><input data-k="inicio_mes" type="number" min="1" value="${h(p.inicio_mes ?? 1)}" /></label>
+              ${p.base === "taxa_administracao" ? `<p class="com-parte-nota">Lançada a cada aluguel recebido no Financeiro, sobre a taxa de administração daquele mês.</p>` : `<label><span>Quando paga</span><select data-k="recorrencia">${opcoes({ unica: "Uma vez, no fechamento", mensal: "Todo mês" }, p.recorrencia || "unica")}</select></label>`}
+              ${p.recorrencia === "mensal" && p.base !== "taxa_administracao" ? `<label><span>A partir do mês</span><input data-k="inicio_mes" type="number" min="1" value="${h(p.inicio_mes ?? 1)}" /></label>
                 <label><span>Por quantos meses</span><input data-k="meses" type="number" min="1" max="120" value="${h(p.meses ?? "")}" placeholder="todo o contrato" /></label>` : ""}
-              <label><span>Vale para</span><select data-k="finalidade">${opcoes(FINS, p.finalidade || "")}</select></label>
+              ${p.base === "taxa_administracao" ? "" : `<label><span>Vale para</span><select data-k="finalidade">${opcoes(FINS, p.finalidade || "")}</select></label>`}
             </div>
             <details class="com-parte-cond"${p.valor_min || p.valor_max || p.meta_min || p.meta_max || (p.tipos && p.tipos.length) ? " open" : ""}>
               <summary>Condições (opcional)</summary>
@@ -223,6 +228,7 @@
         if (!q.finalidade) delete q.finalidade;
         if (q.beneficiario !== "pessoa") delete q.pessoa_id;
         if (q.beneficiario !== "parceiro") delete q.parceiro_nome;
+        if (q.base === "taxa_administracao") { q.recorrencia = "mensal"; q.finalidade = "locacao"; delete q.meses; delete q.inicio_mes; }
         if (q.recorrencia !== "mensal") { delete q.meses; delete q.inicio_mes; }
         if (!q.tipos || !q.tipos.length) delete q.tipos;
         q.rotulo = (q.rotulo || "").trim() || (BASES[q.base] || "Comissão");
@@ -279,7 +285,7 @@
         if (!regra.componentes.length) { box.innerHTML = `<p class="muted-text">Adicione uma parte para simular.</p>`; return; }
         const cenario = {
             finalidade: $("comSimFinalidade").value, valor: numero($("comSimValor").value),
-            contrato_meses: $("comSimPrazo").value || null, volume_mes: numero($("comSimMeta").value)
+            contrato_meses: $("comSimPrazo").value || null, volume_mes: numero($("comSimMeta").value), taxa_adm_pct: numero($("comSimTaxa").value) ?? 10
         };
         box.innerHTML = `<p class="muted-text">Calculando…</p>`;
         const { data, error } = await ctx.sb.rpc("comissao_simular", { p_carteira: ctx.carteiraId(), p_regra: regra, p_cenario: cenario });
@@ -288,7 +294,7 @@
         if (!linhas.length) { box.innerHTML = `<p class="muted-text">Com esse exemplo nenhuma parte se aplica (confira "Vale para" e as condições).</p>`; return; }
         // agrupa as parcelas mensais de cada parte
         const grupos = new Map();
-        linhas.forEach(l => { const g = grupos.get(l.idx) || { ...l, total: 0, n: 0, ultima: l.competencia }; g.total += Number(l.valor) || 0; g.n++; g.ultima = l.competencia; grupos.set(l.idx, g); });
+        linhas.forEach(l => { const k = l.idx + "|" + l.base_tipo; const g = grupos.get(k) || { ...l, total: 0, n: 0, ultima: l.competencia }; g.total += Number(l.valor) || 0; g.n++; g.ultima = l.competencia; grupos.set(k, g); });
         const porPessoa = new Map();
         const quem = g => g.beneficiario === "pessoa" ? nomePessoa(g.pessoa_id) : g.beneficiario === "parceiro" ? (g.parceiro_nome || "Parceiro") : { corretor: "Quem fechou", captador: "Quem captou" }[g.beneficiario];
         grupos.forEach(g => porPessoa.set(quem(g), (porPessoa.get(quem(g)) || 0) + g.total));

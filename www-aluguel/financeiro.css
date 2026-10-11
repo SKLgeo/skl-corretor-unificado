@@ -1,0 +1,83 @@
+/* Financeiro da administração de aluguéis (financeiro.js) */
+.fin-abas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.fin-aba{border:1px solid var(--line);background:#fff;color:var(--navy-deep);border-radius:99px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.fin-aba.ativa{background:var(--navy);border-color:var(--navy);color:#fff}
+.fin-aba .nav-badge{position:static}
+.fin-toolbar input[type=month]{max-width:170px}
+.fin-toolbar input[type=search]{flex:1;min-width:200px}
+.fin-cards{grid-template-columns:repeat(6,minmax(0,1fr))}
+.fin-cards .crm-resumo-item strong{font-size:20px}
+.crm-resumo-item.fin-alerta{box-shadow:inset 0 0 0 2px #e2a29a,0 6px 18px rgba(20,59,76,.06)}
+.crm-resumo-item.fin-alerta strong{color:#a33a2f}
+.fin-avisos{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:6px}
+.fin-aviso{padding:14px 16px}
+.fin-aviso header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.fin-aviso header h3{margin:0;font-size:15px;color:var(--navy-deep);flex:1}
+.fin-aviso header .nav-badge{position:static}
+.fin-aviso ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.fin-aviso li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;border-bottom:1px solid var(--line);padding-bottom:7px}
+.fin-aviso li:last-child{border-bottom:0}
+.fin-aviso li .text-button{font-weight:800;text-align:left;padding:0}
+.fin-aviso li small{color:var(--muted);flex-basis:100%}
+.fin-aviso .crm-btn-contato{padding:3px 9px;font-size:12px}
+.fin-tabela td{vertical-align:top}
+.fin-sub{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.fin-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.fin-mini{padding:6px 11px!important;font-size:12.5px!important}
+.status-pill.fin-paga{background:#dff4e8;color:#247346}
+.status-pill.fin-aberta{background:#e6f3fb;color:#1a6f99}
+.status-pill.fin-hoje{background:#fff3d6;color:#8a5a00}
+.status-pill.fin-atrasada{background:#f7e3e0;color:#a33a2f}
+.status-pill.fin-cancelada{background:#eef2f3;color:var(--muted)}
+.fin-txt-alerta{color:#a33a2f}
+.fin-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:10px}
+.fin-grade label{display:grid;gap:4px}
+.fin-itens{display:grid;gap:8px;margin:6px 0 8px}
+.fin-item{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.fin-item input{min-width:0}
+.fin-ct-resumo{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:#f5fbff;border:1px solid #cfe8f5;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13.5px}
+.fin-ct-acoes{display:grid;gap:8px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.fin-ct-acoes details{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fbfdfe}
+.fin-ct-acoes summary{cursor:pointer;font-weight:800;color:var(--navy-deep)}
+.fin-ct-acoes details[open] summary{margin-bottom:10px}
+.fin-historico{margin-top:14px}
+.fin-historico ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px}
+.fin-historico small{color:var(--muted)}
+.fin-previa{display:grid;gap:8px;background:#f5fbff;border:1px dashed #9fd4ee;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.fin-previa div{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;justify-content:space-between}
+.fin-previa span{font-size:12px;color:var(--muted);font-weight:700}
+.fin-previa small{flex-basis:100%;color:var(--muted)}
+.fin-previa-repasse{border-top:1px solid #cfe8f5;padding-top:8px}
+/* impressão: recibo e demonstrativo */
+.fin-impressao:not([hidden]){position:fixed;inset:0;z-index:3000;background:#eef2f3;overflow:auto;padding:16px;display:block}
+.fin-imp-barra{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+.fin-doc{max-width:720px;margin:0 auto;background:#fff;color:#1d2b33;padding:34px 38px;border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.08);font-size:14px;line-height:1.55}
+.fin-doc header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--navy-deep);padding-bottom:12px;margin-bottom:18px}
+.fin-doc header div{display:grid}
+.fin-doc header strong{font-size:18px;color:var(--navy-deep)}
+.fin-doc header span{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+.fin-doc-tabela{width:100%;border-collapse:collapse;margin:14px 0;min-width:0!important}
+.fin-doc-tabela td{padding:7px 4px;border-bottom:1px solid #e3e9ec}
+.fin-doc-tabela td:last-child{text-align:right;white-space:nowrap}
+.fin-doc-tabela tr.forte td{font-weight:800;font-size:15px;border-top:2px solid var(--navy-deep);border-bottom:0}
+.fin-doc-rodape{color:var(--muted);font-size:12.5px}
+.fin-doc footer{margin-top:46px;display:flex;justify-content:flex-end}
+.fin-assinatura{border-top:1px solid #1d2b33;padding-top:6px;min-width:260px;text-align:center;font-size:13px}
+@media print{
+  body.fin-imprimindo > *:not(#finImpressao){display:none!important}
+  body.fin-imprimindo .fin-impressao{position:static;background:#fff;padding:0;overflow:visible}
+  body.fin-imprimindo .fin-imp-barra{display:none}
+  body.fin-imprimindo .fin-doc{box-shadow:none;max-width:none;padding:0}
+}
+@media(max-width:1100px){.fin-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){
+  .fin-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fin-tabela thead{display:none}
+  .fin-tabela,.fin-tabela tbody,.fin-tabela tr,.fin-tabela td{display:block;width:auto}
+  .fin-tabela tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
+  .fin-tabela td{border:0;padding:2px 0}
+  .fin-acoes{justify-content:flex-start;margin-top:6px}
+  .fin-item{grid-template-columns:minmax(0,1fr) 110px auto}
+  .fin-item .check-inline{grid-column:1/-1;order:3}
+  .fin-doc{padding:20px 18px}
+}

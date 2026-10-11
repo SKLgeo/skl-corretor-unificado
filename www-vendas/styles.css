@@ -122,3 +122,5 @@ td .row-button.whatsapp{background:#25D366;color:#073b1f;margin-top:5px}
 td .row-button.destaque{background:#fff0cb;color:#80540a}
 .warning-banner.prazo{background:#fdecea;color:#8a2f28;border-color:#f1c4bf}
 .status-pill.vencendo{background:#ffe1b3;color:#7a4300}
+
+.modo-corretor-vendas:not([hidden]){padding:7px 12px;font-size:13px;white-space:nowrap}

@@ -208,13 +208,38 @@
         const {data: data, error: error} = await sb.from("empreendimento_usuarios").select("papel, expira_em, empreendimentos(id, nome, slug, tipo, ativo, config)").eq("usuario_id", uid).eq("ativo", true);
         if (error) throw error;
         const agora = Date.now();
-        return (data || []).filter(v => v.papel === "corretor" && v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora)).filter(v => !SLUGS_OCULTOS_NA_BASE.includes(v.empreendimentos.slug)).map(v => ({
+        // Corretor e quem é da Central (administrador/central_vendas) entram aqui; a Central usa o "Modo corretor".
+        return (data || []).filter(v => [ "corretor", "central_vendas", "administrador" ].includes(v.papel) && v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora)).filter(v => !SLUGS_OCULTOS_NA_BASE.includes(v.empreendimentos.slug)).map(v => ({
             id: v.empreendimentos.id,
             nome: v.empreendimentos.nome,
             slug: v.empreendimentos.slug,
             tipo: v.empreendimentos.tipo,
-            config: v.empreendimentos.config || {}
+            config: v.empreendimentos.config || {},
+            papel: v.papel
         }));
+    }
+    // Quem é da Central e entrou pelo "Modo corretor" ganha, na Conta, o botão de voltar à tela da Central
+    // (só existe no app Unificado e no link, onde a tela da Central fica ao lado em www-vendas/).
+    let telaCentralExiste = null;
+    async function temTelaCentral() {
+        if (telaCentralExiste !== null) return telaCentralExiste;
+        if (!/\/www-vendas-corretor\//.test(location.pathname)) return (telaCentralExiste = false);
+        try { telaCentralExiste = (await fetch("../www-vendas/index.html", { cache: "no-store" })).ok; } catch { telaCentralExiste = false; }
+        return telaCentralExiste;
+    }
+    async function mostrarVoltarCentral(sim) {
+        const pode = sim && await temTelaCentral();
+        [ [ "brokerSwitchButton", "brokerCentralButton" ], [ "vtSwitchAccountButton", "vtCentralButton" ] ].forEach(([ ancora, id ]) => {
+            let b = document.getElementById(id);
+            if (!b && pode) {
+                const a = document.getElementById(ancora);
+                if (!a) return;
+                a.insertAdjacentHTML("afterend", `<button id="${id}" class="secondary-button full-width" type="button">Voltar à tela da Central</button>`);
+                b = document.getElementById(id);
+                b.addEventListener("click", () => { location.href = "../www-vendas/index.html" + location.search; });
+            }
+            if (b) b.hidden = !pode;
+        });
     }
     function mostrarSeletorEmpreendimento(lista) {
         authView.hidden = true;
@@ -256,6 +281,7 @@
             localStorage.setItem(EMPREENDIMENTO_ESCOLHIDO_KEY, emp.id);
         } catch {}
         iniciarSimulador(emp.id);
+        mostrarVoltarCentral(!!emp.papel && emp.papel !== "corretor");
         if (emp.tipo === "vertical") enterVerticalApp(); else enterApp();
     }
     async function resolverEmpreendimentoEEntrar() {

@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="crm.css" />
   <link rel="stylesheet" href="corretor-ui.css" />
   <link rel="stylesheet" href="comissoes.css" />
+  <link rel="stylesheet" href="financeiro.css" />
 </head>
 <body>
   <section id="loginView" class="login-view">
@@ -68,6 +69,7 @@
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
         <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Corretores</button>
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
+        <button class="nav-button" id="navFinanceiro" data-page="financeiro" hidden><span>$</span> <em class="nav-texto">Financeiro</em><b id="navFinanceiroBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="settings"><span>⚙</span> Configurações</button>
       </nav>
       <div class="sidebar-user"><span id="currentUserAvatar" class="sidebar-avatar"></span><strong id="currentUserName">Usuário</strong><span id="currentUserRole">—</span><button id="logoutButton">Sair</button></div>
@@ -326,11 +328,30 @@
           <button id="newComissaoAluguelButton" class="secondary-button">+ Lançamento manual</button>
         </div>
         <div id="comResumo" class="crm-resumo com-resumo"></div>
-        <p class="muted-text crm-dica">As comissões são lançadas sozinhas quando a negociação vai para "Fechado", pela regra do corretor (ou a padrão da casa). Monte as regras em Configurações → Regras de comissão.</p>
+        <p class="muted-text crm-dica">As comissões são lançadas sozinhas quando a negociação vai para "Fechado" e, nas partes sobre a taxa de administração, a cada aluguel recebido no Financeiro — sempre pela regra do corretor (ou a padrão da casa). Monte as regras em Configurações → Regras de comissão.</p>
         <div class="panel table-panel">
           <table class="crm-tabela com-tabela"><thead><tr><th>Quem recebe</th><th>Negócio</th><th>Parte</th><th>Base</th><th>Comissão</th><th>Mês</th><th>Situação</th><th></th></tr></thead><tbody id="comissaoAluguelTableBody"></tbody></table>
           <div id="comissaoAluguelTableEmpty" class="empty-state" hidden>Nenhuma comissão nesta seleção.</div>
         </div>
+      </section>
+
+      <section id="page-financeiro" class="page">
+        <div class="fin-abas" role="tablist">
+          <button type="button" class="fin-aba ativa" data-fin-aba="resumo">Resumo</button>
+          <button type="button" class="fin-aba" data-fin-aba="cobrancas">Cobranças <b id="finAtrasoBadge" class="nav-badge" hidden>0</b></button>
+          <button type="button" class="fin-aba" data-fin-aba="contratos">Contratos</button>
+          <button type="button" class="fin-aba" data-fin-aba="repasses">Repasses</button>
+        </div>
+        <div class="crm-toolbar fin-toolbar">
+          <input id="finMes" type="month" title="Mês" />
+          <select id="finFiltro" hidden></select>
+          <input id="finBusca" type="search" placeholder="Buscar inquilino, proprietário, imóvel ou nº" autocomplete="off" hidden />
+          <span id="finContagem" class="crm-contagem"></span>
+          <button id="finAtualizar" type="button" class="secondary-button">Atualizar</button>
+          <button id="finNovoContrato" type="button" class="primary-button" data-fin-gerir>+ Novo contrato</button>
+        </div>
+        <div id="finResumo"></div>
+        <div id="finLista" class="panel table-panel" hidden></div>
       </section>
 
       <section id="page-settings" class="page">
@@ -664,6 +685,7 @@
         <button id="crmNegSalvar" type="button" class="primary-button">Salvar</button>
       </div>
       <div id="crmNegMsg" class="form-message" hidden></div>
+      <section id="crmNegContrato" class="crm-visitas com-negocio" hidden></section>
       <section id="crmNegComissoes" class="crm-visitas com-negocio" hidden></section>
       <section id="crmNegVisitas" class="crm-visitas" hidden></section>
       <section id="crmNegAtendimento" class="crm-atendimento" hidden>
@@ -695,6 +717,7 @@
           <option value="venda_captador">Venda: quem fechou + quem captou</option>
           <option value="parceria">Venda em parceria 50/50</option>
           <option value="meta">Venda escalonada por meta do mês</option>
+          <option value="taxa_adm">1º aluguel + % da taxa de administração</option>
           <option value="bonus">Bônus fixo por locação</option>
         </select></label>
       </div>
@@ -713,6 +736,7 @@
           <label><span>Tipo de negócio</span><select id="comSimFinalidade"><option value="locacao">Locação</option><option value="venda">Venda</option></select></label>
           <label><span id="comSimValorRotulo">Aluguel mensal</span><input id="comSimValor" inputmode="decimal" value="2.500" /></label>
           <label id="comSimPrazoLabel"><span>Prazo do contrato (meses)</span><input id="comSimPrazo" type="number" min="1" max="120" value="30" /></label>
+          <label id="comSimTaxaLabel"><span>Taxa de administração (%)</span><input id="comSimTaxa" inputmode="decimal" value="10" /></label>
           <label id="comSimMetaLabel" hidden><span>Já fechado pelo corretor no mês</span><input id="comSimMeta" inputmode="decimal" placeholder="R$ 0" /></label>
           <button id="comSimular" type="button" class="primary-button">Simular</button>
         </div>
@@ -952,6 +976,94 @@
     </form>
   </dialog>
 
+  <dialog id="finContratoDialog" class="crm-dialog crm-dialog-larga">
+    <form method="dialog" class="dialog-card" id="finContratoForm">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">ADMINISTRAÇÃO DE ALUGUEL</span>
+      <h2 id="finContratoTitulo">Novo contrato de locação</h2>
+      <input id="finCtNegociacao" type="hidden" />
+      <div id="finCtCobrancas"></div>
+      <div class="form-row">
+        <label><span>Imóvel</span><select id="finCtImovel"></select></label>
+        <label><span>Corretor que fechou</span><select id="finCtCorretor"></select></label>
+      </div>
+      <div class="form-row">
+        <label><span>Inquilino</span><select id="finCtInquilino"></select></label>
+        <label><span>Proprietário</span><select id="finCtProprietario"></select></label>
+      </div>
+      <div class="fin-grade">
+        <label><span>Aluguel (R$)</span><input id="finCtValor" inputmode="decimal" autocomplete="off" /></label>
+        <label><span>Vence todo dia</span><input id="finCtDia" type="number" min="1" max="28" /></label>
+        <label><span>Início</span><input id="finCtInicio" type="date" /></label>
+        <label><span>Prazo (meses)</span><input id="finCtPrazo" type="number" min="1" max="240" /></label>
+        <label><span>Reajuste anual</span><select id="finCtIndice"></select></label>
+        <label><span>Taxa de administração (%)</span><input id="finCtTaxa" inputmode="decimal" /></label>
+        <label><span>Intermediação: % do 1º aluguel</span><input id="finCtInter" inputmode="decimal" /></label>
+        <label><span>Multa por atraso (%)</span><input id="finCtMulta" inputmode="decimal" /></label>
+        <label><span>Juros ao mês (%)</span><input id="finCtJuros" inputmode="decimal" /></label>
+        <label><span>Repassar em até (dias após receber)</span><input id="finCtRepPrazo" type="number" min="0" max="60" /></label>
+      </div>
+      <div class="form-row">
+        <label><span>Garantia</span><select id="finCtGarantia"></select></label>
+        <label id="finCtGarantiaDetLabel"><span>Detalhe da garantia</span><input id="finCtGarantiaDet" placeholder="ex.: fiador João, apólice nº…" autocomplete="off" /></label>
+        <label id="finCtCaucaoLabel"><span>Valor da caução (R$)</span><input id="finCtCaucao" inputmode="decimal" /></label>
+      </div>
+      <span class="crm-rotulo">Cobrado junto com o aluguel, todo mês</span>
+      <div id="finCtItens" class="fin-itens"></div>
+      <button id="finCtAddItem" type="button" class="secondary-button fin-mini">+ Item (condomínio, IPTU…)</button>
+      <label><span>Dados para o repasse ao proprietário (PIX, banco)</span><input id="finCtRepDados" autocomplete="off" /></label>
+      <label><span>Observações</span><textarea id="finCtObs" rows="2"></textarea></label>
+      <p id="finCtMsg" class="form-message" hidden></p>
+      <div class="dialog-actions"><button id="finCtSalvar" type="button" class="primary-button">Criar contrato</button></div>
+      <div id="finCtAcoes" class="fin-ct-acoes" hidden>
+        <details><summary>Reajustar aluguel</summary>
+          <div class="fin-grade">
+            <label><span>Índice (<em id="finReajIndice"></em>) do período (%)</span><input id="finReajPct" inputmode="decimal" placeholder="ex.: 4,5" /></label>
+            <label><span>Novo valor (R$)</span><input id="finReajValor" inputmode="decimal" /></label>
+            <label><span>A partir do mês</span><input id="finReajDesde" type="month" /></label>
+          </div>
+          <p class="muted-text">Consulte o índice acumulado dos últimos 12 meses (IBGE / FGV) e digite aqui. O próximo reajuste fica para 12 meses depois.</p>
+          <button id="finReajAplicar" type="button" class="secondary-button">Aplicar reajuste</button>
+        </details>
+        <details><summary>Encerrar contrato</summary>
+          <div class="fin-grade">
+            <label><span>Data de saída</span><input id="finEncData" type="date" /></label>
+            <label><span>Motivo</span><input id="finEncMotivo" placeholder="ex.: fim do prazo, rescisão" autocomplete="off" /></label>
+          </div>
+          <label class="check-inline"><input id="finEncLiberar" type="checkbox" checked /> Imóvel volta a ficar disponível</label>
+          <button id="finEncAplicar" type="button" class="danger-button">Encerrar contrato</button>
+        </details>
+      </div>
+      <div id="finCtHistoricoBox" class="fin-historico" hidden><span class="crm-rotulo">Histórico do contrato</span><ul id="finCtHistorico"></ul></div>
+    </form>
+  </dialog>
+
+  <dialog id="finPagamentoDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">RECEBER ALUGUEL</span>
+      <h2 id="finPgTitulo">Receber</h2>
+      <p id="finPgInfo" class="muted-text"></p>
+      <div class="fin-grade">
+        <label><span>Pago em</span><input id="finPgData" type="date" /></label>
+        <label><span>Forma</span><select id="finPgForma"></select></label>
+        <label><span>Multa (R$)</span><input id="finPgMulta" inputmode="decimal" /></label>
+        <label><span>Juros (R$)</span><input id="finPgJuros" inputmode="decimal" /></label>
+        <label><span>Desconto (R$)</span><input id="finPgDesconto" inputmode="decimal" placeholder="0" /></label>
+        <label><span>Valor recebido (R$)</span><input id="finPgValor" inputmode="decimal" /></label>
+      </div>
+      <div id="finPgPrevia" class="fin-previa"></div>
+      <label><span>Observação</span><input id="finPgObs" autocomplete="off" /></label>
+      <p id="finPgMsg" class="form-message" hidden></p>
+      <div class="dialog-actions"><button id="finPgSalvar" type="button" class="primary-button">Registrar pagamento</button></div>
+    </form>
+  </dialog>
+
+  <div id="finImpressao" class="fin-impressao" hidden>
+    <div class="fin-imp-barra"><button id="finImpImprimir" type="button" class="primary-button">Imprimir / salvar PDF</button><button id="finImpFechar" type="button" class="secondary-button">Fechar</button></div>
+    <div id="finImpConteudo"></div>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
@@ -960,6 +1072,7 @@
   <script src="crm-painel.js"></script>
   <script src="corretor-ui.js"></script>
   <script src="comissoes.js"></script>
+  <script src="financeiro.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

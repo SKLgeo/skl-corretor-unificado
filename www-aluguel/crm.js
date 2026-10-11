@@ -1144,6 +1144,7 @@
             desenharStepper(n);
             desenharSituacao(n);
             if (window.SKLComissoes) window.SKLComissoes.desenharNaNegociacao(n, $("crmNegComissoes"));
+            if (window.SKLFinanceiro) window.SKLFinanceiro.desenharNaNegociacao(n, $("crmNegContrato"));
             tipoAtendimento = "ligacao";
             marcarTipoAtendimento();
             $("crmAtTexto").value = "";
@@ -1156,6 +1157,7 @@
         } else {
             $("crmNegSituacao").hidden = true;
             $("crmNegComissoes").hidden = true;
+            $("crmNegContrato").hidden = true;
             $("crmNegVisitas").hidden = true;
         }
         renderCompativeis();

@@ -44,7 +44,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.6.0";
+    const APP_VERSION = "0.7.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -560,6 +560,21 @@
         };
     }
 
+    function contextoFinanceiro() {
+        return {
+            sb, h, toast, traduzErro, parseValor,
+            carteiraId: () => carteiraId,
+            carteiraNome: () => carteiraNomeAtual || "",
+            usuario: () => currentUser,
+            veTudo: () => veTudo(),
+            podeGerir: () => !!currentUser && [ "administrador", "central_vendas", "financeiro" ].includes(currentUser.papel),
+            imoveis: () => [ ...construcoes.values() ],
+            equipe: () => corretores,
+            recarregarImoveis: () => loadConstrucoes(true),
+            recarregarComissoes: () => loadComissoesAluguel()
+        };
+    }
+
     async function enterApp() {
         $("loginView").hidden = true;
         $("appView").hidden = false;
@@ -599,11 +614,13 @@
         await loadComissoesAluguel();
         connectRealtime();
         if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
+        if (window.SKLFinanceiro) await window.SKLFinanceiro.iniciar(contextoFinanceiro());
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
     function logout() {
         if (window.SKLCRM) window.SKLCRM.sair();
+        if (window.SKLFinanceiro) window.SKLFinanceiro.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         sb.auth.signOut();
         carteiraId = null;
@@ -637,11 +654,12 @@
         $(`page-${page}`).classList.add("active-page");
         const titles = {
             hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
-            settings: "Configurações", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
+            settings: "Configurações", financeiro: "Financeiro", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
         if (window.SKLCRM) window.SKLCRM.aoMostrar(page);
+        if (page === "financeiro" && window.SKLFinanceiro) window.SKLFinanceiro.aoMostrar();
         if (window.SKLModoCorretor) window.SKLModoCorretor.aoMostrar(page);
     }
 
