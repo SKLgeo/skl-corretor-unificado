@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.13.0-web";
+    const APP_VERSION = "0.14.0-web";
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -99,6 +99,8 @@
             await detectarLinhasEEntrar();
         } catch (error) {
             if (!navigator.onLine) return showMessage($("loginMessage"), MSG_SEM_INTERNET);
+            // senha certa mas o servidor não respondeu: não sai da conta, tenta de novo
+            if (ehErroDeRede(error) && (await sb.auth.getSession()).data?.session) return restoreSession();
             await sb.auth.signOut();
             showMessage($("loginMessage"), traduzErro(error.message));
         } finally {
@@ -133,7 +135,7 @@
             erroSessao = error;
         }
         if (!data?.session) {
-            if ((erroSessao || !navigator.onLine) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
+            if (VENDAS_LIGADO && (erroSessao || !navigator.onLine) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
             mostrarLogin();
             if (!navigator.onLine) showMessage($("loginMessage"), MSG_SEM_INTERNET);
             return;
@@ -141,9 +143,16 @@
         try {
             await detectarLinhasEEntrar();
         } catch (error) {
-            if (ehErroDeRede(error) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
+            if (VENDAS_LIGADO && ehErroDeRede(error) && temAcessoOfflineSalvo()) return abrirLinha("vendas-corretor");
             mostrarLogin();
-            showMessage($("loginMessage"), navigator.onLine ? traduzErro(error.message) : MSG_SEM_INTERNET);
+            if (ehErroDeRede(error)) {
+                // continua conectado: tenta de novo sozinho, sem pedir senha
+                showMessage($("loginMessage"), (navigator.onLine ? "Servidor ocupado ou conexão lenta." : "Sem internet.") + " Você continua conectado: tentando de novo em instantes…");
+                clearTimeout(window.__sklRetry);
+                window.__sklRetry = setTimeout(restoreSession, 8000);
+                return;
+            }
+            showMessage($("loginMessage"), traduzErro(error.message));
         }
     }
 
@@ -183,13 +192,13 @@
     async function detectarLinhasEEntrar() {
         if (modoRecuperacao) return mostrarFormulario("recoverNewPasswordForm");
         const limite = new Promise((_, rejeita) => setTimeout(() => rejeita(new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.")), 25000));
-        const [vendas, aluguel] = await Promise.race([Promise.all([temAcessoVendas(), temAcessoAluguel()]), limite]);
+        const [vendas, aluguel] = await Promise.race([Promise.all([VENDAS_LIGADO ? temAcessoVendas() : null, temAcessoAluguel()]), limite]);
         acesso = { vendas: Boolean(vendas), aluguel };
         // usado por trocar-linha.js (Vendas/Aluguéis) para só mostrar o atalho a quem tem as duas linhas
         try { localStorage.setItem("sklu_linhas", [vendas && "vendas", aluguel && "aluguel"].filter(Boolean).join(",")); } catch {}
         alvoVendas = vendas || "vendas";
         if (!vendas && !aluguel) {
-            throw new Error("Este usuário ainda não tem acesso a nenhuma linha de negócio (Vendas ou Aluguéis).");
+            throw new Error("Este usuário ainda não tem acesso à Gestão imobiliária.");
         }
         if (vendas && aluguel) {
             mostrarEscolha();
@@ -201,6 +210,8 @@
     function mostrarLogin() {
         mostrarFormulario("loginForm");
         $("loginForm").reset();
+        // lembra o último e-mail usado neste aparelho (a senha fica com o gerenciador de senhas do aparelho)
+        try { const e = localStorage.getItem("skl_shell_ultimo_email"); if (e) $("loginEmailInput").value = e; } catch {}
     }
 
     function mostrarEscolha() {
@@ -225,6 +236,7 @@
     }
 
     $("loginForm").addEventListener("submit", login);
+    $("loginForm").addEventListener("submit", () => { try { localStorage.setItem("skl_shell_ultimo_email", $("loginEmailInput").value.trim()); } catch {} });
     $("showRecoverButton").addEventListener("click", () => {
         $("recoverEmailInput").value = $("loginEmailInput").value.trim();
         $("recoverMessage").hidden = true;

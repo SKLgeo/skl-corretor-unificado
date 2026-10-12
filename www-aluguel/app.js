@@ -44,7 +44,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.8.0";
+    const APP_VERSION = "0.8.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -420,34 +420,80 @@
 
     // ===== Sessão / carteira =====
 
+    // Lembra o último e-mail usado neste aparelho (a senha fica a cargo do gerenciador de senhas do aparelho/navegador).
+    const ULTIMO_EMAIL_KEY = "skl_alug_ultimo_email";
+    function lembrarEmail(email) { try { if (email) localStorage.setItem(ULTIMO_EMAIL_KEY, email); } catch {} }
+    function preencherEmailLembrado() {
+        try { const e = localStorage.getItem(ULTIMO_EMAIL_KEY); if (e && !$("emailInput").value) $("emailInput").value = e; } catch {}
+    }
+    // Só sai da conta quando a sessão é inválida ou a pessoa não tem acesso; falha de rede/servidor mantém a sessão.
+    function erroDeSessao(error) {
+        return /Sessão inválida|não tem acesso|JWT|refresh[_ ]token|Invalid Refresh|session|not authenticated|expired/i.test(String((error && error.message) || error || ""));
+    }
+    let tentativaTimer = null, tentativas = 0;
+    function aguardarParaTentarDeNovo(error) {
+        $("appView").hidden = true;
+        $("carteiraPicker").hidden = true;
+        $("loginView").hidden = false;
+        preencherEmailLembrado();
+        const espera = [ 5, 10, 20, 30 ][Math.min(tentativas, 3)];
+        tentativas++;
+        showMessage($("loginMessage"), (navigator.onLine ? "Não foi possível abrir agora (servidor ocupado ou conexão lenta)." : "Sem internet.")
+            + ` Você continua conectado: tentando de novo em ${espera} s…`);
+        clearTimeout(tentativaTimer);
+        tentativaTimer = setTimeout(restoreSession, espera * 1000);
+        if (error) console.warn("Abrir a carteira falhou:", error);
+    }
+    window.addEventListener("online", () => { if (tentativaTimer) { clearTimeout(tentativaTimer); tentativaTimer = null; restoreSession(); } });
+
     async function login(event) {
         event.preventDefault();
+        const email = $("emailInput").value.trim();
+        let entrou = false;
         try {
-            const { error } = await sb.auth.signInWithPassword({
-                email: $("emailInput").value.trim(),
-                password: $("passwordInput").value
-            });
+            const { error } = await sb.auth.signInWithPassword({ email, password: $("passwordInput").value });
             if (error) throw error;
+            entrou = true;
+            lembrarEmail(email);
             await resolverCarteiraEEntrar();
         } catch (error) {
+            if (entrou && !erroDeSessao(error)) return aguardarParaTentarDeNovo(error);
             await sb.auth.signOut();
             showMessage($("loginMessage"), traduzErro(error.message));
         }
     }
 
     async function restoreSession() {
+        clearTimeout(tentativaTimer);
+        tentativaTimer = null;
+        let data = null;
         try {
-            const { data } = await sb.auth.getSession();
-            if (!data?.session) return logout();
+            ({ data } = await sb.auth.getSession());
+        } catch (error) {
+            return aguardarParaTentarDeNovo(error);
+        }
+        if (!data?.session) { preencherEmailLembrado(); return logout(); }
+        try {
             await resolverCarteiraEEntrar();
-        } catch {
-            logout();
+            tentativas = 0;
+            $("loginMessage").hidden = true;
+        } catch (error) {
+            if (erroDeSessao(error)) return logout();
+            aguardarParaTentarDeNovo(error);
         }
     }
 
     async function listarCarteirasDoUsuario() {
-        const { data: userData, error: userError } = await sb.auth.getUser();
-        if (userError || !userData?.user) throw new Error("Sessão inválida.");
+        // usa a sessão salva no aparelho (getUser vai ao servidor e, numa falha de rede, parecia "sessão inválida" e deslogava)
+        const { data: sessao } = await sb.auth.getSession();
+        let usuario = sessao?.session?.user || null;
+        if (!usuario) {
+            const { data: userData, error: userError } = await sb.auth.getUser();
+            if (userError && /fetch|network|Load failed|Retryable/i.test(`${userError.name} ${userError.message}`)) throw userError;
+            usuario = userData?.user || null;
+        }
+        if (!usuario) throw new Error("Sessão inválida.");
+        const userData = { user: usuario };
         const uid = userData.user.id;
         pendingUser = {
             id: uid,
@@ -622,19 +668,20 @@
         bairrosFiltro = [];
         faixaValor = null;
         await carregarConfigCarteira();
-        if (window.SKLComissoes) await window.SKLComissoes.iniciar(contextoComissoes());
+        const seguro = async (nome, fn) => { try { await fn(); } catch (e) { console.error("Falha ao iniciar " + nome, e); } };
+        if (window.SKLComissoes) await seguro("comissões", () => window.SKLComissoes.iniciar(contextoComissoes()));
         if (veTudo()) await loadCorretores();
         await loadConstrucoes();
         if (gerencia) await loadInteresses();
         if (window.SKLComissoes) window.SKLComissoes.renderRegras();
         await loadComissoesAluguel();
         connectRealtime();
-        if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
-        if (window.SKLFinanceiro) await window.SKLFinanceiro.iniciar(contextoFinanceiro());
+        if (window.SKLCRM) await seguro("CRM", () => window.SKLCRM.iniciar(contextoCrm()));
+        if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
         const ctxExtras = contextoExtras();
-        if (window.SKLIntegracoes) window.SKLIntegracoes.iniciar(ctxExtras);
-        if (window.SKLDocumentos) window.SKLDocumentos.iniciar(ctxExtras);
-        if (window.SKLExtras) window.SKLExtras.iniciar(ctxExtras);
+        if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
+        if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
+        if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
