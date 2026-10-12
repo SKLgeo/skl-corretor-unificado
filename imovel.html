@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://xigwlofqkmiibzbongkn.supabase.co; connect-src https://xigwlofqkmiibzbongkn.supabase.co;" />
+  <meta name="robots" content="noindex" />
+  <title>Imóvel</title>
+  <style>
+    :root{--azul:#1583B7;--escuro:#061B2E;--texto:#1d2b33;--muted:#6b7c85;--linha:#e2e8eb}
+    *{box-sizing:border-box}html,body{margin:0;background:#eef3f6;color:var(--texto);font-family:Inter,"Segoe UI",Arial,sans-serif}
+    main{max-width:860px;margin:0 auto;padding:0 0 40px}
+    .galeria{position:relative;background:#0b1c29;aspect-ratio:16/10;overflow:hidden}
+    .galeria img{width:100%;height:100%;object-fit:cover;display:block}
+    .galeria button{position:absolute;top:50%;transform:translateY(-50%);border:0;background:rgba(0,0,0,.45);color:#fff;width:42px;height:42px;border-radius:50%;font-size:24px;cursor:pointer}
+    .galeria .ant{left:10px}.galeria .prox{right:10px}
+    .contador{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;border-radius:99px;padding:3px 10px;font-size:13px}
+    .miniaturas{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:#fff}
+    .miniaturas img{width:76px;height:56px;object-fit:cover;border-radius:6px;cursor:pointer;opacity:.7;flex:none}
+    .miniaturas img.ativa{opacity:1;outline:2px solid var(--azul)}
+    .cartao{background:#fff;margin:12px;border-radius:16px;padding:18px 20px;box-shadow:0 6px 20px rgba(6,27,46,.06)}
+    .codigo{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--azul);text-transform:uppercase}
+    h1{font-size:22px;margin:4px 0 6px;color:var(--escuro)}
+    .local{color:var(--muted);margin:0 0 12px}
+    .precos{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+    .preco{background:#eef7fc;border-radius:12px;padding:8px 14px}.preco span{display:block;font-size:12px;color:var(--muted)}.preco strong{font-size:20px;color:var(--escuro)}
+    .extras{color:var(--muted);font-size:14px;margin:4px 0 0}
+    .carac{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:6px}
+    .carac div{border:1px solid var(--linha);border-radius:12px;padding:10px;text-align:center}.carac strong{display:block;font-size:18px}.carac span{font-size:12px;color:var(--muted)}
+    .descricao{white-space:pre-wrap;line-height:1.55}
+    .acoes{position:sticky;bottom:0;display:flex;gap:10px;padding:12px;background:linear-gradient(transparent,#eef3f6 30%)}
+    .acoes a{flex:1;text-align:center;text-decoration:none;font-weight:800;border-radius:12px;padding:14px;color:#fff;background:#25D366}
+    .acoes a.mapa{background:var(--escuro)}
+    .rodape{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
+    .aviso{margin:40px 16px;text-align:center;color:var(--muted)}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <main>
+    <p id="carregando" class="aviso">Carregando o imóvel…</p>
+    <div id="conteudo" hidden>
+      <div class="galeria"><img id="foto" alt="Foto do imóvel" /><button class="ant" id="ant" type="button" aria-label="Foto anterior">‹</button><button class="prox" id="prox" type="button" aria-label="Próxima foto">›</button><span class="contador" id="contador"></span></div>
+      <div class="miniaturas" id="miniaturas"></div>
+      <section class="cartao">
+        <span class="codigo" id="codigo"></span>
+        <h1 id="titulo"></h1>
+        <p class="local" id="local"></p>
+        <div class="precos" id="precos"></div>
+        <p class="extras" id="extras"></p>
+      </section>
+      <section class="cartao"><div class="carac" id="carac"></div></section>
+      <section class="cartao" id="descBox"><div class="descricao" id="descricao"></div></section>
+      <p class="rodape" id="rodape"></p>
+      <div class="acoes"><a id="whats" href="#" target="_blank" rel="noopener" hidden>Falar no WhatsApp</a><a id="mapa" class="mapa" href="#" target="_blank" rel="noopener" hidden>Ver no mapa</a></div>
+    </div>
+  </main>
+  <script src="imovel.js"></script>
+</body>
+</html>

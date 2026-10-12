@@ -836,6 +836,7 @@
         $("crmCliNovaNeg").hidden = !c || (!central() && ehProprietario);
         $("crmCliSalvar").textContent = c ? "Salvar alterações" : "Cadastrar cliente";
         desenharSublistasCliente(c);
+        if (window.SKLExtras) window.SKLExtras.aoAbrirCliente(c);
         $("crmClienteDialog").showModal();
     }
     function desenharSublistasCliente(c) {
@@ -1145,6 +1146,7 @@
             desenharSituacao(n);
             if (window.SKLComissoes) window.SKLComissoes.desenharNaNegociacao(n, $("crmNegComissoes"));
             if (window.SKLFinanceiro) window.SKLFinanceiro.desenharNaNegociacao(n, $("crmNegContrato"));
+            if (window.SKLExtras) window.SKLExtras.aoAbrirNegociacao(n);
             tipoAtendimento = "ligacao";
             marcarTipoAtendimento();
             $("crmAtTexto").value = "";
@@ -1158,6 +1160,7 @@
             $("crmNegSituacao").hidden = true;
             $("crmNegComissoes").hidden = true;
             $("crmNegContrato").hidden = true;
+            if (window.SKLExtras) window.SKLExtras.aoAbrirNegociacao(null);
             $("crmNegVisitas").hidden = true;
         }
         renderCompativeis();

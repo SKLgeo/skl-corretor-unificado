@@ -44,7 +44,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.7.0";
+    const APP_VERSION = "0.8.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -575,6 +575,22 @@
         };
     }
 
+    // Integrações (site/portais), documentos (contrato, vistoria, anexos, informe) e complementos do CRM (propostas, chaves, enviar imóvel)
+    function contextoExtras() {
+        return {
+            sb, h, toast, traduzErro, parseValor,
+            carteiraId: () => carteiraId,
+            carteiraNome: () => carteiraNomeAtual || "",
+            usuario: () => currentUser,
+            papel: () => currentUser && currentUser.papel,
+            veTudo: () => veTudo(),
+            gestao: () => gestaoCrm(),
+            podeGerir: () => !!currentUser && [ "administrador", "central_vendas", "financeiro" ].includes(currentUser.papel),
+            imoveis: () => [ ...construcoes.values() ],
+            equipe: () => corretores
+        };
+    }
+
     async function enterApp() {
         $("loginView").hidden = true;
         $("appView").hidden = false;
@@ -615,6 +631,10 @@
         connectRealtime();
         if (window.SKLCRM) await window.SKLCRM.iniciar(contextoCrm());
         if (window.SKLFinanceiro) await window.SKLFinanceiro.iniciar(contextoFinanceiro());
+        const ctxExtras = contextoExtras();
+        if (window.SKLIntegracoes) window.SKLIntegracoes.iniciar(ctxExtras);
+        if (window.SKLDocumentos) window.SKLDocumentos.iniciar(ctxExtras);
+        if (window.SKLExtras) window.SKLExtras.iniciar(ctxExtras);
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
@@ -1210,6 +1230,7 @@
         $("registrarInteresseButton").hidden = !leitura;
 
         if (window.SKLCRM) window.SKLCRM.proprietarioPreencher(construcao, modoDialogo);
+        if (window.SKLExtras) window.SKLExtras.aoAbrirImovel(construcao);
         renderGaleria();
         $("construcaoDialog").showModal();
         setTimeout(() => {

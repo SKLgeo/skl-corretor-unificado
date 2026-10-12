@@ -139,7 +139,13 @@
         [ "finPgData", "finPgMulta", "finPgJuros", "finPgDesconto" ].forEach(id => $(id).addEventListener("input", () => previaPagamento(id === "finPgData")));
         $("finPgSalvar").addEventListener("click", registrarPagamento);
         // impressão
-        $("finImpFechar").addEventListener("click", () => { $("finImpressao").hidden = true; document.body.classList.remove("fin-imprimindo"); });
+        $("finImpFechar").addEventListener("click", () => {
+            $("finImpressao").hidden = true;
+            document.body.classList.remove("fin-imprimindo");
+            // reabre os diálogos que estavam abertos (contrato, vistoria, proposta...)
+            dialogosAbertos.forEach(d => { try { if (!d.open) d.showModal(); } catch { /* já aberto */ } });
+            dialogosAbertos = [];
+        });
         $("finImpImprimir").addEventListener("click", imprimir);
         document.addEventListener("skl-crm-render", () => { if (ctx && $("page-financeiro").classList.contains("active-page") && aba === "resumo") render(); });
     }
@@ -448,6 +454,7 @@
         $("finCtHistoricoBox").hidden = !c;
         msg($("finCtMsg"), "");
         if (c) desenharHistorico(c.id);
+        if (window.SKLDocumentos) window.SKLDocumentos.aoAbrirContrato(c);
         $("finContratoDialog").showModal();
     }
     function resumoCobrancasContrato(c) {
@@ -648,7 +655,11 @@
           ${linhas(pares)}
           <p class="fin-doc-rodape">${r.status === "pago" ? `Repasse feito em ${h(dataBr(r.pago_em))}` : `Repasse previsto até ${h(dataBr(r.previsto_para))}`}${c.repasse_dados ? ` · ${h(c.repasse_dados)}` : ""}${r.observacao ? ` · ${h(r.observacao)}` : ""}</p>`));
     }
+    // um <dialog> aberto fica na camada de cima e esconderia a impressão: fecha durante a impressão e reabre depois
+    let dialogosAbertos = [];
     function abrirImpressao(html) {
+        dialogosAbertos = [ ...document.querySelectorAll("dialog[open]") ];
+        dialogosAbertos.forEach(d => d.close());
         $("finImpConteudo").innerHTML = html;
         $("finImpressao").hidden = false;
         document.body.classList.add("fin-imprimindo");
@@ -658,5 +669,6 @@
         else window.print();
     }
 
-    window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length };
+    window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length,
+        imprimir: html => abrirImpressao(html), contratos: () => contratos, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto) };
 })();

@@ -250,7 +250,48 @@
         const fx = x.faixas();
         $("painelPadraoBloco").innerHTML = Object.keys(porPadrao).map(p => `<div class="crm-resumo-item painel-padrao-${p}"><span>${h(x.PADROES[p])}</span><strong>${porPadrao[p].length}</strong><small>${porPadrao[p].length ? h(x.dinheiroCurto(porPadrao[p].reduce((s, n) => s + (Number(n.valor) || 0), 0))) + " em negociação" : ""}</small></div>`).join("")
             + `<p class="muted-text painel-nota">Faixas da carteira — venda: médio a partir de ${h(x.dinheiro(fx.venda && fx.venda.medio))}, alto a partir de ${h(x.dinheiro(fx.venda && fx.venda.alto))}; locação: médio a partir de ${h(x.dinheiro(fx.locacao && fx.locacao.medio))}, alto a partir de ${h(x.dinheiro(fx.locacao && fx.locacao.alto))}. ${ctx.central() ? "Altere em Configurações." : ""}</p>`;
+        renderFinanceiro(x);
         $("painelAtualizado").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · ${rotuloPeriodo(periodo)}${filtroCorretor ? " · " + x.corretorDe(filtroCorretor) : ""}`;
+    }
+
+    // ---------- administração de aluguéis (dados do Financeiro, só para quem vê a carteira inteira)
+    function renderFinanceiro(x) {
+        let box = $("painelFinanceiro");
+        const fin = window.SKLFinanceiro;
+        const ve = x.ctx().central() && fin && fin.contratos && fin.contratos().length;
+        if (!ve) { if (box) box.hidden = true; return; }
+        if (!box) {
+            box = document.createElement("article");
+            box.id = "painelFinanceiro";
+            box.className = "panel painel-bloco";
+            $("painelKpis").insertAdjacentElement("afterend", box);
+        }
+        box.hidden = false;
+        const hoje = new Date().toISOString().slice(0, 10);
+        const cob = fin.cobrancas(), rep = fin.repasses(), ativos = fin.contratos().filter(c => c.status === "ativo");
+        const umAno = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+        const vencidas = cob.filter(b => b.status !== "cancelada" && b.vencimento < hoje && b.vencimento >= umAno);
+        const abertas = vencidas.filter(b => b.status === "aberta");
+        const somar = (l, f) => l.reduce((s, i) => s + (Number(f(i)) || 0), 0);
+        const inad = somar(vencidas, b => b.valor_total) ? Math.round(somar(abertas, b => b.valor_total) * 1000 / somar(vencidas, b => b.valor_total)) / 10 : 0;
+        const meses = [];
+        for (let k = 5; k >= 0; k--) { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); meses.push(d.toISOString().slice(0, 7)); }
+        const recebido = meses.map(m => [ m, somar(cob.filter(b => b.status === "paga" && String(b.pago_em).startsWith(m)), b => b.valor_pago) ]);
+        const receita = meses.map(m => [ m, somar(rep.filter(r => { const b = cob.find(c => c.id === r.cobranca_id); return b && String(b.pago_em).startsWith(m); }), r => Number(r.taxa_adm) + Number(r.intermediacao)) ]);
+        const max = Math.max(1, ...recebido.map(r => r[1]));
+        const nomeMes = m => new Date(m + "-15T12:00:00").toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+        box.innerHTML = `<h3>Administração de aluguéis</h3>
+          <div class="crm-resumo painel-kpis">
+            <div class="crm-resumo-item"><span>Contratos ativos</span><strong>${ativos.length}</strong><small>${h(x.dinheiroCurto(somar(ativos, c => c.valor_aluguel)))} por mês</small></div>
+            <div class="crm-resumo-item"><span>Inadimplência (12 meses)</span><strong>${String(inad).replace(".", ",")}%</strong><small>${abertas.length} cobrança(s) vencida(s) em aberto</small></div>
+            <div class="crm-resumo-item"><span>Recebido no mês</span><strong>${h(x.dinheiroCurto(recebido[5][1]))}</strong><small>aluguéis pagos</small></div>
+            <div class="crm-resumo-item"><span>Receita da imobiliária</span><strong>${h(x.dinheiroCurto(receita[5][1]))}</strong><small>taxa de adm. + intermediação no mês</small></div>
+            <div class="crm-resumo-item"><span>A repassar</span><strong>${h(x.dinheiroCurto(somar(rep.filter(r => r.status === "pendente"), r => r.valor_liquido)))}</strong><small>aos proprietários</small></div>
+          </div>
+          <h4>Recebido nos últimos 6 meses</h4>
+          ${recebido.map(([ m, v ], i) => `<div class="painel-funil-linha"><span class="painel-funil-nome">${h(nomeMes(m))}</span>
+            <span class="painel-barra"><i style="width:${pct(v, max)}%;background:#29ABE2"></i></span><strong>${h(x.dinheiroCurto(v))}</strong><small>receita ${h(x.dinheiroCurto(receita[i][1]))}</small></div>`).join("")}`;
+        ultimoCsv.push([ "Mês", "Recebido", "Receita da imobiliária" ], ...recebido.map(([ m, v ], i) => [ m, v.toFixed(2).replace(".", ","), receita[i][1].toFixed(2).replace(".", ",") ]), []);
     }
 
     function tabela(cabecalho, linhas) {
