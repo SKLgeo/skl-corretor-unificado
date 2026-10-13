@@ -58,6 +58,7 @@
         document.querySelectorAll("[data-fin-gerir]").forEach(el => { el.hidden = !podeGerir(); });
         contratos = []; cobrancas = []; repasses = []; clientes = new Map(); resumo = null;
         if (!$("finMes").value) $("finMes").value = hojeIso().slice(0, 7);
+        if (window.SKLFinExtra) window.SKLFinExtra.iniciar(ctx);
         if (!ve) return Promise.resolve();
         ligarTempoReal();
         return carregar();
@@ -65,6 +66,7 @@
     function sair() {
         if (canal && ctx) { ctx.sb.removeChannel(canal); }
         canal = null; contratos = []; cobrancas = []; repasses = []; clientes = new Map();
+        if (window.SKLFinExtra) window.SKLFinExtra.sair();
     }
     function ligarTempoReal() {
         if (canal) ctx.sb.removeChannel(canal);
@@ -159,7 +161,7 @@
     function mostrarAba(nova) {
         aba = nova;
         document.querySelectorAll("[data-fin-aba]").forEach(b => b.classList.toggle("ativa", b.dataset.finAba === aba));
-        const f = FILTROS[aba];
+        const f = FILTROS[aba] || (window.SKLFinExtra && window.SKLFinExtra.filtros[aba]);
         $("finFiltro").hidden = !f;
         if (f) $("finFiltro").innerHTML = Object.entries(f).map(([ v, t ]) => `<option value="${v}">${h(t)}</option>`).join("");
         $("finBusca").hidden = aba === "resumo";
@@ -168,9 +170,14 @@
     }
     function render() {
         if (!ctx) return;
+        // Régua, Encargos e Chamados ficam em financeiro-extra.js
+        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba));
         $("finResumo").hidden = aba !== "resumo";
-        $("finLista").hidden = aba === "resumo";
-        $("finMes").hidden = aba === "contratos";
+        $("finLista").hidden = aba === "resumo" || extra;
+        $("finMes").hidden = aba === "contratos" || extra;
+        $("finNovoContrato").hidden = !podeGerir() || extra;
+        if (window.SKLFinExtra) window.SKLFinExtra.render(aba);
+        if (extra) return;
         if (aba === "resumo") return renderResumo();
         if (aba === "cobrancas") return renderCobrancas();
         if (aba === "contratos") return renderContratos();
@@ -201,9 +208,11 @@
             ${aviso("Reajustes nos próximos 30 dias", reaj.length, reaj.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>${h(INDICES[c.indice_reajuste])} · ${h(dataBr(c.proximo_reajuste))}</small></li>`).join(""), "Nenhum reajuste chegando.", "contratos:reajuste")}
             ${aviso("Contratos terminando em 60 dias", venc.length, venc.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>termina em ${h(dataBr(c.fim))}</small></li>`).join(""), "Nenhum contrato terminando.", "contratos:vencendo")}
             ${semContrato.length && podeGerir() ? aviso("Locações fechadas sem contrato", semContrato.length, semContrato.slice(0, 8).map(n => `<li><button type="button" class="text-button" data-fin-neg="${h(n.id)}">${h(n.titulo || nomeCli(n.cliente_id))}</button><small>${h(dinheiro(n.valor))} · criar contrato</small></li>`).join(""), "") : ""}
+            ${window.SKLFinExtra ? window.SKLFinExtra.avisosResumo(aviso) : ""}
           </div>
           ${contratos.length ? "" : `<div class="empty-state">Nenhum contrato ainda. ${podeGerir() ? `Toque em "+ Novo contrato" ou, numa negociação de locação fechada, em "Criar contrato".` : ""}</div>`}`;
         ligarLinks($("finResumo"));
+        if (window.SKLFinExtra) window.SKLFinExtra.ligar($("finResumo"));
     }
     function card(rotulo, valor, sub, alerta, numero) {
         return `<div class="crm-resumo-item${alerta ? " fin-alerta" : ""}"><span>${h(rotulo)}</span><strong>${numero != null ? h(numero) : h(dinheiro(valor || 0))}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div>`;
@@ -272,7 +281,7 @@
             <td data-r="Vencimento">${h(dataBr(b.vencimento))}</td>
             <td data-r="Inquilino"><strong>${h(nomeCli(c.inquilino_id))}</strong><small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
             <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}</td>
-            <td data-r="Parcela">${h(b.parcela)}ª · ${h(mesAno(b.competencia))}</td>
+            <td data-r="Parcela">${b.tipo === "rescisao" ? "Rescisão" : h(b.parcela) + "ª"} · ${h(mesAno(b.competencia))}</td>
             <td data-r="Valor">${h(dinheiro(b.status === "paga" ? b.valor_pago : b.valor_total))}${(b.itens || []).length ? `<small class="fin-sub">aluguel ${h(dinheiro(b.valor_aluguel))} + ${h(b.itens.map(i => i.descricao).join(", "))}</small>` : ""}${Number(b.multa) + Number(b.juros) > 0 ? `<small class="fin-sub">multa+juros ${h(dinheiro(Number(b.multa) + Number(b.juros)))}</small>` : ""}</td>
             <td data-r="Situação">${situacaoCobranca(b)}</td>
             <td class="fin-acoes">${acoesCobranca(b)}</td></tr>`; }).join("")}
@@ -455,6 +464,7 @@
         msg($("finCtMsg"), "");
         if (c) desenharHistorico(c.id);
         if (window.SKLDocumentos) window.SKLDocumentos.aoAbrirContrato(c);
+        if (window.SKLFinExtra) window.SKLFinExtra.aoAbrirContrato(c);
         $("finContratoDialog").showModal();
     }
     function resumoCobrancasContrato(c) {
@@ -670,5 +680,7 @@
     }
 
     window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length,
-        imprimir: html => abrirImpressao(html), contratos: () => contratos, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto) };
+        imprimir: html => abrirImpressao(html), contratos: () => contratos, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
+        clientes: () => [ ...clientes.values() ], mostrarAba, renderizar: () => render(), recarregar: () => carregar(true),
+        abrirContratoId: id => abrirContrato(contrato(id)), abrirPagamentoId: id => abrirPagamento(cobrancas.find(x => x.id === id)) };
 })();

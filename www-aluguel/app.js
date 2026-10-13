@@ -38,13 +38,13 @@
         corretor: "Corretor",
         gestor: "Gestor",
         financeiro: "Financeiro",
-        central_vendas: "Controle de aluguéis",
+        central_vendas: "Central",
         administrador: "Administrador"
     };
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.8.1";
+    const APP_VERSION = "0.9.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];

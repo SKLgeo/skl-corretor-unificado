@@ -26,7 +26,7 @@
   <section id="loginView" class="login-view">
     <div class="login-brand"><img src="logo.png" alt="SKL Soluções Digitais" /></div>
     <form id="loginForm" class="login-card">
-      <span class="eyebrow">SKL ALUGUÉIS</span>
+      <span class="eyebrow">SKL GESTÃO IMOBILIÁRIA</span>
       <h1>Acesso ao sistema</h1>
       <p>Entre com sua conta autorizada para administrar os imóveis.</p>
       <label><span>E-mail</span><input id="emailInput" type="email" autocomplete="username" required /></label>
@@ -44,7 +44,7 @@
       <button id="backFromRecoverButton" class="text-button" type="button">Voltar ao login</button>
       <div id="recoverMessage" class="form-message" hidden></div>
     </form>
-    <p class="login-footer">SKL SOLUÇÕES DIGITAIS — CONTROLE DE ALUGUÉIS</p>
+    <p class="login-footer">SKL SOLUÇÕES DIGITAIS — GESTÃO IMOBILIÁRIA</p>
   </section>
 
   <section id="carteiraPicker" class="login-view" hidden>
@@ -299,7 +299,7 @@
 
       <section id="page-corretores" class="page">
         <div class="page-actions">
-          <p>Crie convites ou acessos diretos para corretores e funcionários da central de aluguéis. Se a pessoa já tiver conta em outra base SKL (venda, por exemplo) com o mesmo e-mail, ela só ganha acesso a esta carteira também — continua entrando com a senha que já usa.</p>
+          <p>Crie convites ou acessos diretos para corretores e funcionários da central. Se a pessoa já tiver conta em outra base SKL (venda, por exemplo) com o mesmo e-mail, ela só ganha acesso a esta carteira também — continua entrando com a senha que já usa.</p>
           <div style="display:flex;gap:10px">
             <button id="newInviteAluguelButton" class="primary-button">Novo convite</button>
             <button id="newDirectUserAluguelButton" class="secondary-button">Criar acesso direto (com prazo)</button>
@@ -342,6 +342,9 @@
           <button type="button" class="fin-aba" data-fin-aba="cobrancas">Cobranças <b id="finAtrasoBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="contratos">Contratos</button>
           <button type="button" class="fin-aba" data-fin-aba="repasses">Repasses</button>
+          <button type="button" class="fin-aba" data-fin-aba="regua">Régua de cobrança <b id="finReguaBadge" class="nav-badge" hidden>0</b></button>
+          <button type="button" class="fin-aba" data-fin-aba="encargos">Encargos <b id="finEncBadge" class="nav-badge" hidden>0</b></button>
+          <button type="button" class="fin-aba" data-fin-aba="chamados">Manutenção <b id="finChBadge" class="nav-badge" hidden>0</b></button>
         </div>
         <div class="crm-toolbar fin-toolbar">
           <input id="finMes" type="month" title="Mês" />
@@ -353,6 +356,7 @@
         </div>
         <div id="finResumo"></div>
         <div id="finLista" class="panel table-panel" hidden></div>
+        <div id="finExtra" hidden></div>
       </section>
 
       <section id="page-settings" class="page">
@@ -874,7 +878,7 @@
         <label><span>Perfil</span>
           <select id="inviteAluguelRoleInput">
             <option value="corretor">Corretor</option>
-            <option value="central_vendas">Controle de aluguéis</option>
+            <option value="central_vendas">Central (equipe do escritório)</option>
             <option value="administrador">Administrador</option>
             <option value="gestor">Gestor (acompanha e conduz a equipe)</option>
             <option value="financeiro">Financeiro (comissões e indicadores)</option>
@@ -902,7 +906,7 @@
         <label><span>Perfil</span>
           <select id="directAluguelRoleInput">
             <option value="corretor">Corretor</option>
-            <option value="central_vendas">Controle de aluguéis</option>
+            <option value="central_vendas">Central (equipe do escritório)</option>
             <option value="administrador">Administrador</option>
             <option value="gestor">Gestor (acompanha e conduz a equipe)</option>
             <option value="financeiro">Financeiro (comissões e indicadores)</option>
@@ -1074,6 +1078,7 @@
   <script src="corretor-ui.js"></script>
   <script src="comissoes.js"></script>
   <script src="financeiro.js"></script>
+  <script src="financeiro-extra.js"></script>
   <script src="integracoes.js"></script>
   <script src="documentos.js"></script>
   <script src="crm-extras.js"></script>

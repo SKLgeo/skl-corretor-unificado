@@ -88,3 +88,39 @@
   .fin-item .check-inline{grid-column:1/-1;order:3}
   .fin-doc{padding:20px 18px}
 }
+/* Régua de cobrança, encargos, manutenção e rescisão (financeiro-extra.js) */
+.fx-painel{padding:16px}
+.fx-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.fx-topo p{margin:0;flex:1;min-width:240px}
+.fx-grupo{margin-bottom:16px}
+.fx-grupo h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:15px;color:var(--navy-deep)}
+.fx-grupo h3 .nav-badge{position:static}
+.fx-atraso h3{color:#a33a2f}
+.fx-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.fx-cartao{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:grid;gap:4px}
+.fx-cartao.fx-pendente{box-shadow:inset 4px 0 0 #e0a23a}
+.fx-cartao header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.fx-cartao small{color:var(--muted);font-size:12px}
+.fx-valor{font-size:19px;font-weight:800;color:var(--navy-deep)}
+.fx-valor small{display:block;font-size:11px;font-weight:600}
+.fx-ultimo{font-style:italic}
+.fx-cartao .fin-acoes{justify-content:flex-start;margin-top:6px}
+.fx-prior{display:inline-flex;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:800;background:#eef2f3;color:var(--muted)}
+.fx-prior-media{background:#e6f3fb;color:#1a6f99}
+.fx-prior-alta{background:#fff3d6;color:#8a5a00}
+.fx-prior-urgente{background:#f7e3e0;color:#a33a2f}
+.fx-res-listas{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:10px 0}
+.fx-res-linha{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:6px;margin-bottom:6px}
+.fx-res-quadro{background:#f7fafb;border:1px solid var(--line);border-radius:12px;padding:6px 12px;margin-top:10px}
+.fx-res-feita{border:1px solid #e3c9c4;background:#fdf5f3;border-radius:12px;padding:10px 12px}
+.fx-res-feita p{margin:4px 0 8px}
+.fx-ch-nota{display:flex;gap:8px;margin-bottom:8px}
+.fx-ch-nota input{flex:1}
+.fx-historico{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:240px;overflow:auto}
+.fx-historico li{border-left:3px solid var(--line);padding:2px 0 2px 9px;font-size:13.5px}
+.fx-historico li small{display:block;color:var(--muted);font-size:11.5px}
+.fx-historico li.fx-ev-status{border-left-color:var(--navy)}
+.fx-historico li.fx-ev-comentario{border-left-color:#e0a23a}
+.fin-doc footer.fx-assinaturas{justify-content:space-between;gap:16px;flex-wrap:wrap}
+.fx-assinaturas .fin-assinatura{min-width:180px;flex:1}
+@media(max-width:780px){.fx-cartoes{grid-template-columns:1fr}.fx-res-linha{grid-template-columns:minmax(0,1fr) 90px auto}}
