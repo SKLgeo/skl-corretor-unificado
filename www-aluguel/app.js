@@ -44,7 +44,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.9.0";
+    const APP_VERSION = "0.9.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -117,6 +117,19 @@
         });
     }
 
+
+    // tela de "carregando" até saber se a pessoa já está conectada (evita o login piscar na abertura)
+    (function () {
+        const boot = document.getElementById("bootView");
+        if (!boot) return;
+        const telas = ["loginView","appView","carteiraPicker"].map(id => document.getElementById(id)).filter(Boolean);
+        let limite = null;
+        const obs = new MutationObserver(() => {
+            if (telas.some(el => !el.hidden)) { boot.remove(); obs.disconnect(); clearTimeout(limite); }
+        });
+        telas.forEach(el => obs.observe(el, { attributes: true, attributeFilter: [ "hidden" ] }));
+        limite = setTimeout(() => { if (boot.isConnected) { boot.remove(); obs.disconnect(); if (telas.every(el => el.hidden)) telas[0].hidden = false; } }, 15000);
+    })();
     bindEvents();
     skl_aguardarSessaoDoShell(1500).then(async sessao => {
         if (sessao) {

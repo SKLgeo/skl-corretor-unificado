@@ -176,6 +176,10 @@ html, body {
 .form-message.ok { background: #dff4e8; color: #247346; }
 #showRecoverButton, #backFromRecoverButton { display: block; margin: 14px auto 0; }
 
+/* abertura: "carregando" até conferir a sessão (o login não pisca mais) */
+.boot-view { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color: #fff; font-weight: 800; letter-spacing: .04em; }
+.boot-view img { height: clamp(64px, 11vw, 104px); }
+
 
 /* ---- acrescentado na versão web (link) ---- */
 .chooser-view { padding-top: max(32px, env(safe-area-inset-top)); padding-bottom: max(32px, env(safe-area-inset-bottom)); }

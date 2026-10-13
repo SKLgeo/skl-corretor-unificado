@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.15.0-web";
+    const APP_VERSION = "0.15.1-web";
     // Vendas (loteamento/prédio) desligado neste app por enquanto: só a Gestão imobiliária (aluguel + venda de imóveis).
     // Para religar, trocar para true (o código de Vendas continua no pacote).
     const VENDAS_LIGADO = false;
@@ -251,6 +251,20 @@
     $("chooseVendasButton").addEventListener("click", () => abrirLinha("vendas"));
     $("chooseAluguelButton").addEventListener("click", () => abrirLinha("aluguel"));
     $("chooserLogoutButton").addEventListener("click", sair);
+
+
+    // tela de "carregando" até saber se a pessoa já está conectada (evita o login piscar na abertura)
+    (function () {
+        const boot = document.getElementById("bootView");
+        if (!boot) return;
+        const telas = ["loginView","chooserView"].map(id => document.getElementById(id)).filter(Boolean);
+        let limite = null;
+        const obs = new MutationObserver(() => {
+            if (telas.some(el => !el.hidden)) { boot.remove(); obs.disconnect(); clearTimeout(limite); }
+        });
+        telas.forEach(el => obs.observe(el, { attributes: true, attributeFilter: [ "hidden" ] }));
+        limite = setTimeout(() => { if (boot.isConnected) { boot.remove(); obs.disconnect(); if (telas.every(el => el.hidden)) telas[0].hidden = false; } }, 15000);
+    })();
 
     restoreSession();
 })();
