@@ -504,6 +504,11 @@
             .select("papel, expira_em, carteiras_aluguel(id, nome, slug, ativo)")
             .eq("usuario_id", uid).eq("ativo", true);
         if (error) throw error;
+        // o nome mostrado vem do perfil (é o que a Central edita); o do login fica guardado no aparelho e pode estar desatualizado
+        try {
+            const { data: perfil } = await sb.from("perfis").select("nome_exibicao").eq("id", uid).maybeSingle();
+            if (perfil && perfil.nome_exibicao) pendingUser.display_name = perfil.nome_exibicao;
+        } catch { /* sem perfil: fica o nome do login */ }
         const agora = Date.now();
         return (data || [])
             .filter(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora))
