@@ -176,9 +176,9 @@ html, body {
 .form-message.ok { background: #dff4e8; color: #247346; }
 #showRecoverButton, #backFromRecoverButton { display: block; margin: 14px auto 0; }
 
-/* abertura: "carregando" até conferir a sessão (o login não pisca mais) */
-.boot-view { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color: #fff; font-weight: 800; letter-spacing: .04em; }
-.boot-view img { height: clamp(64px, 11vw, 104px); }
+/* abertura: "carregando" até conferir a sessão — igual à da Gestão imobiliária, para as duas parecerem uma tela só */
+.boot-view { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: linear-gradient(135deg, #29ABE2, #061B2E); color: #fff; font-weight: 800; letter-spacing: .04em; }
+.boot-view img { width: min(260px, 62vw); height: auto; border-radius: 10px; }
 
 
 /* ---- acrescentado na versão web (link) ---- */
