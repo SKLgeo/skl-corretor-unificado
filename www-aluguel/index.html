@@ -45,6 +45,15 @@
       <button id="backFromRecoverButton" class="text-button" type="button">Voltar ao login</button>
       <div id="recoverMessage" class="form-message" hidden></div>
     </form>
+    <form id="recoverNewPasswordForm" class="login-card" hidden>
+      <span class="eyebrow">NOVA SENHA</span>
+      <h1>Defina sua nova senha</h1>
+      <p>Você veio pelo link de recuperação. Escolha uma senha nova (mínimo 6 caracteres).</p>
+      <label><span>Nova senha</span><input id="recoverNewPasswordInput" type="password" autocomplete="new-password" required minlength="6" /></label>
+      <label><span>Repita a nova senha</span><input id="recoverNewPasswordInput2" type="password" autocomplete="new-password" required minlength="6" /></label>
+      <button id="recoverNewPasswordButton" class="primary-button" type="submit">Salvar nova senha</button>
+      <div id="recoverNewPasswordMessage" class="form-message" hidden></div>
+    </form>
     <p class="login-footer">SKL SOLUÇÕES DIGITAIS — GESTÃO IMOBILIÁRIA</p>
   </section>
 
@@ -1180,6 +1189,7 @@
 
   <div id="toast" class="toast" hidden></div>
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="marca.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
   <script src="avatar.js"></script>
   <script src="crm.js"></script>

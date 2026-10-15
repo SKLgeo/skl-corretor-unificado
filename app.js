@@ -4,7 +4,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.16.2-web";
+    const APP_VERSION = "0.16.3-web";
     // Vendas (loteamento/prédio) desligado neste app por enquanto: só a Gestão imobiliária (aluguel + venda de imóveis).
     // Para religar, trocar para true (o código de Vendas continua no pacote).
     const VENDAS_LIGADO = false;

@@ -53,9 +53,12 @@
         administrador: "Administrador"
     };
 
-    const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.10.2";
+    // Marca da imobiliária (marca.js): no app da SKL fica vazio; o gerador do link de cada cliente
+    // (Codigo_Fonte/Web_Imobiliaria) preenche nome, link, carteira e, se o cliente tiver banco próprio, o Supabase dele.
+    const MARCA = window.SKL_MARCA || {};
+    const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
+    const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
+    const APP_VERSION = "0.10.3";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -162,6 +165,8 @@
         $("showRecoverButton").addEventListener("click", () => mostrarRecuperarSenha(true));
         $("backFromRecoverButton").addEventListener("click", () => mostrarRecuperarSenha(false));
         $("recoverForm").addEventListener("submit", enviarRecuperarSenha);
+        $("recoverNewPasswordForm").addEventListener("submit", salvarNovaSenha);
+        sb.auth.onAuthStateChange(evento => { if (evento === "PASSWORD_RECOVERY") { modoRecuperacao = true; mostrarNovaSenha(); } });
         $("logoutButton").addEventListener("click", logout);
         document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
         document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.go)));
@@ -436,10 +441,41 @@
         element.style.color = success ? "#247346" : "#9a3b34";
         element.hidden = false;
     }
-    // Esqueci minha senha: o e-mail traz um link que abre o link web do SKL Unificado, onde a pessoa define a senha nova
-    // (vale para qualquer conta — o login é o mesmo em todos os apps da SKL).
-    const LINK_RECUPERAR_SENHA = "https://sklgeo.github.io/skl-corretor-unificado/";
+    // Esqueci minha senha: o e-mail traz um link que abre o link web (o do cliente, se houver marca; senão o do SKL Unificado),
+    // onde a pessoa define a senha nova. O próprio app também trata esse link (formulário "Defina sua nova senha").
+    const LINK_RECUPERAR_SENHA = MARCA.link || "https://sklgeo.github.io/skl-corretor-unificado/";
+    let modoRecuperacao = /type=recovery/.test(location.hash);
+    function mostrarNovaSenha() {
+        $("appView").hidden = true;
+        $("carteiraPicker").hidden = true;
+        $("loginView").hidden = false;
+        $("loginForm").hidden = true;
+        $("recoverForm").hidden = true;
+        $("recoverNewPasswordForm").hidden = false;
+    }
+    async function salvarNovaSenha(event) {
+        event.preventDefault();
+        const senha = $("recoverNewPasswordInput").value;
+        if (senha !== $("recoverNewPasswordInput2").value) return showMessage($("recoverNewPasswordMessage"), "As duas senhas não são iguais.");
+        $("recoverNewPasswordButton").disabled = true;
+        try {
+            const { error } = await sb.auth.updateUser({ password: senha });
+            if (error) throw error;
+            await sb.auth.signOut();
+            modoRecuperacao = false;
+            history.replaceState(null, "", location.pathname);
+            $("recoverNewPasswordForm").reset();
+            mostrarRecuperarSenha(false);
+            showMessage($("loginMessage"), "Senha alterada. Entre com a senha nova.", true);
+        } catch (error) {
+            showMessage($("recoverNewPasswordMessage"), /different from the old|should be different/i.test(error.message || "")
+                ? "A senha nova precisa ser diferente da anterior." : traduzErro(error.message));
+        } finally {
+            $("recoverNewPasswordButton").disabled = false;
+        }
+    }
     function mostrarRecuperarSenha(mostrar) {
+        $("recoverNewPasswordForm").hidden = true;
         $("loginForm").hidden = mostrar;
         $("recoverForm").hidden = !mostrar;
         $("recoverMessage").hidden = true;
@@ -542,6 +578,7 @@
     }
 
     async function restoreSession() {
+        if (modoRecuperacao) return mostrarNovaSenha();
         clearTimeout(tentativaTimer);
         tentativaTimer = null;
         let data = null;
@@ -590,7 +627,8 @@
         const agora = Date.now();
         return (data || [])
             .filter(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora))
-            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [] }));
+            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [] }))
+            .filter(c => !MARCA.carteira_id || c.id === MARCA.carteira_id);
     }
 
     async function resolverCarteiraEEntrar() {
