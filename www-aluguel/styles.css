@@ -335,3 +335,15 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .benfeitorias-add input{flex:1;min-width:140px}
 .benfeitorias-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .benfeitoria-sugestao{border:1px dashed #c9a43b;background:#fff;color:#5d4a1f;border-radius:99px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* ficha do cliente */
+.cli-qualidade{margin:8px 0}
+.crm-ficha .crm-ficha-grupo{border-top:1px dashed var(--line);margin-top:10px;padding-top:8px}
+.crm-ficha-check{align-self:end;padding-bottom:12px}
+.ext-chaves-avisos{background:#fff8e6;border:1px solid #f0d68a;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.ext-entrega{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f3e3b5}
+.ext-entrega:first-of-type{border-top:0}
+.ext-entrega small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.ext-entrega.receber{background:#fffdf3}
+.ext-chave-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.ext-chave-acoes .ext-entrega{width:100%;border:1px solid #f0d68a;border-radius:10px;padding:8px 10px;background:#fff8e6}

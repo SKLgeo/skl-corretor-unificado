@@ -69,7 +69,7 @@
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
         <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
-        <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Corretores</button>
+        <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Equipe</button>
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
         <button class="nav-button" id="navFinanceiro" data-page="financeiro" hidden><span>$</span> <em class="nav-texto">Financeiro</em><b id="navFinanceiroBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="settings"><span>⚙</span> Configurações</button>
@@ -265,6 +265,7 @@
             <option value="comprador">Compradores</option>
             <option value="inquilino">Inquilinos</option>
             <option value="vendedor">Vendedores</option>
+            <option value="investidor">Investidores</option>
             <option value="proprietario">Proprietários</option>
             <option value="pendente">Aguardando aprovação</option>
           </select>
@@ -314,14 +315,14 @@
 
       <section id="page-corretores" class="page">
         <div class="page-actions">
-          <p>Crie convites ou acessos diretos para corretores e funcionários da central. Se a pessoa já tiver conta em outra base SKL (venda, por exemplo) com o mesmo e-mail, ela só ganha acesso a esta carteira também — continua entrando com a senha que já usa.</p>
+          <p>Corretores e pessoas do escritório: crie convites ou acessos diretos. Se a pessoa já tiver conta em outra base SKL (venda, por exemplo) com o mesmo e-mail, ela só ganha acesso a esta carteira também — continua entrando com a senha que já usa.</p>
           <div style="display:flex;gap:10px">
             <button id="newInviteAluguelButton" class="primary-button">Novo convite</button>
             <button id="newDirectUserAluguelButton" class="secondary-button">Criar acesso direto (com prazo)</button>
           </div>
         </div>
         <div class="panel table-panel">
-          <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Regra de comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
+          <table><thead><tr><th>Nome</th><th>E-mail</th><th>Acesso</th><th>Regra de comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
         </div>
         <article class="panel">
           <div class="panel-heading"><h2>Convites aguardando ativação</h2></div>
@@ -428,7 +429,7 @@
           <div id="comRegrasPanel" class="panel form-panel com-regras-panel" data-comissao hidden>
             <span class="eyebrow">COMISSÕES</span>
             <h2>Regras de comissão</h2>
-            <p>Monte do jeito que a imobiliária paga: 1º aluguel, % do aluguel todo mês, % da venda, captação, parceria, bônus fixo e metas do mês. A regra "padrão da casa" vale para todos; em Corretores dá para dar uma regra diferente a alguém. Ao fechar um negócio, as comissões são lançadas sozinhas.</p>
+            <p>Monte do jeito que a imobiliária paga: 1º aluguel, % do aluguel todo mês, % da venda, captação, parceria, bônus fixo e metas do mês. A regra "padrão da casa" vale para todos; em Equipe dá para dar uma regra diferente a alguém. Ao fechar um negócio, as comissões são lançadas sozinhas.</p>
             <div id="comRegrasLista" class="com-regras-lista"></div>
             <div class="crm-config-acoes"><button id="comNovaRegra" type="button" class="primary-button">+ Nova regra</button></div>
           </div>
@@ -680,12 +681,52 @@
         <label class="check-inline"><input type="checkbox" value="comprador" data-crm-tipo /> Comprador</label>
         <label class="check-inline"><input type="checkbox" value="inquilino" data-crm-tipo /> Inquilino</label>
         <label class="check-inline"><input type="checkbox" value="vendedor" data-crm-tipo /> Vendedor</label>
+        <label class="check-inline" title="Compra imóveis para investir (renda de aluguel, valorização, revenda)"><input type="checkbox" value="investidor" data-crm-tipo /> Investidor</label>
         <label class="check-inline"><input type="checkbox" value="proprietario" data-crm-tipo /> Proprietário</label>
       </div>
       <div class="crm-perfis-cliente">
         <span class="crm-rotulo">Perfil do cliente <small>— a roleta entrega para o corretor do mesmo perfil</small></span>
         <div id="crmCliPerfis"></div>
       </div>
+      <div id="crmCliQualidade" class="qualidade-box cli-qualidade" hidden>
+        <div class="qualidade-topo"><span class="eyebrow">QUALIDADE DO CADASTRO</span><strong id="crmCliEstrelas">☆☆☆☆☆</strong><span id="crmCliPct">0%</span></div>
+        <div class="qualidade-barra"><div id="crmCliBarra"></div></div>
+        <p id="crmCliFalta" class="muted-text"></p>
+      </div>
+      <details id="crmCliFichaBox" class="crm-perfil crm-ficha">
+        <summary>Ficha do cliente <small>— opcional: melhora a nota e mostra se o imóvel cabe no orçamento</small></summary>
+        <div class="form-row">
+          <label><span>Renda mensal (familiar)</span><input id="crmFichaRenda" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+          <label><span>Profissão</span><input id="crmFichaProfissao" autocomplete="off" /></label>
+        </div>
+        <div class="form-row">
+          <label><span>Estado civil</span><select id="crmFichaEstadoCivil"><option value="">—</option><option value="solteiro">Solteiro(a)</option><option value="casado">Casado(a)</option><option value="uniao_estavel">União estável</option><option value="divorciado">Divorciado(a)</option><option value="viuvo">Viúvo(a)</option></select></label>
+          <label><span>Quando quer fechar</span><select id="crmFichaPrazo"><option value="">—</option><option value="imediato">Imediato</option><option value="ate_3_meses">Até 3 meses</option><option value="ate_6_meses">Até 6 meses</option><option value="sem_pressa">Sem pressa</option></select></label>
+        </div>
+        <div class="crm-ficha-grupo" data-ficha-grupo="compra">
+          <span class="crm-rotulo">Compra</span>
+          <div class="form-row">
+            <label><span>Forma de pagamento</span><select id="crmFichaPagamento"><option value="">—</option><option value="a_vista">À vista</option><option value="financiamento">Financiamento bancário</option><option value="consorcio">Consórcio</option><option value="parcelado_direto">Parcelado direto</option><option value="permuta">Permuta</option></select></label>
+            <label><span>Entrada / recursos próprios</span><input id="crmFichaEntrada" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+          </div>
+          <div class="form-row">
+            <label><span>Crédito aprovado (banco/consórcio)</span><input id="crmFichaCredito" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+            <label class="check-inline crm-ficha-check"><input id="crmFichaFgts" type="checkbox" /> Vai usar FGTS</label>
+          </div>
+        </div>
+        <div class="crm-ficha-grupo" data-ficha-grupo="locacao">
+          <span class="crm-rotulo">Locação</span>
+          <div class="form-row">
+            <label><span>Garantia</span><select id="crmFichaGarantia"><option value="">—</option><option value="fiador">Fiador</option><option value="caucao">Caução</option><option value="seguro_fianca">Seguro-fiança</option><option value="titulo_capitalizacao">Título de capitalização</option><option value="sem_garantia">Ainda não sabe</option></select></label>
+            <label><span>Quantas pessoas vão morar</span><input id="crmFichaMoradores" type="number" min="0" max="20" /></label>
+          </div>
+          <label class="check-inline crm-ficha-check"><input id="crmFichaPets" type="checkbox" /> Tem animal de estimação</label>
+        </div>
+        <div class="crm-ficha-grupo" data-ficha-grupo="investidor">
+          <span class="crm-rotulo">Investidor</span>
+          <label><span>Objetivo do investimento</span><select id="crmFichaObjetivo"><option value="">—</option><option value="renda_aluguel">Renda de aluguel</option><option value="valorizacao">Valorização</option><option value="revenda">Comprar para revender</option><option value="reserva">Reserva de patrimônio</option></select></label>
+        </div>
+      </details>
       <p id="crmCliAvisoProp" class="muted-text" hidden>Proprietário cadastrado por corretor vai para a aprovação da Central. Depois disso, os dados ficam só com a Central.</p>
       <label id="crmCliCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmCliCorretor"></select></label>
       <label><span>Observações</span><textarea id="crmCliObs" rows="3"></textarea></label>

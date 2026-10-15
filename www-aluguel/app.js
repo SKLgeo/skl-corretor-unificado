@@ -55,7 +55,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.10.1";
+    const APP_VERSION = "0.10.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -804,7 +804,7 @@
         document.querySelectorAll(".page").forEach(section => section.classList.remove("active-page"));
         $(`page-${page}`).classList.add("active-page");
         const titles = {
-            hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Corretores", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
+            hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Equipe", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
             settings: "Configurações", financeiro: "Financeiro", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
@@ -874,6 +874,7 @@
         if (podeGerenciar()) loadInteresses();
         connectRealtime();
         if (window.SKLCRM) window.SKLCRM.recarregar();
+        if (window.SKLExtras && window.SKLExtras.recarregarChaves) window.SKLExtras.recarregarChaves();
     }
 
     function connectRealtime() {

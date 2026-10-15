@@ -7,7 +7,7 @@
     const $ = id => document.getElementById(id);
     const ORIGENS = [ "Site", "Instagram", "Facebook", "WhatsApp", "Indicação", "Placa no imóvel", "Portal imobiliário",
         "Ligação", "Visita à imobiliária", "Interesse no app", "Outro" ];
-    const TIPOS_CLIENTE = { comprador: "Comprador", inquilino: "Inquilino", vendedor: "Vendedor", proprietario: "Proprietário" };
+    const TIPOS_CLIENTE = { comprador: "Comprador", inquilino: "Inquilino", vendedor: "Vendedor", investidor: "Investidor", proprietario: "Proprietário" };
     const TIPOS_ATENDIMENTO = [
         [ "ligacao", "📞", "Ligação" ], [ "whatsapp", "💬", "WhatsApp" ], [ "visita", "🏠", "Visita" ],
         [ "email", "✉️", "E-mail" ], [ "anotacao", "📝", "Anotação" ]
@@ -273,6 +273,8 @@
             abrirNegociacao(null, { cliente_id: id });
         });
         document.querySelectorAll("[data-crm-tipo]").forEach(cb => cb.addEventListener("change", atualizarAvisoProprietario));
+        $("crmClienteDialog").addEventListener("input", atualizarQualidadeCliente);
+        $("crmClienteDialog").addEventListener("change", atualizarQualidadeCliente);
         $("crmNegSalvar").addEventListener("click", salvarNegociacao);
         $("crmNegExcluir").addEventListener("click", excluirNegociacao);
         $("crmNegNovoCli").addEventListener("click", () => {
@@ -776,7 +778,7 @@
             return `<tr data-cli="${h(c.id)}" class="crm-linha">
               <td><strong>${h(c.nome)}</strong>${aprov}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
               <td>${h(formatarTelefone(c.telefone)) || "—"}${c.email ? `<br><small class="muted-text">${h(c.email)}</small>` : ""}</td>
-              <td>${tipos}${window.SKLPerfis && (c.perfis || []).length ? "<br>" + window.SKLPerfis.chips(c.perfis) : ""}</td>
+              <td>${tipos}${window.SKLPerfis && (c.perfis || []).length ? "<br>" + window.SKLPerfis.chips(c.perfis) : ""}${(() => { const q = qualidadeCliente(c); return q.conta ? `<br><span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelas(q.estrelas)}</span>` : ""; })()}</td>
               <td class="crm-col-central" ${central() ? "" : "hidden"}>${c.corretor_id ? `<span class="crm-card-corretor">${ctx.fotoDoUsuario(c.corretor_id, 20)}<span>${h(corretorDe(c.corretor_id))}</span></span>` : "—"}</td>
               <td>${total ? `${abertas} em aberto${total > abertas ? ` · ${total - abertas} encerrada${total - abertas === 1 ? "" : "s"}` : ""}` : "—"}</td>
               <td>${h(dataCurta(c.created_at))}</td>
@@ -815,6 +817,7 @@
         });
         atualizarAvisoProprietario();
         if (window.SKLPerfis) window.SKLPerfis.editor($("crmCliPerfis"), c ? c.perfis || [] : []);
+        preencherFicha(c ? c.ficha || {} : {});
         $("crmCliCorretorLabel").hidden = !central();
         if (central()) preencherSelectCorretor($("crmCliCorretor"), c ? c.corretor_id : "", true);
         if (central() && gestao() && roleta && roleta.ativa && !(c && (c.tipos || []).includes("proprietario"))) {
@@ -886,6 +889,74 @@
         dados.indicado_por = dados.origem === "Indicação" ? ($("crmCliIndicado").value || null) : null;
         return dados;
     }
+    // ------------------------------------------------------------------ ficha do cliente (opcional) e nota do cadastro
+    function preencherFicha(f) {
+        const din = v => v != null && v !== "" ? dinheiro(v) : "";
+        $("crmFichaRenda").value = din(f.renda_mensal);
+        $("crmFichaProfissao").value = f.profissao || "";
+        $("crmFichaEstadoCivil").value = f.estado_civil || "";
+        $("crmFichaPrazo").value = f.prazo || "";
+        $("crmFichaPagamento").value = f.forma_pagamento || "";
+        $("crmFichaEntrada").value = din(f.valor_entrada);
+        $("crmFichaCredito").value = din(f.credito_aprovado);
+        $("crmFichaFgts").checked = !!f.usa_fgts;
+        $("crmFichaGarantia").value = f.garantia || "";
+        $("crmFichaMoradores").value = f.moradores ?? "";
+        $("crmFichaPets").checked = !!f.pets;
+        $("crmFichaObjetivo").value = f.objetivo_investimento || "";
+        $("crmCliFichaBox").open = false;
+        atualizarQualidadeCliente();
+    }
+    function lerFicha() {
+        const num = id => { const v = ctx.parseValor($(id).value); return v != null && v > 0 ? v : null; };
+        const f = {
+            renda_mensal: num("crmFichaRenda"), profissao: $("crmFichaProfissao").value.trim() || null,
+            estado_civil: $("crmFichaEstadoCivil").value || null, prazo: $("crmFichaPrazo").value || null,
+            forma_pagamento: $("crmFichaPagamento").value || null, valor_entrada: num("crmFichaEntrada"), credito_aprovado: num("crmFichaCredito"),
+            usa_fgts: $("crmFichaFgts").checked || null, garantia: $("crmFichaGarantia").value || null,
+            moradores: $("crmFichaMoradores").value === "" ? null : Number($("crmFichaMoradores").value), pets: $("crmFichaPets").checked || null,
+            objetivo_investimento: $("crmFichaObjetivo").value || null
+        };
+        Object.keys(f).forEach(k => { if (f[k] == null) delete f[k]; });
+        return f;
+    }
+    // Nota do cadastro do cliente (nada é obrigatório). Proprietário e vendedor não entram na nota.
+    function qualidadeCliente(c) {
+        const tipos = c.tipos || [];
+        const f = c.ficha || {};
+        const compra = tipos.includes("comprador") || tipos.includes("investidor");
+        const locacao = tipos.includes("inquilino");
+        const tem = v => v != null && String(v).trim() !== "";
+        const itens = [
+            [ tem(c.telefone), "celular" ], [ tem(c.email), "e-mail" ], [ tem(c.cpf), "CPF" ], [ tem(c.origem), "origem do contato" ],
+            [ (c.perfis || []).length > 0, "perfil do cliente" ], [ Number(f.renda_mensal) > 0, "renda mensal" ], [ tem(f.profissao), "profissão" ],
+            [ (!compra || tem(f.forma_pagamento)) && (!locacao || tem(f.garantia)), compra && locacao ? "forma de pagamento e garantia" : locacao ? "garantia da locação" : "forma de pagamento" ],
+            [ (!compra || Number(f.valor_entrada) > 0 || Number(f.credito_aprovado) > 0) && (!locacao || tem(f.moradores)), compra && locacao ? "entrada/crédito e moradores" : locacao ? "quantas pessoas vão morar" : "entrada ou crédito aprovado" ],
+            [ tem(f.prazo), "quando quer fechar" ]
+        ];
+        const pct = itens.filter(([ ok ]) => ok).length * 10;
+        return { pct, estrelas: Math.floor(pct / 20), faltando: itens.filter(([ ok ]) => !ok).map(([ , r ]) => r), conta: compra || locacao };
+    }
+    const estrelas = n => "★".repeat(n) + "☆".repeat(5 - n);
+    function atualizarQualidadeCliente() {
+        const tipos = [ ...document.querySelectorAll("[data-crm-tipo]") ].filter(cb => cb.checked).map(cb => cb.value);
+        document.querySelectorAll("[data-ficha-grupo]").forEach(g => {
+            const grupo = g.dataset.fichaGrupo;
+            g.hidden = !(grupo === "compra" ? tipos.includes("comprador") || tipos.includes("investidor") : grupo === "locacao" ? tipos.includes("inquilino") : tipos.includes("investidor"));
+        });
+        const proprietario = tipos.includes("proprietario");
+        $("crmCliFichaBox").hidden = proprietario;
+        const q = qualidadeCliente({
+            telefone: $("crmCliTelefone").value, email: $("crmCliEmail").value, cpf: $("crmCliCpf").value, origem: $("crmCliOrigem").value, tipos,
+            perfis: window.SKLPerfis ? window.SKLPerfis.ler($("crmCliPerfis")) : [], ficha: lerFicha()
+        });
+        $("crmCliQualidade").hidden = !q.conta;
+        if (!q.conta) return;
+        $("crmCliEstrelas").textContent = estrelas(q.estrelas);
+        $("crmCliPct").textContent = q.pct + "%";
+        $("crmCliBarra").style.width = q.pct + "%";
+        $("crmCliFalta").textContent = q.faltando.length ? "Para completar: " + q.faltando.join(", ") + "." : "Cadastro completo.";
+    }
     async function salvarCliente(ignorarDuplicado) {
         const dados = coletarCliente();
         if (!dados.nome) { msg($("crmCliMsg"), "Informe o nome do cliente."); return; }
@@ -901,6 +972,11 @@
                 if (perfis.slice().sort().join() !== (data.perfis || []).slice().sort().join()) {
                     const r = await ctx.sb.rpc("crm_definir_perfis_cliente", { p_cliente: data.id, p_perfis: perfis });
                     if (r.error) ctx.toast(erro(r.error)); else data.perfis = r.data;
+                }
+                const ficha = lerFicha();
+                if (JSON.stringify(ficha) !== JSON.stringify(data.ficha || {})) {
+                    const r = await ctx.sb.rpc("crm_definir_ficha_cliente", { p_cliente: data.id, p_ficha: ficha });
+                    if (r.error) ctx.toast(erro(r.error)); else data.ficha = r.data;
                 }
             }
             clientes.set(data.id, data);
@@ -1245,7 +1321,11 @@
         if (finalidade === "locacao") return imovel.para_aluguel !== false;
         return true;
     }
-    function compatibilidade(perfil, finalidade, imovel) {
+    function fichaDoCliente(id) {
+        const c = id ? clientes.get(id) : null;
+        return (c && c.ficha) || {};
+    }
+    function compatibilidade(perfil, finalidade, imovel, ficha) {
         if (!serveParaFinalidade(imovel, finalidade)) return null;
         const criterios = [];
         const p = perfil || {};
@@ -1265,6 +1345,17 @@
             if (ok && p.valor_max != null && valor > p.valor_max) { ok = false; falta = `${dinheiro(valor - p.valor_max)} acima do máximo`; }
             if (ok && p.valor_min != null && valor < p.valor_min) { ok = false; falta = `abaixo do valor mínimo`; }
             criterios.push([ ok, falta ]);
+        }
+        // orçamento pela ficha do cliente: aluguel + condomínio até 30% da renda; compra até entrada + crédito aprovado (ou à vista)
+        const fc = ficha || {};
+        if (valor != null && finalidade === "locacao" && Number(fc.renda_mensal) > 0) {
+            const custo = valor + (imovel.condominio_tipo === "valor" ? Number(imovel.valor_condominio) || 0 : 0);
+            const ok = custo <= Number(fc.renda_mensal) * 0.3;
+            criterios.push([ ok, ok ? "" : "passa de 30% da renda" ]);
+        } else if (valor != null && finalidade === "venda" && (Number(fc.credito_aprovado) > 0 || (fc.forma_pagamento === "a_vista" && Number(fc.valor_entrada) > 0))) {
+            const orcamento = (Number(fc.credito_aprovado) || 0) + (Number(fc.valor_entrada) || 0);
+            const ok = valor <= orcamento;
+            criterios.push([ ok, ok ? "" : `${dinheiro(valor - orcamento)} acima do orçamento` ]);
         }
         if (p.quartos_min != null) {
             const ok = Number(imovel.quartos) >= p.quartos_min;
@@ -1320,7 +1411,7 @@
             return;
         }
         const lista = ctx.imoveis()
-            .map(i => ({ i, r: compatibilidade(perfil, f ? f.finalidade : "", i) }))
+            .map(i => ({ i, r: compatibilidade(perfil, f ? f.finalidade : "", i, fichaDoCliente($("crmNegCliente").value)) }))
             .filter(x => x.r && x.r.pct >= 50)
             .sort((a, b) => b.r.pct - a.r.pct || (a.r.valor ?? 0) - (b.r.valor ?? 0))
             .slice(0, 8);
@@ -1383,13 +1474,16 @@
         const box = $("crmInteressados");
         if (!box) return;
         if (!ctx || !imovel || (imovel.aprovacao || "aprovado") !== "aprovado") { box.hidden = true; return; }
+        // Negócios já neste imóvel aparecem para todos (sem o nome do cliente de outro corretor);
+        // a compatibilidade só mostra os clientes de quem está usando o app.
+        const meuId = (ctx.usuario() || {}).id;
         const itens = [];
         negs.forEach(n => {
             if (n.situacao !== "aberta") return;
             const f = funil(n.funil_id);
             if (n.construcao_id === imovel.id) { itens.push({ n, pct: null }); return; }
-            if (perfilVazio(n.perfil_busca)) return;
-            const r = compatibilidade(n.perfil_busca, f ? f.finalidade : "", imovel);
+            if (n.corretor_id !== meuId || perfilVazio(n.perfil_busca)) return;
+            const r = compatibilidade(n.perfil_busca, f ? f.finalidade : "", imovel, fichaDoCliente(n.cliente_id));
             if (r && r.pct >= 75) itens.push({ n, pct: r.pct });
         });
         const visImovel = [ ...visitas.values() ].filter(v => v.construcao_id === imovel.id);
@@ -1398,13 +1492,15 @@
         box.hidden = false;
         const feitas = visImovel.filter(v => v.situacao === "realizada");
         const resumoVisitas = visImovel.length ? `<p class="muted-text crm-visitas-resumo">Visitas: ${feitas.length} realizada(s)${feitas.length ? ` — ${feitas.filter(v => v.resultado === "gostou").length} gostaram, ${feitas.filter(v => v.resultado === "proposta").length} querem proposta` : ""}${visImovel.filter(v => v.situacao === "agendada").length ? `; ${visImovel.filter(v => v.situacao === "agendada").length} agendada(s)` : ""}.</p>` : "";
-        box.innerHTML = `<span class="eyebrow">CLIENTES QUE PROCURAM ISTO <em>${itens.length}</em></span>` + resumoVisitas + itens.map(({ n, pct }) => {
-            const c = clientes.get(n.cliente_id);
+        box.innerHTML = `<span class="eyebrow">NEGÓCIOS E CLIENTES PARA ESTE IMÓVEL <em>${itens.length}</em></span>` + resumoVisitas + itens.map(({ n, pct }) => {
+            const meu = n.corretor_id === meuId;
+            const c = meu ? clientes.get(n.cliente_id) : null;
             const et = etapa(n.etapa_id), f = funil(n.funil_id);
-            return `<button type="button" class="crm-sub-item" data-neg="${h(n.id)}">
+            const quem = meu ? (c ? c.nome : "Seu cliente") : "Cliente em negociação";
+            return `<button type="button" class="crm-sub-item" ${meu || gestao() ? `data-neg="${h(n.id)}"` : "disabled"}>
               <span class="crm-pill" style="--cor:${h(et && et.cor || "#64748b")}">${h(et ? et.nome : "")}</span>
-              <strong>${h(c ? c.nome : "Cliente")}</strong> ${h(f ? f.nome : "")}${central() ? " · " + h(corretorDe(n.corretor_id)) : ""}
-              <em>${pct == null ? "já negociando este" : pct + "% compatível"}</em>
+              <strong>${h(quem)}</strong> ${h(f ? f.nome : "")}${!meu && central() ? " · " + h(corretorDe(n.corretor_id)) : ""}
+              <em>${pct == null ? "negociando este imóvel" : pct + "% compatível"}</em>
             </button>`;
         }).join("");
         box.querySelectorAll("[data-neg]").forEach(b => b.addEventListener("click", () => abrirNegociacao(b.dataset.neg)));
@@ -1598,11 +1694,28 @@
         renderInteressados(imovel);
         prop = { modo, imovel, clienteVisivel: null };
         const bloco = $("proprietarioBloco");
-        bloco.hidden = modo === "leitura" || !ctx;
-        if (bloco.hidden) return;
         const linkado = imovel && imovel.proprietario_cliente_id;
         const visivel = linkado ? clientes.get(imovel.proprietario_cliente_id) : null;
         prop.clienteVisivel = visivel || null;
+        // corretor vendo imóvel aprovado: só quem captou vê o proprietário (o banco só entrega o cadastro a ele), sem editar
+        const captadorLendo = modo === "leitura" && !!ctx && !!visivel && imovel.cadastrado_por === (ctx.usuario() || {}).id;
+        let resumoLeitura = $("fichaProprietario");
+        if (!resumoLeitura && $("fichaLeitura")) {
+            resumoLeitura = document.createElement("div");
+            resumoLeitura.id = "fichaProprietario";
+            resumoLeitura.className = "proprietario-bloco ficha-proprietario";
+            $("fichaLeitura").appendChild(resumoLeitura);
+        }
+        if (resumoLeitura) {
+            resumoLeitura.hidden = !captadorLendo;
+            resumoLeitura.innerHTML = captadorLendo ? `<span class="crm-rotulo">Proprietário <small>— você captou este imóvel</small></span>
+              <strong>${h(visivel.nome)}</strong>${visivel.cpf ? " · CPF " + h(visivel.cpf) : ""}
+              <div class="crm-contato-rapido">${linksContato(visivel)}</div>
+              ${imovel.exclusividade ? `<p class="muted-text">Exclusividade${imovel.exclusividade_ate ? " até " + h(dataCurta(imovel.exclusividade_ate + "T12:00:00")) : ""}.</p>` : ""}
+              <small class="muted-text">Para mudar os dados do proprietário, fale com a Central.</small>` : "";
+        }
+        bloco.hidden = modo === "leitura" || !ctx;
+        if (bloco.hidden) return;
         $("exclusividadeInput").checked = !!(imovel && imovel.exclusividade);
         $("exclusividadeAteInput").value = imovel && imovel.exclusividade_ate ? imovel.exclusividade_ate : "";
         $("exclusividadeAteLabel").hidden = !$("exclusividadeInput").checked;

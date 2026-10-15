@@ -1,6 +1,7 @@
 // Complementos do CRM da imobiliária:
 //  - Propostas na negociação (valor, condições, validade; aceita/recusada/contraproposta; aceita atualiza o valor do negócio).
-//  - Controle de chaves no imóvel (quem retirou, quando, previsão de devolução; corretor registra para si, a Central para qualquer um).
+//  - Controle de chaves no imóvel (quem retirou, quando, previsão de devolução). Passar a chave para outra pessoa ou devolver à
+//    imobiliária só vale depois que quem recebe aceita no app (tabela imovel_chave_entregas).
 //  - "Enviar ao cliente": texto pronto para WhatsApp com link da página pública do imóvel (quando o feed está ligado) e ficha em PDF.
 //  - Anexos no cliente, na negociação e no imóvel (componente do documentos.js).
 (function () {
@@ -16,7 +17,7 @@
     const papel = () => (ctx && ctx.papel()) || "";
     const nomeEquipe = id => { const u = ctx.equipe().find(x => x.id === id); return u ? u.display_name : (id === (ctx.usuario() || {}).id ? "Você" : "alguém da equipe"); };
 
-    function iniciar(contexto) { ctx = contexto; criarDialogs(); }
+    function iniciar(contexto) { ctx = contexto; criarDialogs(); avisadas = new Set(); ligarChaves(); }
     function garantirBox(id, antesDeId, classe) {
         let el = $(id);
         if (!el) {
@@ -56,8 +57,9 @@
   <label id="extChaveNomeLabel" hidden><span>Nome (pessoa de fora: proprietário, prestador…)</span><input id="extChaveNome" autocomplete="off" /></label>
   <div class="form-row"><label><span>Motivo</span><input id="extChaveMotivo" placeholder="ex.: visita com cliente" autocomplete="off" /></label>
     <label><span>Devolver até</span><input id="extChavePrev" type="datetime-local" /></label></div>
+  <p id="extChaveAviso" class="muted-text" hidden>A pessoa recebe o aviso no app e precisa aceitar. Até lá, a chave continua no seu nome.</p>
   <p id="extChaveMsg" class="form-message" hidden></p>
-  <div class="dialog-actions"><button id="extChaveSalvar" type="button" class="primary-button">Registrar retirada</button></div>
+  <div class="dialog-actions"><button id="extChaveSalvar" type="button" class="primary-button">Registrar</button></div>
 </form></dialog>`);
         document.querySelectorAll("#extPropostaDialog [data-fechar], #extEnviarDialog [data-fechar], #extChaveDialog [data-fechar]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
         $("extPropSalvar").addEventListener("click", salvarProposta);
@@ -165,39 +167,150 @@
         desenharChave(c);
         // documentos do imóvel (matrícula, CAR...): ficam no próprio cadastro do imóvel (app.js, renderDocsImovel)
     }
-    async function desenharChave(c) {
-        const box = $("extChaveEstado");
-        if (!box) return;
-        const { data } = await ctx.sb.from("imovel_chaves").select("*").eq("construcao_id", c.id).order("retirada_em", { ascending: false }).limit(5);
-        const lista = data || [];
-        const fora = lista.find(k => !k.devolvida_em);
-        const eu = (ctx.usuario() || {}).id;
-        const atrasada = fora && fora.previsao_devolucao && new Date(fora.previsao_devolucao) < new Date();
-        box.innerHTML = `<span class="crm-rotulo">🔑 Chaves</span>
-          ${fora ? `<p class="${atrasada ? "fin-txt-alerta" : ""}"><strong>Com ${h(fora.com_nome || nomeEquipe(fora.com_usuario))}</strong> desde ${h(dataHora(fora.retirada_em))}${fora.motivo ? " · " + h(fora.motivo) : ""}${fora.previsao_devolucao ? " · devolver até " + h(dataHora(fora.previsao_devolucao)) : ""}${atrasada ? " (atrasada)" : ""}</p>
-              ${fora.com_usuario === eu || ctx.gestao() ? `<button type="button" class="secondary-button fin-mini" id="extDevolver">Registrar devolução</button>` : ""}`
-            : `<p class="muted-text">Na imobiliária.</p><button type="button" class="secondary-button fin-mini" id="extRetirar">Retirar chave</button>`}
-          ${lista.filter(k => k.devolvida_em).length ? `<details><summary class="muted-text">Últimas retiradas</summary><ul class="ext-hist">${lista.filter(k => k.devolvida_em).map(k => `<li>${h(k.com_nome || nomeEquipe(k.com_usuario))} · ${h(dataHora(k.retirada_em))} → ${h(dataHora(k.devolvida_em))}</li>`).join("")}</ul></details>` : ""}`;
-        const ret = $("extRetirar");
-        if (ret) ret.addEventListener("click", () => abrirRetirada(c));
-        const dev = $("extDevolver");
-        if (dev) dev.addEventListener("click", async () => {
-            const { error } = await ctx.sb.rpc("chave_devolver", { p_id: fora.id, p_observacao: null });
-            if (error) { ctx.toast(erro(error)); return; }
-            ctx.toast("Devolução registrada.");
-            desenharChave(c);
+    // ------------------------------------------------------------------ chaves (com aceite de quem recebe)
+    // Retirar para si: direto. Entregar a outra pessoa da equipe ou devolver à imobiliária: fica pendente até quem recebe aceitar
+    // (na devolução, a Central confirma). Até o aceite, a chave continua com quem está entregando.
+    let equipeNomes = [], entregasPendentes = [], canalChaves = null, timerChaves = null, avisadas = new Set();
+    const eu = () => (ctx.usuario() || {}).id;
+    const nomePessoa = id => {
+        if (!id) return "a imobiliária";
+        if (id === eu()) return "você";
+        const p = equipeNomes.find(x => x.id === id);
+        return p ? p.nome : nomeEquipe(id);
+    };
+    const nomeImovel = id => { const c = ctx.imoveis().find(x => x.id === id); return c ? `${c.codigo ? c.codigo + " · " : ""}${c.nome}` : "imóvel"; };
+    function souRecebedor(e) { return e.para_usuario ? e.para_usuario === eu() : ctx.gestao(); }
+
+    async function carregarEquipeNomes() {
+        const { data } = await ctx.sb.rpc("equipe_da_carteira", { p_carteira: ctx.carteiraId() });
+        equipeNomes = data || [];
+    }
+    async function carregarEntregas() {
+        if (!ctx) return;
+        const { data } = await ctx.sb.from("imovel_chave_entregas").select("*").eq("carteira_id", ctx.carteiraId()).eq("situacao", "pendente").order("criado_em");
+        entregasPendentes = data || [];
+        desenharAvisosChaves();
+        if (imovelAberto) desenharChave(imovelAberto);
+        // aviso na hora para quem precisa aceitar
+        entregasPendentes.filter(e => souRecebedor(e) && !avisadas.has(e.id)).forEach(e => {
+            avisadas.add(e.id);
+            ctx.toast(`🔑 ${e.para_usuario ? "Chave para você" : "Devolução de chave"}: ${nomeImovel(e.construcao_id)} — confirme o recebimento.`);
         });
     }
-    function abrirRetirada(c) {
+    function ligarChaves() {
+        carregarEquipeNomes().then(carregarEntregas);
+        if (canalChaves) ctx.sb.removeChannel(canalChaves);
+        canalChaves = ctx.sb.channel("chaves-" + ctx.carteiraId())
+            .on("postgres_changes", { event: "*", schema: "public", table: "imovel_chave_entregas", filter: `carteira_id=eq.${ctx.carteiraId()}` }, () => carregarEntregas())
+            .subscribe();
+        clearInterval(timerChaves);
+        timerChaves = setInterval(carregarEntregas, 60000);
+    }
+    // Quadro "Chaves aguardando você" no topo do Hoje (corretor) e da Visão geral (Central)
+    function desenharAvisosChaves() {
+        const meus = entregasPendentes.filter(e => souRecebedor(e) || e.criado_por === eu() || e.de_usuario === eu());
+        [ [ "extChavesHoje", "page-hoje" ], [ "extChavesVisao", "page-dashboard" ] ].forEach(([ id, pagina ]) => {
+            const pg = $(pagina);
+            if (!pg) return;
+            let box = $(id);
+            if (!box) { box = document.createElement("section"); box.id = id; box.className = "ext-chaves-avisos"; pg.insertBefore(box, pg.firstChild); }
+            box.hidden = !meus.length;
+            box.innerHTML = meus.length ? `<span class="eyebrow">🔑 CHAVES AGUARDANDO CONFIRMAÇÃO</span>` + meus.map(itemEntrega).join("") : "";
+            ligarBotoesEntrega(box);
+        });
+    }
+    function itemEntrega(e) {
+        const receber = souRecebedor(e);
+        const texto = e.para_usuario
+            ? (receber ? `<strong>${h(nomePessoa(e.de_usuario))}</strong> quer te entregar a chave de <strong>${h(nomeImovel(e.construcao_id))}</strong>`
+                       : `Aguardando <strong>${h(nomePessoa(e.para_usuario))}</strong> aceitar a chave de <strong>${h(nomeImovel(e.construcao_id))}</strong>`)
+            : (receber ? `<strong>${h(nomePessoa(e.de_usuario))}</strong> devolveu a chave de <strong>${h(nomeImovel(e.construcao_id))}</strong> — confirme que recebeu`
+                       : `Devolução da chave de <strong>${h(nomeImovel(e.construcao_id))}</strong> aguardando a Central confirmar`);
+        const podeCancelar = e.criado_por === eu() || ctx.gestao();
+        return `<div class="ext-entrega${receber ? " receber" : ""}"><span>${texto}<small>${h(dataHora(e.criado_em))}${e.motivo ? " · " + h(e.motivo) : ""}${e.observacao ? " · " + h(e.observacao) : ""}</small></span>
+          <span class="ext-item-acoes">${receber ? `<button type="button" class="primary-button fin-mini" data-aceitar="${h(e.id)}">${e.para_usuario ? "Aceitar a chave" : "Confirmar recebimento"}</button>
+            <button type="button" class="secondary-button fin-mini" data-recusar="${h(e.id)}">Recusar</button>` : ""}
+            ${!receber && podeCancelar ? `<button type="button" class="text-button" data-cancelar="${h(e.id)}">Cancelar</button>` : ""}</span></div>`;
+    }
+    function ligarBotoesEntrega(box) {
+        box.querySelectorAll("[data-aceitar]").forEach(b => b.addEventListener("click", () => responderEntrega(b.dataset.aceitar, true)));
+        box.querySelectorAll("[data-recusar]").forEach(b => b.addEventListener("click", () => {
+            if (window.confirm("Recusar? A chave continua com quem está entregando.")) responderEntrega(b.dataset.recusar, false);
+        }));
+        box.querySelectorAll("[data-cancelar]").forEach(b => b.addEventListener("click", async () => {
+            const { error } = await ctx.sb.rpc("chave_cancelar_entrega", { p_entrega: b.dataset.cancelar });
+            if (error) { ctx.toast(erro(error)); return; }
+            ctx.toast("Entrega cancelada.");
+            carregarEntregas();
+        }));
+    }
+    async function responderEntrega(id, aceitar) {
+        const { error } = await ctx.sb.rpc("chave_responder_entrega", { p_entrega: id, p_aceitar: aceitar, p_obs: null });
+        if (error) { ctx.toast(erro(error)); return; }
+        ctx.toast(aceitar ? "Pronto: a chave agora está registrada com quem recebeu." : "Entrega recusada.");
+        carregarEntregas();
+    }
+
+    async function desenharChave(c) {
+        const box = $("extChaveEstado");
+        if (!box || !c) return;
+        const { data } = await ctx.sb.from("imovel_chaves").select("*").eq("construcao_id", c.id).order("retirada_em", { ascending: false }).limit(5);
+        if (!imovelAberto || imovelAberto.id !== c.id) return;
+        const lista = data || [];
+        const fora = lista.find(k => !k.devolvida_em);
+        const pendente = entregasPendentes.find(e => e.construcao_id === c.id);
         const gestao = ctx.gestao();
-        $("extChaveTitulo").textContent = `Retirar chave — ${c.codigo ? c.codigo + " · " : ""}${c.nome}`;
-        $("extChaveQuemLabel").hidden = !gestao;
-        $("extChaveQuem").innerHTML = `<option value="">Eu mesmo</option>` + ctx.equipe().filter(u => u.active !== false && u.id !== (ctx.usuario() || {}).id)
-            .map(u => `<option value="${h(u.id)}">${h(u.display_name)}</option>`).join("") + `<option value="__fora">Pessoa de fora…</option>`;
+        const atrasada = fora && fora.previsao_devolucao && new Date(fora.previsao_devolucao) < new Date();
+        const comigo = fora && fora.com_usuario === eu();
+        let acoes = "";
+        if (pendente) acoes = itemEntrega(pendente);
+        else if (fora) {
+            acoes = (comigo || gestao ? `<button type="button" class="secondary-button fin-mini" id="extEntregar">Entregar para…</button>` : "")
+                + (comigo && !gestao ? `<button type="button" class="secondary-button fin-mini" id="extDevolver">Devolver à imobiliária</button>` : "")
+                + (gestao ? `<button type="button" class="secondary-button fin-mini" id="extDevolver">Registrar devolução</button>` : "");
+        } else {
+            acoes = `<button type="button" class="secondary-button fin-mini" id="extRetirar">${gestao ? "Retirar / entregar chave" : "Retirar chave"}</button>`;
+        }
+        box.innerHTML = `<span class="crm-rotulo">🔑 Chaves</span>
+          ${fora ? `<p class="${atrasada ? "fin-txt-alerta" : ""}"><strong>Com ${h(fora.com_nome || (comigo ? "você" : nomePessoa(fora.com_usuario)))}</strong> desde ${h(dataHora(fora.retirada_em))}${fora.motivo ? " · " + h(fora.motivo) : ""}${fora.previsao_devolucao ? " · devolver até " + h(dataHora(fora.previsao_devolucao)) : ""}${atrasada ? " (atrasada)" : ""}</p>`
+              : `<p class="muted-text">Na imobiliária.</p>`}
+          <div class="ext-chave-acoes">${acoes}</div>
+          ${lista.filter(k => k.devolvida_em).length ? `<details><summary class="muted-text">Últimas movimentações</summary><ul class="ext-hist">${lista.filter(k => k.devolvida_em).map(k => `<li>${h(k.com_nome || nomePessoa(k.com_usuario))} · ${h(dataHora(k.retirada_em))} → ${h(dataHora(k.devolvida_em))}${k.observacao ? " · " + h(k.observacao) : ""}</li>`).join("")}</ul></details>` : ""}`;
+        ligarBotoesEntrega(box);
+        const ret = $("extRetirar");
+        if (ret) ret.addEventListener("click", () => abrirChave(c, "retirar", null));
+        const ent = $("extEntregar");
+        if (ent) ent.addEventListener("click", () => abrirChave(c, "entregar", fora));
+        const dev = $("extDevolver");
+        if (dev) dev.addEventListener("click", async () => {
+            if (!gestao && !window.confirm("Avisar a Central que você devolveu a chave? Ela fica no seu nome até a Central confirmar.")) return;
+            const { error } = await ctx.sb.rpc("chave_devolver", { p_id: fora.id, p_observacao: null });
+            if (error) { ctx.toast(erro(error)); return; }
+            ctx.toast(gestao ? "Devolução registrada." : "Devolução enviada — a Central precisa confirmar.");
+            carregarEntregas();
+        });
+    }
+    let modoChave = "retirar", chaveAtual = null;
+    function abrirChave(c, modo, registro) {
+        modoChave = modo; chaveAtual = registro;
+        const gestao = ctx.gestao();
+        $("extChaveTitulo").textContent = `${modo === "entregar" ? "Entregar chave" : "Retirar chave"} — ${c.codigo ? c.codigo + " · " : ""}${c.nome}`;
+        const pessoas = equipeNomes.filter(u => u.id !== eu() && (!registro || u.id !== registro.com_usuario));
+        if (modo === "entregar") {
+            $("extChaveQuemLabel").hidden = false;
+            $("extChaveQuemLabel").querySelector("span").textContent = "Entregar para";
+            $("extChaveQuem").innerHTML = pessoas.map(u => `<option value="${h(u.id)}">${h(u.nome)}</option>`).join("");
+        } else {
+            $("extChaveQuemLabel").hidden = !gestao;
+            $("extChaveQuemLabel").querySelector("span").textContent = "Com quem fica";
+            $("extChaveQuem").innerHTML = `<option value="">Eu mesmo</option>` + pessoas.map(u => `<option value="${h(u.id)}">${h(u.nome)} (precisa aceitar)</option>`).join("") + `<option value="__fora">Pessoa de fora…</option>`;
+        }
         $("extChaveNomeLabel").hidden = true;
-        $("extChaveNome").value = ""; $("extChaveMotivo").value = "";
-        const prev = new Date(Date.now() + 4 * 3600e3);
+        $("extChaveNome").value = ""; $("extChaveMotivo").value = registro && registro.motivo ? registro.motivo : "";
+        const prev = registro && registro.previsao_devolucao ? new Date(registro.previsao_devolucao) : new Date(Date.now() + 4 * 3600e3);
         $("extChavePrev").value = new Date(prev.getTime() - prev.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        $("extChaveSalvar").textContent = modo === "entregar" ? "Enviar para aceite" : "Registrar";
+        $("extChaveAviso").hidden = modo !== "entregar";
         msg($("extChaveMsg"), "");
         $("extChaveDialog").showModal();
     }
@@ -205,13 +318,18 @@
         const c = imovelAberto; if (!c) return;
         const quem = $("extChaveQuem").value;
         const dados = { motivo: $("extChaveMotivo").value.trim(), previsao_devolucao: $("extChavePrev").value ? new Date($("extChavePrev").value).toISOString() : null };
-        if (quem === "__fora") { dados.com_nome = $("extChaveNome").value.trim(); if (!dados.com_nome) { msg($("extChaveMsg"), "Informe o nome de quem fica com a chave."); return; } }
-        else if (quem) dados.com_usuario = quem;
-        const { error } = await ctx.sb.rpc("chave_retirar", { p_construcao: c.id, p_dados: dados });
-        if (error) { msg($("extChaveMsg"), erro(error)); return; }
+        let resultado;
+        if (modoChave === "entregar" || (quem && quem !== "__fora")) {
+            if (!quem) { msg($("extChaveMsg"), "Escolha para quem vai a chave."); return; }
+            resultado = await ctx.sb.rpc("chave_entregar", { p_construcao: c.id, p_para: quem, p_dados: dados });
+        } else {
+            if (quem === "__fora") { dados.com_nome = $("extChaveNome").value.trim(); if (!dados.com_nome) { msg($("extChaveMsg"), "Informe o nome de quem fica com a chave."); return; } }
+            resultado = await ctx.sb.rpc("chave_retirar", { p_construcao: c.id, p_dados: dados });
+        }
+        if (resultado.error) { msg($("extChaveMsg"), erro(resultado.error)); return; }
         $("extChaveDialog").close();
-        ctx.toast("Retirada registrada.");
-        desenharChave(c);
+        ctx.toast(resultado.data && resultado.data.situacao === "pendente" ? `Enviado: ${nomePessoa(quem)} precisa aceitar no app.` : "Retirada registrada.");
+        carregarEntregas();
     }
 
     // ------------------------------------------------------------------ enviar ao cliente
@@ -285,5 +403,6 @@
           <p class="fin-doc-rodape">Corretor: ${h((ctx.usuario() || {}).display_name || "")} · ${h(ctx.carteiraNome())}. Valores sujeitos a alteração.</p></div>`);
     }
 
-    window.SKLExtras = { iniciar, aoAbrirNegociacao, aoAbrirCliente, aoAbrirImovel };
+    // recarregarChaves: o app chama ao voltar do segundo plano (o Realtime dorme no celular)
+    window.SKLExtras = { iniciar, aoAbrirNegociacao, aoAbrirCliente, aoAbrirImovel, recarregarChaves: () => ctx && carregarEntregas() };
 })();
