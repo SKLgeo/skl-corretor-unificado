@@ -28,12 +28,19 @@
     // A mesma classificação está no banco (categoria_imovel), que vale na nota de qualidade.
     const TIPOS_RESIDENCIAIS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Chácara/Sítio" ];
     const TIPOS_COMERCIAIS = [ "Sala comercial", "Ponto comercial", "Galpão" ];
+    // Imóvel rural: aba própria na busca, área em hectares/alqueires e perímetro em KML/KMZ (rural.js).
+    const TIPOS_RURAIS = [ "Fazenda", "Sítio", "Chácara rural", "Haras", "Área rural", "Terreno rural" ];
+    const TIPOS_URBANOS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Sala comercial", "Ponto comercial", "Galpão", "Terreno", "Chácara/Sítio", "Outro" ];
+    const TIPOS_DE_LOTE = [ "Terreno", "Terreno rural" ];
     const CARACTERISTICAS_POR_CATEGORIA = {
         residencial: [ "area", "quartos", "suites", "banheiros", "vagas" ],
         comercial: [ "area", "salas", "banheiros" ],
         terreno: [ "area" ],
+        rural: [ "area", "quartos", "banheiros" ],
         outro: [ "area", "salas", "quartos", "banheiros", "vagas" ]
     };
+    const DOCS_URBANO = [ "Matrícula", "Escritura", "IPTU", "Planta", "Habite-se", "Laudo / avaliação", "Autorização do proprietário", "Outro" ];
+    const DOCS_RURAL = [ "Matrícula", "CAR", "CCIR", "ITR", "Georreferenciamento (SIGEF)", "Escritura", "KML / KMZ do perímetro", "Planta / croqui", "Laudo / avaliação", "Outorga d'água", "Autorização do proprietário", "Outro" ];
     const ROLE = {
         corretor: "Corretor",
         gestor: "Gestor",
@@ -44,7 +51,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.9.1";
+    const APP_VERSION = "0.10.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -71,6 +78,13 @@
     let pickerMarker = null;
 
     let finalidadeFiltro = "todos";
+    let zonaFiltro = "urbano";
+    let perimetroAtual = null;
+    let perimetroNome = null;
+    let perimetroAreaM2 = null;
+    let pickerPerimetro = null;
+    let docsPendentes = null;
+    let perimetrosNoMapa = [];
     let bairrosFiltro = [];
     let faixaValor = null;
     let notaMinimaCadastro = null;
@@ -177,7 +191,30 @@
         $("finalidadeAluguelInput").addEventListener("change", atualizarCamposFinalidade);
         $("finalidadeVendaInput").addEventListener("change", atualizarCamposFinalidade);
         $("condominioTipoInput").addEventListener("change", atualizarCamposCusto);
-        $("construcaoTipoInput").addEventListener("change", atualizarCamposCaracteristicas);
+        $("construcaoTipoInput").addEventListener("change", () => {
+            // terreno já nasce marcado como lote (dá para desmarcar)
+            if (TIPOS_DE_LOTE.includes($("construcaoTipoInput").value)) $("loteInput").checked = true;
+            atualizarCamposCaracteristicas();
+        });
+        $("loteInput").addEventListener("change", atualizarCamposCaracteristicas);
+        $("perfilAtuacaoSalvar").addEventListener("click", salvarPerfilAtuacao);
+        $("contaPerfilAtuacao").addEventListener("click", () => abrirPerfilAtuacao(currentUser.id));
+        $("zonaImovel").querySelectorAll("[data-zona]").forEach(b => b.addEventListener("click", () => {
+            if (modoDialogo === "leitura") return;
+            definirZonaImovel(b.dataset.zona === "rural", true);
+            atualizarQualidade();
+        }));
+        $("zonaFiltro").querySelectorAll("[data-zona]").forEach(b => b.addEventListener("click", () => {
+            zonaFiltro = b.dataset.zona;
+            $("zonaFiltro").querySelectorAll("[data-zona]").forEach(x => x.classList.toggle("ativo", x === b));
+            renderConstrucoes();
+        }));
+        $("areaUnidadeInput").addEventListener("change", atualizarConversaoArea);
+        $("areaInput").addEventListener("input", atualizarConversaoArea);
+        $("perimetroInput").addEventListener("change", carregarPerimetro);
+        $("perimetroUsarArea").addEventListener("click", usarAreaDoPerimetro);
+        $("perimetroBaixar").addEventListener("click", () => window.SKLRural.baixarKml({ ...(construcoes.get(editandoId) || {}), nome: $("construcaoNomeInput").value || "Área", perimetro: perimetroAtual }));
+        $("perimetroRemover").addEventListener("click", () => { definirPerimetro(null, null); atualizarQualidade(); });
         $("iptuTipoInput").addEventListener("change", atualizarCamposCusto);
         $("ufInput").addEventListener("input", () => { $("ufInput").value = $("ufInput").value.toUpperCase(); });
         $("formEdicao").addEventListener("input", atualizarQualidade);
@@ -319,18 +356,29 @@
     function categoriaImovel(tipo) {
         if (TIPOS_RESIDENCIAIS.includes(tipo)) return "residencial";
         if (TIPOS_COMERCIAIS.includes(tipo)) return "comercial";
-        return tipo === "Terreno" ? "terreno" : "outro";
+        if (TIPOS_DE_LOTE.includes(tipo)) return "terreno";
+        return TIPOS_RURAIS.includes(tipo) ? "rural" : "outro";
+    }
+    // Campos de característica do imóvel: lote (sem construção) só tem área.
+    function camposDoImovel(tipo, lote) {
+        return lote ? CARACTERISTICAS_POR_CATEGORIA.terreno : CARACTERISTICAS_POR_CATEGORIA[categoriaImovel(tipo)];
+    }
+    function areaTexto(c) {
+        return window.SKLRural ? window.SKLRural.areaTexto(c) : (Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString("pt-BR")} m²` : "");
     }
     function caracteristicasCompletas(c) {
         const preenchido = v => v != null && v !== "";
         if (!(Number(c.area_m2) > 0)) return false;
+        if (c.lote || c.rural) return true;
         const categoria = categoriaImovel(c.tipo_imovel);
         if (categoria === "residencial") return preenchido(c.quartos) && preenchido(c.banheiros) && preenchido(c.vagas);
         if (categoria === "comercial") return preenchido(c.salas) && preenchido(c.banheiros);
         if (categoria === "terreno") return true;
         return preenchido(c.banheiros);
     }
-    function rotuloCaracteristicas(tipo) {
+    function rotuloCaracteristicas(tipo, c) {
+        if (c && c.lote) return "área do lote";
+        if (c && c.rural) return "área do imóvel";
         return {
             residencial: "características (área, quartos, banheiros e vagas)",
             comercial: "características (área, salas e banheiros)",
@@ -350,20 +398,27 @@
         const vazio = v => !String(v == null ? "" : v).trim();
         const fotos = totalFotos != null ? totalFotos : (c.fotos || []).length;
         const custoOk = (tipo, valor) => !!tipo && (tipo !== "valor" || valor != null);
+        // rural: localidade no lugar do bairro, estrada de acesso + cidade no endereço e o perímetro (KML) no lugar de condomínio/IPTU;
+        // lote (sem construção): 1 foto já cumpre os dois itens de fotos
+        const rural = !!c.rural, lote = !!c.lote;
         const itens = [
             [ !vazio(c.tipo_imovel), "tipo do imóvel" ],
-            [ !vazio(c.bairro), "bairro" ],
-            [ !vazio(c.logradouro) && !vazio(c.numero) && !vazio(c.cidade), "endereço completo (rua, número e cidade)" ],
+            [ !vazio(c.bairro), rural ? "localidade / região" : "bairro" ],
+            rural
+                ? [ !vazio(c.logradouro) && !vazio(c.cidade), "acesso (estrada ou rodovia) e cidade" ]
+                : [ !vazio(c.logradouro) && !vazio(c.numero) && !vazio(c.cidade), "endereço completo (rua, número e cidade)" ],
             [ c.latitude != null && c.longitude != null, "localização no mapa" ],
             [ (c.para_aluguel === false || Number(c.valor_aluguel) > 0) && (!c.para_venda || Number(c.valor_venda) > 0), "valor" ],
-            [ custoOk(c.condominio_tipo, c.valor_condominio) && custoOk(c.iptu_tipo, c.valor_iptu), "condomínio e IPTU" ],
+            rural
+                ? [ !!c.perimetro, "perímetro da área (KML/KMZ)" ]
+                : [ custoOk(c.condominio_tipo, c.valor_condominio) && custoOk(c.iptu_tipo, c.valor_iptu), "condomínio e IPTU" ],
             [ String(c.descricao || "").trim().length >= 150, "descrição com 150 caracteres ou mais" ],
-            [ fotos >= 3, "pelo menos 3 fotos" ],
-            [ fotos >= 8, "8 fotos ou mais" ],
-            [ caracteristicasCompletas(c), rotuloCaracteristicas(c.tipo_imovel) ]
+            [ fotos >= (lote ? 1 : 3), lote ? "pelo menos 1 foto" : "pelo menos 3 fotos" ],
+            [ fotos >= (lote ? 1 : 8), lote ? "pelo menos 1 foto" : "8 fotos ou mais" ],
+            [ caracteristicasCompletas(c), rotuloCaracteristicas(c.tipo_imovel, c) ]
         ];
         const pct = itens.filter(([ ok ]) => ok).length * 10;
-        return { pct, estrelas: Math.floor(pct / 20), faltando: itens.filter(([ ok ]) => !ok).map(([ , rotulo ]) => rotulo) };
+        return { pct, estrelas: Math.floor(pct / 20), faltando: [ ...new Set(itens.filter(([ ok ]) => !ok).map(([ , rotulo ]) => rotulo)) ] };
     }
     function showMessage(element, message, success = false) {
         element.textContent = message;
@@ -514,7 +569,7 @@
             display_name: userData.user.user_metadata?.nome_exibicao || userData.user.email
         };
         const { data, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("papel, expira_em, carteiras_aluguel(id, nome, slug, ativo)")
+            .select("papel, expira_em, perfis_atuacao, carteiras_aluguel(id, nome, slug, ativo)")
             .eq("usuario_id", uid).eq("ativo", true);
         if (error) throw error;
         // o nome mostrado vem do perfil (é o que a Central edita); o do login fica guardado no aparelho e pode estar desatualizado
@@ -525,7 +580,7 @@
         const agora = Date.now();
         return (data || [])
             .filter(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora))
-            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel }));
+            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [] }));
     }
 
     async function resolverCarteiraEEntrar() {
@@ -569,7 +624,7 @@
     async function entrarNaCarteira(carteira) {
         carteiraId = carteira.id;
         carteiraNomeAtual = carteira.nome;
-        currentUser = { ...pendingUser, papel: carteira.papel };
+        currentUser = { ...pendingUser, papel: carteira.papel, perfis_atuacao: carteira.perfis || [] };
         try { localStorage.setItem(CARTEIRA_ESCOLHIDA_KEY, carteira.id); } catch {}
         $("carteiraPicker").hidden = true;
         await enterApp();
@@ -586,7 +641,7 @@
             papel: () => currentUser && currentUser.papel,
             imoveis: () => [ ...construcoes.values() ],
             equipe: () => corretores,
-            tiposImovel: () => [ ...$("construcaoTipoInput").options ].map(o => o.value),
+            tiposImovel: () => [ ...TIPOS_URBANOS, ...TIPOS_RURAIS ],
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); }
         };
     }
@@ -617,7 +672,7 @@
             podeGerir: () => !!currentUser && [ "administrador", "central_vendas", "financeiro" ].includes(currentUser.papel),
             equipe: () => corretores,
             imoveis: () => [ ...construcoes.values() ],
-            tiposImovel: () => [ ...$("construcaoTipoInput").options ].map(o => o.value).filter(Boolean),
+            tiposImovel: () => [ ...TIPOS_URBANOS, ...TIPOS_RURAIS ],
             comissoes: () => comissoesAluguel,
             recarregarComissoes: () => loadComissoesAluguel(),
             recarregarEquipe: async () => { if (veTudo()) await loadCorretores(); }
@@ -686,6 +741,7 @@
         bairrosFiltro = [];
         faixaValor = null;
         await carregarConfigCarteira();
+        atualizarChipsConta();
         const seguro = async (nome, fn) => { try { await fn(); } catch (e) { console.error("Falha ao iniciar " + nome, e); } };
         if (window.SKLComissoes) await seguro("comissões", () => window.SKLComissoes.iniciar(contextoComissoes()));
         if (veTudo()) await loadCorretores();
@@ -841,6 +897,7 @@
         return [ ...construcoes.values() ].filter(imovelVisivelNaBusca);
     }
     function passaFinalidade(c) {
+        if (!!c.rural !== (zonaFiltro === "rural")) return false;
         if (finalidadeFiltro === "aluguel") return c.para_aluguel !== false;
         if (finalidadeFiltro === "venda") return !!c.para_venda;
         return true;
@@ -998,7 +1055,7 @@
         const porFinalidade = baseBusca().filter(passaFinalidade);
         atualizarFaixaValor(porFinalidade);
         const usarFaixa = faixaAtiva();
-        return porFinalidade.filter(c => {
+        const filtrados = porFinalidade.filter(c => {
             if (status && c.status !== status) return false;
             if (bairros.length && !bairros.includes(normalizar(c.bairro))) return false;
             if (usarFaixa) {
@@ -1011,6 +1068,14 @@
             }
             return true;
         });
+        // primeiro os imóveis do perfil de atuação de quem está usando (ele continua vendo todos)
+        return window.SKLPerfis ? window.SKLPerfis.ordenar(filtrados, meusPerfis()) : filtrados;
+    }
+    function meusPerfis() {
+        return (currentUser && currentUser.perfis_atuacao) || [];
+    }
+    function doMeuPerfil(c) {
+        return !!window.SKLPerfis && meusPerfis().length > 0 && window.SKLPerfis.combina(meusPerfis(), window.SKLPerfis.doImovel(c));
     }
 
     function precoCard(c) {
@@ -1022,9 +1087,9 @@
     }
 
     function specsResumo(c) {
-        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel(c.tipo_imovel)];
+        const campos = camposDoImovel(c.tipo_imovel, c.lote);
         const partes = [];
-        if (Number(c.area_m2) > 0) partes.push(`📐 ${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
+        if (Number(c.area_m2) > 0) partes.push(`📐 ${areaTexto(c)}`);
         if (campos.includes("salas") && Number(c.salas) > 0) partes.push(`🚪 ${c.salas} ${c.salas == 1 ? "sala" : "salas"}`);
         if (campos.includes("quartos") && Number(c.quartos) > 0) partes.push(`🛏 ${c.quartos}`);
         if (campos.includes("banheiros") && Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
@@ -1046,6 +1111,8 @@
     function renderConstrucoes() {
         if (!$("construcaoStatusFilter").options.length) montarOpcoesStatusFiltro();
         renderChipsBairro();
+        const rurais = baseBusca().filter(c => c.rural).length;
+        $("zonaRuralQtd").textContent = rurais ? ` (${rurais})` : "";
         const rows = filteredConstrucoes();
         const gerencia = podeGerenciar();
         $("buscaResultado").textContent = rows.length === 1 ? "1 imóvel encontrado" : `${rows.length} imóveis encontrados`;
@@ -1055,7 +1122,7 @@
             const specs = specsResumo(c);
             return `<article class="construcao-card" data-id="${h(c.id)}">
         <div class="construcao-card-photo" data-foto-holder="${h(c.id)}">${(c.fotos || []).length ? "" : `<span class="sem-foto">Sem foto</span>`}
-          ${c.destaque ? `<span class="card-destaque">★ Destaque</span>` : ""}<span class="card-finalidade">${h(finalidadeTexto(c))}</span></div>
+          ${c.destaque ? `<span class="card-destaque">★ Destaque</span>` : ""}<span class="card-finalidade">${h(finalidadeTexto(c))}</span>${c.lote ? `<span class="card-tag-lote">Lote</span>` : ""}${doMeuPerfil(c) ? `<span class="card-meu-perfil" title="Combina com o seu perfil de atuação">★ Seu perfil</span>` : ""}</div>
         <div class="construcao-card-body">
           <div class="card-topo"><small class="card-codigo">${c.codigo ? "Cód. " + h(c.codigo) : ""}</small>${q ? `<span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelasTexto(q.estrelas)}</span>` : ""}</div>
           <h3>${h(c.nome)}</h3>
@@ -1194,8 +1261,11 @@
         if (!map) return;
         markersById.forEach(marker => map.removeLayer(marker));
         markersById.clear();
+        perimetrosNoMapa.forEach(camada => map.removeLayer(camada));
+        perimetrosNoMapa = [];
         const pontos = [];
         rows.forEach(c => {
+            if (c.perimetro && window.SKLRural) perimetrosNoMapa.push(window.SKLRural.camada(L, c.perimetro, { weight: 2 }).addTo(map));
             if (c.latitude == null || c.longitude == null) return;
             const marker = L.marker([ c.latitude, c.longitude ], { icon: statusDivIcon(c.status) }).addTo(map);
             marker.bindTooltip(c.nome);
@@ -1231,7 +1301,18 @@
         $("construcaoNomeInput").value = construcao?.nome || "";
         $("finalidadeAluguelInput").checked = construcao ? construcao.para_aluguel !== false : true;
         $("finalidadeVendaInput").checked = !!construcao?.para_venda;
-        $("construcaoTipoInput").value = construcao?.tipo_imovel || "Casa";
+        if (!$("areaUnidadeInput").options.length) {
+            $("areaUnidadeInput").innerHTML = Object.entries(window.SKLRural.UNIDADES).map(([ k, u ]) => `<option value="${k}">${h(u.nome)}</option>`).join("");
+        }
+        // novo imóvel aberto na aba Rurais já começa como rural
+        const rural = construcao ? !!construcao.rural : zonaFiltro === "rural";
+        definirZonaImovel(rural, false);
+        if (construcao?.tipo_imovel && ![ ...$("construcaoTipoInput").options ].some(o => o.value === construcao.tipo_imovel)) {
+            $("construcaoTipoInput").insertAdjacentHTML("beforeend", `<option value="${h(construcao.tipo_imovel)}">${h(construcao.tipo_imovel)}</option>`);
+        }
+        $("construcaoTipoInput").value = construcao?.tipo_imovel || (rural ? "Fazenda" : "Casa");
+        $("loteInput").checked = !!construcao?.lote;
+        $("areaUnidadeInput").value = construcao?.area_unidade || (rural ? "ha" : "m2");
         $("construcaoValorInput").value = construcao?.valor_aluguel != null ? formatMoney(construcao.valor_aluguel) : "";
         $("construcaoValorVendaInput").value = construcao?.valor_venda != null ? formatMoney(construcao.valor_venda) : "";
         $("construcaoCodigoInput").value = construcao?.codigo || "";
@@ -1240,7 +1321,8 @@
         $("condominioValorInput").value = construcao?.valor_condominio != null ? formatMoney(construcao.valor_condominio) : "";
         $("iptuTipoInput").value = construcao?.iptu_tipo || "";
         $("iptuValorInput").value = construcao?.valor_iptu != null ? formatMoney(construcao.valor_iptu) : "";
-        $("areaInput").value = construcao?.area_m2 ?? "";
+        $("areaInput").value = construcao && construcao.area_unidade && construcao.area_unidade !== "m2" && construcao.area_valor != null
+            ? construcao.area_valor : (construcao?.area_m2 ?? "");
         $("salasInput").value = construcao?.salas ?? "";
         $("quartosInput").value = construcao?.quartos ?? "";
         $("suitesInput").value = construcao?.suites ?? "";
@@ -1281,6 +1363,8 @@
         $("construcaoCameraInput").disabled = leitura;
         renderAprovacaoBanner(construcao);
         renderAutoria(construcao);
+        definirPerimetro(construcao?.perimetro || null, construcao?.perimetro_nome || null);
+        renderDocsImovel(construcao);
 
         const pendente = construcao?.aprovacao === "pendente";
         $("deleteConstrucaoButton").hidden = !construcao || leitura;
@@ -1310,7 +1394,121 @@
                 pickerMap.setView(CENTRO_PADRAO, 4);
             }
             if (pickerMarker) pickerMarker.dragging[leitura ? "disable" : "enable"]();
+            desenharPerimetroNoPicker(true);
         }, 60);
+    }
+
+    // ===== Imóvel rural, lote e perímetro (KML/KMZ) =====
+    function zonaRuralNoForm() {
+        return $("zonaImovel").dataset.rural === "1";
+    }
+    // Troca os tipos de imóvel e os rótulos do endereço; rural não tem edifício nem condomínio/IPTU, tem perímetro.
+    function definirZonaImovel(rural, interativo) {
+        $("zonaImovel").dataset.rural = rural ? "1" : "";
+        $("zonaImovel").querySelectorAll("[data-zona]").forEach(b => b.classList.toggle("ativo", (b.dataset.zona === "rural") === rural));
+        const select = $("construcaoTipoInput");
+        const atual = select.value;
+        const lista = rural ? TIPOS_RURAIS : TIPOS_URBANOS;
+        select.innerHTML = lista.map(t => `<option value="${h(t)}">${h(t)}</option>`).join("");
+        select.value = lista.includes(atual) ? atual : lista[0];
+        $("bairroRotulo").textContent = rural ? "Localidade / região" : "Bairro";
+        $("logradouroRotulo").textContent = rural ? "Estrada / rodovia de acesso" : "Rua / avenida";
+        $("numeroRotulo").textContent = rural ? "Km / referência" : "Número";
+        $("complementoInput").placeholder = rural ? "Ex.: entrada à direita após a ponte" : "Apto, sala, bloco";
+        $("edificioLabel").hidden = rural;
+        $("custoRow").hidden = rural;
+        $("perimetroBloco").hidden = !rural;
+        if (interativo) {
+            if (rural && $("areaUnidadeInput").value === "m2") $("areaUnidadeInput").value = "ha";
+            if (TIPOS_DE_LOTE.includes(select.value)) $("loteInput").checked = true;
+            if (!docsPendentes || !docsPendentes.quantidade()) renderDocsImovel(construcoes.get(editandoId) || null);
+        }
+        atualizarCamposCaracteristicas();
+    }
+
+    function atualizarConversaoArea() {
+        const valor = numeroOuNulo($("areaInput").value);
+        const unidade = $("areaUnidadeInput").value || "m2";
+        const m2 = valor > 0 ? valor * window.SKLRural.fator(unidade) : 0;
+        $("areaConversao").textContent = m2 > 0 && (unidade !== "m2" || m2 >= 10000) ? window.SKLRural.conversaoTexto(m2, unidade) : "";
+    }
+
+    function definirPerimetro(geometria, nome) {
+        perimetroAtual = geometria || null;
+        perimetroNome = geometria ? (nome || null) : null;
+        perimetroAreaM2 = geometria ? window.SKLRural.areaM2(geometria) : null;
+        const tem = !!perimetroAtual;
+        $("perimetroInfo").textContent = tem
+            ? `${perimetroNome ? perimetroNome + " · " : ""}área do desenho: ${window.SKLRural.conversaoTexto(perimetroAreaM2, "-").replace(/^= /, "")}`
+            : "Carregue o arquivo do perímetro (Google Earth, CAR, SIGEF ou do topógrafo). A área aparece no mapa do imóvel.";
+        $("perimetroUsarArea").hidden = !tem;
+        $("perimetroBaixar").hidden = !tem;
+        $("perimetroRemover").hidden = !tem;
+        desenharPerimetroNoPicker(false);
+    }
+
+    function desenharPerimetroNoPicker(ajustar) {
+        if (!pickerMap) return;
+        if (pickerPerimetro) { pickerMap.removeLayer(pickerPerimetro); pickerPerimetro = null; }
+        if (!perimetroAtual) return;
+        pickerPerimetro = window.SKLRural.camada(L, perimetroAtual).addTo(pickerMap);
+        if (ajustar) pickerMap.fitBounds(pickerPerimetro.getBounds(), { padding: [ 20, 20 ] });
+    }
+
+    async function carregarPerimetro() {
+        const input = $("perimetroInput");
+        const arquivo = input.files[0];
+        input.value = "";
+        if (!arquivo) return;
+        try {
+            const geometria = await window.SKLRural.lerArquivo(arquivo);
+            definirPerimetro(geometria, arquivo.name);
+            // sem ponto marcado ainda: usa o centro da área
+            if ($("construcaoLatInput").value === "" || $("construcaoLngInput").value === "") {
+                const centro = window.SKLRural.centro(geometria);
+                if (centro) {
+                    $("construcaoLatInput").value = centro.lat.toFixed(6);
+                    $("construcaoLngInput").value = centro.lng.toFixed(6);
+                    syncPickerFromInputs();
+                }
+            }
+            if (!(numeroOuNulo($("areaInput").value) > 0)) usarAreaDoPerimetro();
+            const detalhes = document.querySelector("#construcaoDialog .coordenada-details");
+            if (detalhes) detalhes.open = true;
+            setTimeout(() => { if (pickerMap) { pickerMap.invalidateSize(); desenharPerimetroNoPicker(true); } }, 80);
+            toast("Perímetro carregado.");
+        } catch (error) {
+            toast(error.message || "Não foi possível ler o arquivo.");
+        }
+        atualizarQualidade();
+    }
+
+    function usarAreaDoPerimetro() {
+        if (!(perimetroAreaM2 > 0)) return;
+        if ($("areaUnidadeInput").value === "m2" && perimetroAreaM2 >= 10000) $("areaUnidadeInput").value = "ha";
+        const unidade = $("areaUnidadeInput").value || "m2";
+        $("areaInput").value = Math.round(perimetroAreaM2 / window.SKLRural.fator(unidade) * 10000) / 10000;
+        atualizarConversaoArea();
+        atualizarQualidade();
+    }
+
+    // Documentos do imóvel (matrícula, CAR, CCIR...) no próprio cadastro. Imóvel novo: os arquivos sobem ao salvar.
+    function renderDocsImovel(c) {
+        const bloco = $("docsImovelBloco");
+        docsPendentes = null;
+        const mostrar = modoDialogo !== "leitura" && !!window.SKLDocumentos;
+        bloco.hidden = !mostrar;
+        if (!mostrar) return;
+        const categorias = zonaRuralNoForm() ? DOCS_RURAL : DOCS_URBANO;
+        const central = modoDialogo === "central";
+        const quemVe = central ? "Só a Central vê." : "Os documentos vão para a Central; depois que o cadastro for aprovado, só a Central vê.";
+        if (c && c.id) {
+            $("docsImovelDica").textContent = `Matrícula, escritura, CAR e outros documentos. ${quemVe}`;
+            window.SKLDocumentos.anexos($("docsImovelLista"), "imovel", c.id, { podeEnviar: true, categorias });
+        } else {
+            $("docsImovelDica").textContent = `Escolha os arquivos agora: eles são enviados quando você salvar o imóvel. ${quemVe}`;
+            docsPendentes = window.SKLDocumentos.anexosNovos($("docsImovelLista"), { categorias });
+        }
     }
 
     function atualizarCamposFinalidade() {
@@ -1328,9 +1526,22 @@
     }
 
     function atualizarCamposCaracteristicas() {
-        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel($("construcaoTipoInput").value)];
+        const tipo = $("construcaoTipoInput").value;
+        const lote = $("loteInput").checked;
+        const rural = zonaRuralNoForm();
+        const campos = camposDoImovel(tipo, lote);
         document.querySelectorAll("[data-car]").forEach(label => { label.hidden = !campos.includes(label.dataset.car); });
-        $("areaRotulo").textContent = $("construcaoTipoInput").value === "Terreno" ? "Área do terreno (m²)" : "Área (m²)";
+        $("areaRotulo").textContent = lote ? "Área do lote" : rural ? "Área total" : tipo === "Terreno" ? "Área do terreno" : "Área";
+        // hectare/alqueire: em imóvel rural, lote e terreno; o resto fica em m²
+        const comUnidade = rural || lote || TIPOS_DE_LOTE.includes(tipo);
+        const unidade = $("areaUnidadeInput");
+        if (!comUnidade && unidade.value && unidade.value !== "m2") {
+            const valor = numeroOuNulo($("areaInput").value);
+            if (valor != null) $("areaInput").value = Math.round(valor * window.SKLRural.fator(unidade.value) * 100) / 100;
+            unidade.value = "m2";
+        }
+        unidade.hidden = !comUnidade;
+        atualizarConversaoArea();
     }
 
     function atualizarCamposCusto() {
@@ -1369,18 +1580,29 @@
         const custo = (tipo, valor, periodo) => tipo === "valor" ? `${precoCurto(valor)}${periodo}` : tipo === "incluso" ? "Incluso no valor" : tipo === "nao_tem" ? "Não tem" : "Não informado";
         const plural = (n, um, varios) => `${n ?? "—"} ${n === 1 ? um : varios}`;
         // blocos conforme o tipo: comercial mostra salas (sem quartos/garagem); terreno só a área
-        const categoria = categoriaImovel(c.tipo_imovel);
-        const campos = CARACTERISTICAS_POR_CATEGORIA[categoria];
-        const mostrar = campo => campos.includes(campo) && (categoria !== "outro" || c[campo] != null);
+        const categoria = c.lote ? "terreno" : categoriaImovel(c.tipo_imovel);
+        const campos = camposDoImovel(c.tipo_imovel, c.lote);
+        const mostrar = campo => campos.includes(campo) && ((categoria !== "outro" && categoria !== "rural") || c[campo] != null);
         const specs = [
-            [ "📐", Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString("pt-BR")} m²` : "— m²", categoria === "terreno" ? "Área do terreno" : "Área" ],
+            c.rural && [ "🌾", "Imóvel rural", c.tipo_imovel || null ],
+            c.lote && [ "🏷️", "Lote", "sem construção" ],
+            [ "📐", areaTexto(c) || "—", c.lote ? "Área do lote" : c.rural ? "Área total" : categoria === "terreno" ? "Área do terreno" : "Área" ],
             mostrar("salas") && [ "🚪", plural(c.salas, "sala", "salas"), c.tipo_imovel || null ],
             mostrar("quartos") && [ "🛏️", plural(c.quartos, "quarto", "quartos") + (Number(c.suites) > 0 ? ` (${plural(c.suites, "suíte", "suítes")})` : ""), c.tipo_imovel || null ],
             mostrar("banheiros") && [ "🚿", plural(c.banheiros, "banheiro", "banheiros"), null ],
             mostrar("vagas") && [ "🚗", plural(c.vagas, "vaga", "vagas"), "de garagem" ],
-            [ "🏢", custo(c.condominio_tipo, c.valor_condominio, "/mês"), "Condomínio" ],
-            [ "🧾", custo(c.iptu_tipo, c.valor_iptu, "/ano"), "IPTU" ]
+            !c.rural && [ "🏢", custo(c.condominio_tipo, c.valor_condominio, "/mês"), "Condomínio" ],
+            !c.rural && [ "🧾", custo(c.iptu_tipo, c.valor_iptu, "/ano"), "IPTU" ]
         ].filter(Boolean);
+        // perímetro da área (rural): resumo + baixar o KML para levar ao campo (Google Earth, GPS)
+        const perimetro = $("fichaPerimetro");
+        perimetro.hidden = !c.perimetro;
+        if (c.perimetro) {
+            const m2 = window.SKLRural.areaM2(c.perimetro);
+            perimetro.innerHTML = `<span>🗺️ <strong>Perímetro da área</strong> · ${h(window.SKLRural.conversaoTexto(m2, "-").replace(/^= /, ""))}</span>
+              <button type="button" class="secondary-button fin-mini" id="fichaBaixarKml">Baixar KML</button>`;
+            $("fichaBaixarKml").addEventListener("click", () => window.SKLRural.baixarKml(c));
+        }
         $("fichaSpecs").innerHTML = specs.map(([ icone, titulo, sub ]) => `<div class="unit-spec-item"><span class="unit-spec-icon">${icone}</span><div><strong>${h(titulo)}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div></div>`).join("");
         const endereco = enderecoTexto(c);
         $("fichaEndereco").textContent = [ c.edificio, endereco ].filter(Boolean).join(" · ") || "Endereço não informado";
@@ -1393,8 +1615,18 @@
         const venda = $("finalidadeVendaInput").checked;
         const condominioTipo = $("condominioTipoInput").value;
         const iptuTipo = $("iptuTipoInput").value;
-        const campos = CARACTERISTICAS_POR_CATEGORIA[categoriaImovel($("construcaoTipoInput").value)];
+        const rural = zonaRuralNoForm();
+        const lote = $("loteInput").checked;
+        const campos = camposDoImovel($("construcaoTipoInput").value, lote);
+        const unidade = $("areaUnidadeInput").value || "m2";
+        const areaValor = campos.includes("area") ? numeroOuNulo($("areaInput").value) : null;
         return {
+            rural,
+            lote,
+            area_unidade: unidade,
+            area_valor: areaValor,
+            perimetro: rural ? perimetroAtual : null,
+            perimetro_nome: rural && perimetroAtual ? perimetroNome : null,
             nome: $("construcaoNomeInput").value.trim(),
             tipo_imovel: $("construcaoTipoInput").value,
             status: $("construcaoStatusInput").value || "disponivel",
@@ -1403,13 +1635,13 @@
             valor_aluguel: aluguel ? parseValor($("construcaoValorInput").value) : null,
             valor_venda: venda ? parseValor($("construcaoValorVendaInput").value) : null,
             codigo: $("construcaoCodigoInput").value.trim() || null,
-            edificio: $("construcaoEdificioInput").value.trim() || null,
-            condominio_tipo: condominioTipo || null,
-            valor_condominio: condominioTipo === "valor" ? parseValor($("condominioValorInput").value) : null,
-            iptu_tipo: iptuTipo || null,
-            valor_iptu: iptuTipo === "valor" ? parseValor($("iptuValorInput").value) : null,
+            edificio: rural ? null : ($("construcaoEdificioInput").value.trim() || null),
+            condominio_tipo: rural ? null : (condominioTipo || null),
+            valor_condominio: !rural && condominioTipo === "valor" ? parseValor($("condominioValorInput").value) : null,
+            iptu_tipo: rural ? null : (iptuTipo || null),
+            valor_iptu: !rural && iptuTipo === "valor" ? parseValor($("iptuValorInput").value) : null,
             // característica que não se aplica ao tipo (ex.: quartos em sala comercial) vai vazia
-            area_m2: campos.includes("area") ? numeroOuNulo($("areaInput").value) : null,
+            area_m2: areaValor != null ? Math.round(areaValor * window.SKLRural.fator(unidade) * 100) / 100 : null,
             salas: campos.includes("salas") ? numeroOuNulo($("salasInput").value) : null,
             quartos: campos.includes("quartos") ? numeroOuNulo($("quartosInput").value) : null,
             suites: campos.includes("suites") ? numeroOuNulo($("suitesInput").value) : null,
@@ -1451,9 +1683,14 @@
     function ensurePickerMap() {
         if (pickerMap) return;
         pickerMap = L.map("construcaoPickerMap", { zoomControl: true });
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        const ruas = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 20, attribution: "© OpenStreetMap"
         }).addTo(pickerMap);
+        // satélite ajuda a conferir o perímetro de área rural
+        const satelite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+            maxZoom: 19, attribution: "Imagens © Esri"
+        });
+        L.control.layers({ "Mapa": ruas, "Satélite": satelite }, null, { position: "topright" }).addTo(pickerMap);
         pickerMap.setView(CENTRO_PADRAO, 4);
         pickerMap.on("click", event => {
             if (modoDialogo === "leitura") return;
@@ -1730,6 +1967,11 @@
             fotosNovas = [];
             fotosRemovidas = [];
             salvo = true;
+            let avisoDocs = "";
+            if (docsPendentes && docsPendentes.quantidade()) {
+                const falhas = await docsPendentes.enviar("imovel", imovel.id);
+                if (falhas) avisoDocs = ` Atenção: ${falhas} documento(s) não foram enviados — abra o imóvel e anexe de novo.`;
+            }
             // proprietário e exclusividade (dados que só a Central vê) — antes de enviar/aprovar,
             // para o proprietário ser aprovado junto com o imóvel
             if (window.SKLCRM) {
@@ -1750,9 +1992,9 @@
             }
             atualizarTudo();
             $("construcaoDialog").close();
-            if (aprovar) toast("Cadastro aprovado. O imóvel já aparece para todos.");
-            else if (enviar) toast("Cadastro enviado. A Central vai revisar.");
-            else toast(podeGerenciar() ? "Imóvel salvo com sucesso." : "Rascunho salvo. Envie para aprovação quando estiver pronto.");
+            if (aprovar) toast("Cadastro aprovado. O imóvel já aparece para todos." + avisoDocs);
+            else if (enviar) toast("Cadastro enviado. A Central vai revisar." + avisoDocs);
+            else toast((podeGerenciar() ? "Imóvel salvo com sucesso." : "Rascunho salvo. Envie para aprovação quando estiver pronto.") + avisoDocs);
         } catch (error) {
             if (salvo) atualizarTudo();
             const texto = traduzErro(error.message);
@@ -1919,7 +2161,7 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis(nome_exibicao, foto_path)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, perfis(nome_exibicao, foto_path)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
@@ -1931,7 +2173,8 @@
             active: v.ativo,
             expires_at: v.expira_em,
             percentual_comissao: v.percentual_comissao,
-            regra_comissao_id: v.regra_comissao_id
+            regra_comissao_id: v.regra_comissao_id,
+            perfis_atuacao: v.perfis_atuacao || []
         }));
         const { data: conviteRows } = await sb.from("convites_aluguel")
             .select("id, email, papel, percentual_comissao, token, expira_em")
@@ -2002,20 +2245,52 @@
     }
     function renderCorretores() {
         $("corretorTableBody").innerHTML = corretores.map(user => {
+            const perfilHtml = window.SKLPerfis ? `<div class="perfil-linha">${window.SKLPerfis.chips(user.perfis_atuacao, "Sem perfil de atuação")}</div>` : "";
             const percentualTexto = window.SKLComissoes ? window.SKLComissoes.celulaRegra(user, canManageCorretor(user)) : (user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—");
             if (!canManageCorretor(user)) {
-                return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button>` : "—"}</td></tr>`;
+                return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button> <button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button>` : "—"}</td></tr>`;
             }
             const toggleLabel = user.active ? "Desativar" : "Reativar";
-            return `<tr><td>${nomeComFoto(user)}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
+            return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
         }).join("");
         if (window.SKLComissoes) window.SKLComissoes.ligarCelulas($("corretorTableBody"));
         $("corretorTableBody").querySelectorAll("[data-user-foto]").forEach(button => button.addEventListener("click", () => trocarFotoUsuario(button.dataset.userFoto)));
+        $("corretorTableBody").querySelectorAll("[data-user-perfil]").forEach(button => button.addEventListener("click", () => abrirPerfilAtuacao(button.dataset.userPerfil)));
         $("corretorTableBody").querySelectorAll("[data-corretor-percentual]").forEach(button => button.addEventListener("click", () => openEditPercentual(button.dataset.corretorPercentual)));
         $("corretorTableBody").querySelectorAll("[data-corretor-reset]").forEach(button => button.addEventListener("click", () => openResetPasswordAluguel(button.dataset.corretorReset)));
         $("corretorTableBody").querySelectorAll("[data-corretor-toggle]").forEach(button => button.addEventListener("click", () => toggleCorretorStatus(button.dataset.corretorToggle, button.dataset.nextActive === "1")));
         $("corretorTableBody").querySelectorAll("[data-corretor-remove]").forEach(button => button.addEventListener("click", () => openRemoveUserAluguel(button.dataset.corretorRemove, button.dataset.corretorName)));
         $("inviteAluguelList").innerHTML = invitesAluguel.length ? invitesAluguel.map(invite => `<div class="invite-row"><span><strong>${h(invite.email)}</strong><br><small>${h(ROLE[invite.papel])}${invite.percentual_comissao != null ? " · " + h(invite.percentual_comissao) + "% comissão" : ""} · expira ${h(formatDate(invite.expira_em))}</small></span><code class="invite-code">${h(invite.token || "")}</code></div>`).join("") : '<div class="empty-state">Nenhum convite pendente.</div>';
+    }
+
+    // Perfil de atuação (Econômico, Médio, Alto padrão, Rural, Aluguéis, Vendas): a Central define o de qualquer um; o corretor, o próprio.
+    let perfilAtuacaoDe = null;
+    function abrirPerfilAtuacao(usuarioId) {
+        if (!window.SKLPerfis) return;
+        perfilAtuacaoDe = usuarioId || currentUser.id;
+        const eu = perfilAtuacaoDe === currentUser.id;
+        const pessoa = eu ? currentUser : corretores.find(u => u.id === perfilAtuacaoDe);
+        if (!pessoa) return;
+        $("perfilAtuacaoTitulo").textContent = eu ? "Meu perfil de atuação" : "Perfil de " + pessoa.display_name;
+        window.SKLPerfis.editor($("perfilAtuacaoEditor"), pessoa.perfis_atuacao || []);
+        $("perfilAtuacaoMsg").hidden = true;
+        $("perfilAtuacaoDialog").showModal();
+    }
+    async function salvarPerfilAtuacao() {
+        const perfis = window.SKLPerfis.ler($("perfilAtuacaoEditor"));
+        $("perfilAtuacaoSalvar").disabled = true;
+        const { data, error } = await sb.rpc("definir_perfil_atuacao", { p_carteira: carteiraId, p_usuario: perfilAtuacaoDe, p_perfis: perfis });
+        $("perfilAtuacaoSalvar").disabled = false;
+        if (error) { showMessage($("perfilAtuacaoMsg"), traduzErro(error.message)); return; }
+        const pessoa = corretores.find(u => u.id === perfilAtuacaoDe);
+        if (pessoa) pessoa.perfis_atuacao = data || [];
+        if (perfilAtuacaoDe === currentUser.id) { currentUser.perfis_atuacao = data || []; atualizarChipsConta(); renderConstrucoes(); }
+        $("perfilAtuacaoDialog").close();
+        if (veTudo()) renderCorretores();
+        toast("Perfil de atuação salvo.");
+    }
+    function atualizarChipsConta() {
+        if ($("contaPerfilChips") && window.SKLPerfis) $("contaPerfilChips").innerHTML = window.SKLPerfis.chips(meusPerfis(), "não definido");
     }
 
     async function createInviteAluguel() {

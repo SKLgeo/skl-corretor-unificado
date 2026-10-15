@@ -489,7 +489,7 @@ Testemunhas:
             ${d.enviado_por === eu || ctx.gestao() || podeGerir() ? `<button type="button" class="text-button" data-apagar="${h(d.id)}">Excluir</button>` : ""}</span></div>`).join("")
             : `<p class="muted-text">Nenhum documento anexado.</p>`}</div>
           ${op.podeEnviar === false ? "" : `<div class="ext-anexar"><select data-cat>${(op.categorias || [ "Documento pessoal", "Comprovante de renda", "Comprovante de endereço", "Outro" ]).map(c => `<option>${h(c)}</option>`).join("")}</select>
-            <label class="secondary-button fin-mini">📎 Anexar arquivo<input type="file" hidden data-arquivo accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" /></label></div>`}`;
+            <label class="secondary-button fin-mini">📎 Anexar arquivo<input type="file" hidden data-arquivo accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.kml,.kmz,.zip" /></label></div>`}`;
         box.querySelectorAll("[data-abrir]").forEach(b => b.addEventListener("click", async () => {
             const d = lista.find(x => x.id === b.dataset.abrir);
             const { data: u, error: e2 } = await ctx.sb.storage.from("documentos-aluguel").createSignedUrl(d.path, 600);
@@ -523,6 +523,46 @@ Testemunhas:
         });
     }
 
+    // Anexos de um cadastro que ainda não foi salvo: os arquivos ficam na fila e sobem depois de salvar (enviar(entidade, id)).
+    function anexosNovos(box, opcoes) {
+        const op = opcoes || {};
+        const fila = [];
+        const desenhar = () => {
+            box.innerHTML = `<div class="ext-lista">${fila.length ? fila.map((f, i) => `<div class="ext-item"><span><strong>${h(f.arquivo.name)}</strong>
+                <small>${h(f.categoria)} · ${Math.max(1, Math.round(f.arquivo.size / 1024))} KB · enviado ao salvar</small></span>
+                <span class="ext-item-acoes"><button type="button" class="text-button" data-tirar="${i}">Tirar</button></span></div>`).join("")
+                : `<p class="muted-text">Nenhum documento escolhido.</p>`}</div>
+              <div class="ext-anexar"><select data-cat>${(op.categorias || [ "Outro" ]).map(c => `<option>${h(c)}</option>`).join("")}</select>
+                <label class="secondary-button fin-mini">📎 Anexar arquivo<input type="file" hidden data-arquivo multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.kml,.kmz,.zip" /></label></div>`;
+            box.querySelectorAll("[data-tirar]").forEach(b => b.addEventListener("click", () => { fila.splice(Number(b.dataset.tirar), 1); desenhar(); }));
+            const inp = box.querySelector("[data-arquivo]");
+            inp.addEventListener("change", () => {
+                const categoria = box.querySelector("[data-cat]").value;
+                [ ...inp.files ].forEach(arquivo => {
+                    if (arquivo.size > 20 * 1024 * 1024) { ctx.toast(`"${arquivo.name}" passa de 20 MB.`); return; }
+                    fila.push({ arquivo, categoria });
+                });
+                desenhar();
+            });
+        };
+        desenhar();
+        return {
+            quantidade: () => fila.length,
+            async enviar(entidade, id) {
+                let falhas = 0;
+                for (const { arquivo, categoria } of fila.splice(0)) {
+                    const caminho = `${ctx.carteiraId()}/${entidade}/${id}/${Date.now()}_${arquivo.name.replace(/[^\w.-]+/g, "_").slice(-80)}`;
+                    const { error: e1 } = await ctx.sb.storage.from("documentos-aluguel").upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+                    if (e1) { falhas++; continue; }
+                    const { error: e2 } = await ctx.sb.rpc("doc_registrar", { p_carteira: ctx.carteiraId(), p_entidade: entidade, p_id: id,
+                        p_dados: { nome: arquivo.name, categoria, path: caminho, tamanho: arquivo.size, tipo_mime: arquivo.type } });
+                    if (e2) { falhas++; await ctx.sb.storage.from("documentos-aluguel").remove([ caminho ]); }
+                }
+                return falhas;
+            }
+        };
+    }
+
     // ------------------------------------------------------------------ informe de rendimentos
     function abrirInforme() {
         const ano = new Date().getFullYear();
@@ -551,5 +591,5 @@ Testemunhas:
         window.SKLFinanceiro.imprimir(html);
     }
 
-    window.SKLDocumentos = { iniciar, aoAbrirContrato, anexos, abrirInforme, extenso, valoresContrato };
+    window.SKLDocumentos = { iniciar, aoAbrirContrato, anexos, anexosNovos, abrirInforme, extenso, valoresContrato };
 })();

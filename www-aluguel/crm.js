@@ -255,6 +255,7 @@
         $("crmNovaNegButton").addEventListener("click", () => abrirNegociacao(null));
         $("crmBuscaCli").addEventListener("input", renderClientes);
         $("crmTipoCliFiltro").addEventListener("change", renderClientes);
+        $("crmPerfilCliFiltro").addEventListener("change", renderClientes);
         $("crmCorretorCliFiltro").addEventListener("change", renderClientes);
         $("crmNovoCliButton").addEventListener("click", () => abrirCliente(null));
         $("crmCliSalvar").addEventListener("click", salvarCliente);
@@ -739,6 +740,8 @@
         const tipo = $("crmTipoCliFiltro").value;
         if (tipo === "pendente" && c.aprovacao !== "pendente") return false;
         if (tipo && tipo !== "pendente" && !(c.tipos || []).includes(tipo)) return false;
+        const perfil = $("crmPerfilCliFiltro").value;
+        if (perfil && !(c.perfis || []).includes(perfil)) return false;
         if (central()) {
             const cor = $("crmCorretorCliFiltro").value;
             if (cor === "__sem" && c.corretor_id) return false;
@@ -773,7 +776,7 @@
             return `<tr data-cli="${h(c.id)}" class="crm-linha">
               <td><strong>${h(c.nome)}</strong>${aprov}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
               <td>${h(formatarTelefone(c.telefone)) || "—"}${c.email ? `<br><small class="muted-text">${h(c.email)}</small>` : ""}</td>
-              <td>${tipos}</td>
+              <td>${tipos}${window.SKLPerfis && (c.perfis || []).length ? "<br>" + window.SKLPerfis.chips(c.perfis) : ""}</td>
               <td class="crm-col-central" ${central() ? "" : "hidden"}>${c.corretor_id ? `<span class="crm-card-corretor">${ctx.fotoDoUsuario(c.corretor_id, 20)}<span>${h(corretorDe(c.corretor_id))}</span></span>` : "—"}</td>
               <td>${total ? `${abertas} em aberto${total > abertas ? ` · ${total - abertas} encerrada${total - abertas === 1 ? "" : "s"}` : ""}` : "—"}</td>
               <td>${h(dataCurta(c.created_at))}</td>
@@ -811,6 +814,7 @@
             cb.disabled = !central() && !!c && cb.value === "proprietario";
         });
         atualizarAvisoProprietario();
+        if (window.SKLPerfis) window.SKLPerfis.editor($("crmCliPerfis"), c ? c.perfis || [] : []);
         $("crmCliCorretorLabel").hidden = !central();
         if (central()) preencherSelectCorretor($("crmCliCorretor"), c ? c.corretor_id : "", true);
         if (central() && gestao() && roleta && roleta.ativa && !(c && (c.tipos || []).includes("proprietario"))) {
@@ -891,6 +895,14 @@
         try {
             const { data, error } = await ctx.sb.rpc("crm_salvar_cliente", { p_carteira: ctx.carteiraId(), p_dados: dados, p_id: cliAberto });
             if (error) throw error;
+            // perfil do cliente (antes da roleta, que usa esse perfil para escolher o corretor)
+            if (window.SKLPerfis && !(data.tipos || []).includes("proprietario")) {
+                const perfis = window.SKLPerfis.ler($("crmCliPerfis"));
+                if (perfis.slice().sort().join() !== (data.perfis || []).slice().sort().join()) {
+                    const r = await ctx.sb.rpc("crm_definir_perfis_cliente", { p_cliente: data.id, p_perfis: perfis });
+                    if (r.error) ctx.toast(erro(r.error)); else data.perfis = r.data;
+                }
+            }
             clientes.set(data.id, data);
             const callback = aoSalvarCliente;
             aoSalvarCliente = null;

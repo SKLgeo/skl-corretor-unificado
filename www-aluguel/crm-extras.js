@@ -160,12 +160,10 @@
         box.hidden = !aprovado;
         if (!aprovado) return;
         box.innerHTML = `<div class="ext-int-acoes"><button type="button" class="primary-button" id="extEnviarCliente">📤 Enviar ao cliente</button></div>
-          <div id="extChaveEstado" class="ext-chave"></div>
-          ${ctx.veTudo() ? `<div class="ext-sub"><span class="crm-rotulo">Documentos do imóvel (só a Central vê)</span><div id="extImovelAnexos"></div></div>` : ""}`;
+          <div id="extChaveEstado" class="ext-chave"></div>`;
         $("extEnviarCliente").addEventListener("click", () => abrirEnviar(c));
         desenharChave(c);
-        if (ctx.veTudo() && window.SKLDocumentos) window.SKLDocumentos.anexos($("extImovelAnexos"), "imovel", c.id,
-            { podeEnviar: ctx.gestao() || ctx.podeGerir(), categorias: [ "Matrícula", "IPTU", "Autorização do proprietário", "Planta", "Laudo", "Outro" ] });
+        // documentos do imóvel (matrícula, CAR...): ficam no próprio cadastro do imóvel (app.js, renderDocsImovel)
     }
     async function desenharChave(c) {
         const box = $("extChaveEstado");
@@ -230,7 +228,7 @@
         if (c.valor_iptu) extras.push(`IPTU ${dinheiro(c.valor_iptu)}/ano`);
         if (extras.length) linhas.push(`+ ${extras.join(" · ")}`);
         const carac = [];
-        if (c.area_m2) carac.push(`${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
+        if (c.area_m2) carac.push(window.SKLRural ? window.SKLRural.areaTexto(c) : `${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
         if (c.quartos) carac.push(`${c.quartos} quarto(s)`);
         if (c.suites) carac.push(`${c.suites} suíte(s)`);
         if (c.banheiros) carac.push(`${c.banheiros} banheiro(s)`);
@@ -271,7 +269,7 @@
             const { data } = await ctx.sb.storage.from("fotos-construcoes").createSignedUrls(fotos, 3600);
             urls = (data || []).map(u => u.signedUrl).filter(Boolean);
         }
-        const carac = [ [ "Área", c.area_m2 ? `${c.area_m2} m²` : "" ], [ "Quartos", c.quartos ], [ "Suítes", c.suites ], [ "Banheiros", c.banheiros ], [ "Vagas", c.vagas ], [ "Salas", c.salas ] ].filter(x => x[1]);
+        const carac = [ [ "Área", c.area_m2 ? (window.SKLRural ? window.SKLRural.areaTexto(c) : `${c.area_m2} m²`) : "" ], [ "Quartos", c.quartos ], [ "Suítes", c.suites ], [ "Banheiros", c.banheiros ], [ "Vagas", c.vagas ], [ "Salas", c.salas ] ].filter(x => x[1]);
         window.SKLFinanceiro.imprimir(`<div class="fin-doc ext-ficha"><header><div><strong>${h(ctx.carteiraNome())}</strong><span>Ficha do imóvel${c.codigo ? " · cód. " + h(c.codigo) : ""}</span></div><small>${h(new Date().toLocaleDateString("pt-BR"))}</small></header>
           <h3>${h(c.nome)}</h3>
           <p>${h([ c.edificio, c.bairro, c.cidade && c.uf ? c.cidade + "/" + c.uf : c.cidade ].filter(Boolean).join(" · "))}</p>

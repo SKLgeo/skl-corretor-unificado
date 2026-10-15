@@ -218,17 +218,19 @@
     function renderNovidades(central) {
         const lista = ctx.imoveis()
             .filter(c => c.aprovacao === "aprovado" && (central ? c.status === "disponivel" : !OCULTOS_CORRETOR.includes(c.status)))
-            .sort((a, b) => String(b.aprovado_em || b.created_at || "").localeCompare(String(a.aprovado_em || a.created_at || "")))
-            .slice(0, 10);
-        $("hojeNovidadesBloco").hidden = !lista.length;
-        $("hojeNovidades").innerHTML = lista.map(c => `<button type="button" class="hoje-imovel" data-imovel="${h(c.id)}">
+            .sort((a, b) => String(b.aprovado_em || b.created_at || "").localeCompare(String(a.aprovado_em || a.created_at || "")));
+        // primeiro os do perfil de atuação do corretor (Alto padrão, Rural, Aluguéis...)
+        const meus = (ctx.usuario() || {}).perfis_atuacao || [];
+        const ordenada = (window.SKLPerfis ? window.SKLPerfis.ordenar(lista, meus) : lista).slice(0, 10);
+        $("hojeNovidadesBloco").hidden = !ordenada.length;
+        $("hojeNovidades").innerHTML = ordenada.map(c => `<button type="button" class="hoje-imovel" data-imovel="${h(c.id)}">
             <span class="hoje-imovel-foto" data-hoje-foto="${h(c.id)}">${(c.fotos || []).length ? "" : `<span class="sem-foto">Sem foto</span>`}</span>
             <strong>${h(c.nome)}</strong>
             <small>${h([ c.tipo_imovel, c.bairro ].filter(Boolean).join(" · "))}</small>
             <em>${h(precoTexto(c))}</em>
           </button>`).join("");
         $("hojeNovidades").querySelectorAll("[data-imovel]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.imovel)));
-        lista.forEach(c => ctx.preencherFotoCapa(c, `[data-hoje-foto="${CSS.escape(c.id)}"]`));
+        ordenada.forEach(c => ctx.preencherFotoCapa(c, `[data-hoje-foto="${CSS.escape(c.id)}"]`));
     }
 
     function renderConta() {

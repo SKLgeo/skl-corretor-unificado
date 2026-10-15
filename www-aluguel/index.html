@@ -131,6 +131,7 @@
           <button type="button" data-go="cadastros"><span>✚</span><em id="contaCadastrosTexto">Meus cadastros de imóveis</em><b id="contaCadastrosBadge" class="ct-badge" hidden>0</b><i>›</i></button>
           <button type="button" data-go="agenda"><span>◷</span><em>Agenda completa</em><i>›</i></button>
           <button type="button" data-go="comissoes"><span>%</span><em>Minhas comissões</em><i>›</i></button>
+          <button type="button" id="contaPerfilAtuacao"><span>★</span><em>Meu perfil de atuação</em><span id="contaPerfilChips" class="conta-perfil-chips"></span><i>›</i></button>
           <button type="button" data-go="indicadores"><span>▥</span><em>Indicadores</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
           <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
@@ -161,6 +162,10 @@
               <button type="button" data-finalidade="aluguel">Aluguel</button>
               <button type="button" data-finalidade="venda">Venda</button>
               <button type="button" data-finalidade="todos" class="ativo">Todos</button>
+            </div>
+            <div id="zonaFiltro" class="segmentado zona-filtro" role="group" aria-label="Urbanos ou rurais">
+              <button type="button" data-zona="urbano" class="ativo">🏙️ Urbanos</button>
+              <button type="button" data-zona="rural">🌾 Rurais<span id="zonaRuralQtd" class="zona-qtd"></span></button>
             </div>
             <input id="construcaoSearchInput" type="search" placeholder="Nome, código, endereço ou edifício" />
             <select id="construcaoStatusFilter"></select>
@@ -262,6 +267,15 @@
             <option value="vendedor">Vendedores</option>
             <option value="proprietario">Proprietários</option>
             <option value="pendente">Aguardando aprovação</option>
+          </select>
+          <select id="crmPerfilCliFiltro" aria-label="Perfil do cliente">
+            <option value="">Todos os perfis</option>
+            <option value="economico">Econômico</option>
+            <option value="medio">Médio padrão</option>
+            <option value="alto">Alto padrão</option>
+            <option value="rural">Rural</option>
+            <option value="locacao">Aluguéis</option>
+            <option value="venda">Vendas</option>
           </select>
           <select id="crmCorretorCliFiltro" data-so-central><option value="">Todos os corretores</option><option value="__sem">Sem corretor</option></select>
           <span id="crmCliContagem" class="crm-contagem"></span>
@@ -463,11 +477,19 @@
       <div id="fichaLeitura" class="ficha-leitura" hidden>
         <div id="fichaPrecos" class="imovel-precos"></div>
         <div id="fichaSpecs" class="unit-specs-card"></div>
+        <div id="fichaPerimetro" class="ficha-perimetro" hidden></div>
         <p id="fichaEndereco" class="ficha-endereco"></p>
         <p id="fichaDescricao" class="ficha-descricao"></p>
       </div>
 
       <div id="formEdicao" class="form-edicao">
+        <div class="finalidade-row zona-row">
+          <span class="campo-rotulo">Tipo de área</span>
+          <div id="zonaImovel" class="segmentado" role="group" aria-label="Urbano ou rural">
+            <button type="button" data-zona="urbano" class="ativo">🏙️ Urbano</button>
+            <button type="button" data-zona="rural">🌾 Rural</button>
+          </div>
+        </div>
         <label><span>Nome do anúncio</span><input id="construcaoNomeInput" placeholder="ex.: Casa 3 quartos no Vila Aurora" required /></label>
         <div class="finalidade-row">
           <span class="campo-rotulo">Finalidade</span>
@@ -493,15 +515,16 @@
           </label>
           <label><span>Situação</span><select id="construcaoStatusInput"></select></label>
         </div>
+        <label id="loteLabel" class="check-inline lote-check"><input id="loteInput" type="checkbox" /> 🏷️ Lote / terreno sem construção <small>— na nota de qualidade basta 1 foto</small></label>
         <div class="form-row">
           <label id="valorAluguelLabel"><span>Valor do aluguel (por mês)</span><input id="construcaoValorInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
           <label id="valorVendaLabel"><span>Valor de venda</span><input id="construcaoValorVendaInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
         </div>
         <div class="form-row">
           <label id="codigoLabel"><span>Código do imóvel</span><input id="construcaoCodigoInput" placeholder="Gerado automaticamente" /></label>
-          <label><span>Edifício ou condomínio (se houver)</span><input id="construcaoEdificioInput" /></label>
+          <label id="edificioLabel"><span>Edifício ou condomínio (se houver)</span><input id="construcaoEdificioInput" /></label>
         </div>
-        <div class="form-row">
+        <div id="custoRow" class="form-row">
           <div class="custo-campo">
             <label><span>Condomínio</span>
               <select id="condominioTipoInput"><option value="">Não informado</option><option value="valor">Valor mensal</option><option value="incluso">Incluso no valor</option><option value="nao_tem">Não tem</option></select>
@@ -518,7 +541,7 @@
         <div>
           <span class="campo-rotulo">Características</span>
           <div class="caracteristicas-grid">
-            <label data-car="area"><span id="areaRotulo">Área (m²)</span><input id="areaInput" type="number" min="0" step="0.01" inputmode="decimal" /></label>
+            <label data-car="area" class="area-campo"><span id="areaRotulo">Área</span><span class="area-com-unidade"><input id="areaInput" type="number" min="0" step="any" inputmode="decimal" /><select id="areaUnidadeInput" aria-label="Unidade da área"></select></span><small id="areaConversao" class="area-conversao"></small></label>
             <label data-car="salas"><span>Salas</span><input id="salasInput" type="number" min="0" step="1" inputmode="numeric" /></label>
             <label data-car="quartos"><span>Quartos</span><input id="quartosInput" type="number" min="0" step="1" inputmode="numeric" /></label>
             <label data-car="suites"><span>Suítes</span><input id="suitesInput" type="number" min="0" step="1" inputmode="numeric" /></label>
@@ -526,19 +549,34 @@
             <label data-car="vagas"><span>Vagas</span><input id="vagasInput" type="number" min="0" step="1" inputmode="numeric" /></label>
           </div>
         </div>
+        <div id="perimetroBloco" class="perimetro-bloco" hidden>
+          <span class="campo-rotulo">Perímetro da área (KML / KMZ)</span>
+          <p id="perimetroInfo" class="muted-text">Carregue o arquivo do perímetro (Google Earth, CAR, SIGEF ou do topógrafo). A área aparece no mapa do imóvel.</p>
+          <div class="perimetro-acoes">
+            <label class="secondary-button">📍 Carregar KML/KMZ<input id="perimetroInput" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden /></label>
+            <button id="perimetroUsarArea" type="button" class="secondary-button" hidden>Usar a área do arquivo</button>
+            <button id="perimetroBaixar" type="button" class="secondary-button" hidden>Baixar KML</button>
+            <button id="perimetroRemover" type="button" class="text-button" hidden>Remover</button>
+          </div>
+        </div>
         <div>
           <span class="campo-rotulo">Endereço</span>
           <div class="endereco-grid">
-            <label class="c-3"><span>CEP</span><input id="cepInput" inputmode="numeric" placeholder="00000-000" /></label>
-            <label class="c-6 largo"><span>Rua / avenida</span><input id="logradouroInput" /></label>
-            <label class="c-3"><span>Número</span><input id="numeroInput" /></label>
+            <label id="cepLabel" class="c-3"><span>CEP</span><input id="cepInput" inputmode="numeric" placeholder="00000-000" /></label>
+            <label class="c-6 largo"><span id="logradouroRotulo">Rua / avenida</span><input id="logradouroInput" /></label>
+            <label class="c-3"><span id="numeroRotulo">Número</span><input id="numeroInput" /></label>
             <label class="c-3"><span>Complemento</span><input id="complementoInput" placeholder="Apto, sala, bloco" /></label>
-            <label class="c-3"><span>Bairro</span><input id="bairroInput" list="bairrosLista" autocomplete="off" /></label>
+            <label class="c-3"><span id="bairroRotulo">Bairro</span><input id="bairroInput" list="bairrosLista" autocomplete="off" /></label>
             <label class="c-4"><span>Cidade</span><input id="cidadeInput" /></label>
             <label class="c-2"><span>UF</span><input id="ufInput" maxlength="2" /></label>
           </div>
         </div>
         <label><span>Descrição</span><textarea id="construcaoDescricaoInput" rows="4" placeholder="Detalhes do imóvel: cômodos, acabamentos, diferenciais, proximidades..."></textarea></label>
+        <div id="docsImovelBloco" class="docs-imovel-bloco">
+          <span class="campo-rotulo">Documentos do imóvel</span>
+          <p id="docsImovelDica" class="muted-text"></p>
+          <div id="docsImovelLista"></div>
+        </div>
         <div id="opcoesCentralRow" class="finalidade-row">
           <label class="check-inline"><input id="destaqueInput" type="checkbox" /> Destaque</label>
           <label class="check-inline"><input id="publicarSiteInput" type="checkbox" /> Publicar no site</label>
@@ -595,6 +633,19 @@
     </form>
   </dialog>
 
+  <dialog id="perfilAtuacaoDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">PERFIL DE ATUAÇÃO</span>
+      <h2 id="perfilAtuacaoTitulo">Perfil do corretor</h2>
+      <p class="muted-text">Os imóveis que combinam com o perfil aparecem primeiro para o corretor (ele continua vendo todos), e a roleta entrega os contatos desse perfil para ele.</p>
+      <div id="perfilAtuacaoEditor"></div>
+      <p class="muted-text perfil-dica">Econômico, médio e alto padrão seguem as faixas de valor de Configurações.</p>
+      <div class="dialog-actions"><button id="perfilAtuacaoSalvar" type="button" class="primary-button">Salvar perfil</button></div>
+      <div id="perfilAtuacaoMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
   <dialog id="crmClienteDialog" class="crm-dialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
@@ -618,6 +669,10 @@
         <label class="check-inline"><input type="checkbox" value="inquilino" data-crm-tipo /> Inquilino</label>
         <label class="check-inline"><input type="checkbox" value="vendedor" data-crm-tipo /> Vendedor</label>
         <label class="check-inline"><input type="checkbox" value="proprietario" data-crm-tipo /> Proprietário</label>
+      </div>
+      <div class="crm-perfis-cliente">
+        <span class="crm-rotulo">Perfil do cliente <small>— a roleta entrega para o corretor do mesmo perfil</small></span>
+        <div id="crmCliPerfis"></div>
       </div>
       <p id="crmCliAvisoProp" class="muted-text" hidden>Proprietário cadastrado por corretor vai para a aprovação da Central. Depois disso, os dados ficam só com a Central.</p>
       <label id="crmCliCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmCliCorretor"></select></label>
@@ -1081,6 +1136,8 @@
   <script src="financeiro.js"></script>
   <script src="financeiro-extra.js"></script>
   <script src="integracoes.js"></script>
+  <script src="rural.js"></script>
+  <script src="perfis.js"></script>
   <script src="documentos.js"></script>
   <script src="crm-extras.js"></script>
   <script src="app.js"></script>
