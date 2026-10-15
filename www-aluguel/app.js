@@ -36,9 +36,13 @@
         residencial: [ "area", "quartos", "suites", "banheiros", "vagas" ],
         comercial: [ "area", "salas", "banheiros" ],
         terreno: [ "area" ],
-        rural: [ "area", "quartos", "banheiros" ],
+        rural: [ "area" ],
         outro: [ "area", "salas", "quartos", "banheiros", "vagas" ]
     };
+    // Rural não tem quartos/banheiros: o corretor monta a lista de benfeitorias (sugestões + texto livre).
+    const BENFEITORIAS_SUGERIDAS = [ "Casa sede", "Casa de caseiro", "Barracão", "Silo", "Armazém", "Curral", "Mangueiro", "Brete / balança",
+        "Galpão de máquinas", "Paiol", "Estábulo", "Baias", "Pocilga", "Granja / aviário", "Poço artesiano", "Represa / açude", "Rio / córrego",
+        "Pivô de irrigação", "Energia elétrica", "Pastagem formada", "Lavoura", "Cercas", "Estrada interna", "Pista de pouso" ];
     const DOCS_URBANO = [ "Matrícula", "Escritura", "IPTU", "Planta", "Habite-se", "Laudo / avaliação", "Autorização do proprietário", "Outro" ];
     const DOCS_RURAL = [ "Matrícula", "CAR", "CCIR", "ITR", "Georreferenciamento (SIGEF)", "Escritura", "KML / KMZ do perímetro", "Planta / croqui", "Laudo / avaliação", "Outorga d'água", "Autorização do proprietário", "Outro" ];
     const ROLE = {
@@ -51,7 +55,7 @@
 
     const SUPABASE_URL = "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.10.0";
+    const APP_VERSION = "0.10.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -85,6 +89,7 @@
     let pickerPerimetro = null;
     let docsPendentes = null;
     let perimetrosNoMapa = [];
+    let benfeitoriasAtuais = [];
     let bairrosFiltro = [];
     let faixaValor = null;
     let notaMinimaCadastro = null;
@@ -212,6 +217,11 @@
         $("areaUnidadeInput").addEventListener("change", atualizarConversaoArea);
         $("areaInput").addEventListener("input", atualizarConversaoArea);
         $("perimetroInput").addEventListener("change", carregarPerimetro);
+        $("benfeitoriaAddButton").addEventListener("click", () => adicionarBenfeitoria($("benfeitoriaNomeInput").value, $("benfeitoriaDetalheInput").value));
+        [ "benfeitoriaNomeInput", "benfeitoriaDetalheInput" ].forEach(id => $(id).addEventListener("keydown", e => {
+            // Enter adiciona (sem fechar o diálogo, que é um <form method="dialog">)
+            if (e.key === "Enter") { e.preventDefault(); adicionarBenfeitoria($("benfeitoriaNomeInput").value, $("benfeitoriaDetalheInput").value); }
+        }));
         $("perimetroUsarArea").addEventListener("click", usarAreaDoPerimetro);
         $("perimetroBaixar").addEventListener("click", () => window.SKLRural.baixarKml({ ...(construcoes.get(editandoId) || {}), nome: $("construcaoNomeInput").value || "Área", perimetro: perimetroAtual }));
         $("perimetroRemover").addEventListener("click", () => { definirPerimetro(null, null); atualizarQualidade(); });
@@ -1090,6 +1100,10 @@
         const campos = camposDoImovel(c.tipo_imovel, c.lote);
         const partes = [];
         if (Number(c.area_m2) > 0) partes.push(`📐 ${areaTexto(c)}`);
+        if (c.rural && (c.benfeitorias || []).length) {
+            const nomes = c.benfeitorias.map(b => b.nome);
+            partes.push(`🏗️ ${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` +${nomes.length - 3}` : ""}`);
+        }
         if (campos.includes("salas") && Number(c.salas) > 0) partes.push(`🚪 ${c.salas} ${c.salas == 1 ? "sala" : "salas"}`);
         if (campos.includes("quartos") && Number(c.quartos) > 0) partes.push(`🛏 ${c.quartos}`);
         if (campos.includes("banheiros") && Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
@@ -1364,6 +1378,8 @@
         renderAprovacaoBanner(construcao);
         renderAutoria(construcao);
         definirPerimetro(construcao?.perimetro || null, construcao?.perimetro_nome || null);
+        benfeitoriasAtuais = (construcao?.benfeitorias || []).map(b => ({ ...b }));
+        renderBenfeitorias();
         renderDocsImovel(construcao);
 
         const pendente = construcao?.aprovacao === "pendente";
@@ -1418,12 +1434,40 @@
         $("edificioLabel").hidden = rural;
         $("custoRow").hidden = rural;
         $("perimetroBloco").hidden = !rural;
+        $("benfeitoriasBloco").hidden = !rural;
         if (interativo) {
             if (rural && $("areaUnidadeInput").value === "m2") $("areaUnidadeInput").value = "ha";
             if (TIPOS_DE_LOTE.includes(select.value)) $("loteInput").checked = true;
             if (!docsPendentes || !docsPendentes.quantidade()) renderDocsImovel(construcoes.get(editandoId) || null);
         }
         atualizarCamposCaracteristicas();
+    }
+
+    function renderBenfeitorias() {
+        const editavel = modoDialogo !== "leitura";
+        $("benfeitoriasLista").innerHTML = benfeitoriasAtuais.length
+            ? benfeitoriasAtuais.map((b, i) => `<span class="benfeitoria-chip">${h(b.nome)}${b.detalhe ? ` <small>${h(b.detalhe)}</small>` : ""}${editavel ? `<button type="button" data-tirar-benf="${i}" aria-label="Remover ${h(b.nome)}">×</button>` : ""}</span>`).join("")
+            : `<span class="muted-text">Nenhuma benfeitoria adicionada.</span>`;
+        $("benfeitoriasLista").querySelectorAll("[data-tirar-benf]").forEach(bt => bt.addEventListener("click", () => {
+            benfeitoriasAtuais.splice(Number(bt.dataset.tirarBenf), 1);
+            renderBenfeitorias();
+        }));
+        const usadas = new Set(benfeitoriasAtuais.map(b => normalizar(b.nome)));
+        const livres = BENFEITORIAS_SUGERIDAS.filter(s => !usadas.has(normalizar(s)));
+        $("benfeitoriasSugestoes").innerHTML = livres.map(s => `<option value="${h(s)}"></option>`).join("");
+        $("benfeitoriasRapidas").innerHTML = livres.map(s => `<button type="button" class="benfeitoria-sugestao" data-sugestao="${h(s)}">+ ${h(s)}</button>`).join("");
+        $("benfeitoriasRapidas").querySelectorAll("[data-sugestao]").forEach(bt => bt.addEventListener("click", () => adicionarBenfeitoria(bt.dataset.sugestao, "")));
+    }
+    function adicionarBenfeitoria(nome, detalhe) {
+        nome = String(nome || "").trim().slice(0, 60);
+        detalhe = String(detalhe || "").trim().slice(0, 80);
+        if (!nome) { $("benfeitoriaNomeInput").focus(); return; }
+        const existente = benfeitoriasAtuais.find(b => normalizar(b.nome) === normalizar(nome));
+        if (existente) { if (detalhe) existente.detalhe = detalhe; }
+        else benfeitoriasAtuais.push(detalhe ? { nome, detalhe } : { nome });
+        $("benfeitoriaNomeInput").value = "";
+        $("benfeitoriaDetalheInput").value = "";
+        renderBenfeitorias();
     }
 
     function atualizarConversaoArea() {
@@ -1603,6 +1647,7 @@
               <button type="button" class="secondary-button fin-mini" id="fichaBaixarKml">Baixar KML</button>`;
             $("fichaBaixarKml").addEventListener("click", () => window.SKLRural.baixarKml(c));
         }
+        if (c.rural) (c.benfeitorias || []).forEach(b => specs.push([ "🏗️", b.nome, b.detalhe || null ]));
         $("fichaSpecs").innerHTML = specs.map(([ icone, titulo, sub ]) => `<div class="unit-spec-item"><span class="unit-spec-icon">${icone}</span><div><strong>${h(titulo)}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div></div>`).join("");
         const endereco = enderecoTexto(c);
         $("fichaEndereco").textContent = [ c.edificio, endereco ].filter(Boolean).join(" · ") || "Endereço não informado";
@@ -1627,6 +1672,7 @@
             area_valor: areaValor,
             perimetro: rural ? perimetroAtual : null,
             perimetro_nome: rural && perimetroAtual ? perimetroNome : null,
+            benfeitorias: rural ? benfeitoriasAtuais : [],
             nome: $("construcaoNomeInput").value.trim(),
             tipo_imovel: $("construcaoTipoInput").value,
             status: $("construcaoStatusInput").value || "disponivel",

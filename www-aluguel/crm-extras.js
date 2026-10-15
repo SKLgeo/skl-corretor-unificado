@@ -234,6 +234,7 @@
         if (c.banheiros) carac.push(`${c.banheiros} banheiro(s)`);
         if (c.vagas) carac.push(`${c.vagas} vaga(s)`);
         if (carac.length) linhas.push(`📐 ${carac.join(" · ")}`);
+        if (c.rural && (c.benfeitorias || []).length) linhas.push(`🏗️ ${c.benfeitorias.map(b => b.nome + (b.detalhe ? " (" + b.detalhe + ")" : "")).join(", ")}`);
         if (link) linhas.push(``, `Veja fotos e detalhes: ${link}`);
         linhas.push(``, `Posso agendar uma visita? — ${(ctx.usuario() || {}).display_name || ""}, ${ctx.carteiraNome()}`);
         return linhas.join("\n");

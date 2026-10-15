@@ -324,3 +324,14 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .crm-perfis-cliente .perfil-editor{margin:6px 0 0}
 .card-meu-perfil{position:absolute;bottom:10px;right:10px;background:#f3d78a;color:#2b2140;font-size:11px;font-weight:800;padding:4px 9px;border-radius:99px;box-shadow:0 2px 6px rgba(0,0,0,.18)}
 .conta-perfil-chips{margin-left:auto;margin-right:6px}
+/* benfeitorias do imóvel rural */
+.benfeitorias-bloco{border:1px solid #e3cf8f;background:#fffdf6;border-radius:12px;padding:10px 12px}
+.benfeitorias-bloco .muted-text{margin:4px 0 8px}
+.benfeitorias-lista{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.benfeitoria-chip{display:inline-flex;align-items:center;gap:6px;background:#5d4a1f;color:#fff;font-weight:700;font-size:13px;padding:5px 6px 5px 11px;border-radius:99px}
+.benfeitoria-chip small{font-weight:600;opacity:.85}
+.benfeitoria-chip button{border:0;background:rgba(255,255,255,.22);color:#fff;width:22px;height:22px;border-radius:50%;font-size:15px;line-height:1;padding:0;cursor:pointer}
+.benfeitorias-add{display:flex;gap:6px;flex-wrap:wrap}
+.benfeitorias-add input{flex:1;min-width:140px}
+.benfeitorias-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.benfeitoria-sugestao{border:1px dashed #c9a43b;background:#fff;color:#5d4a1f;border-radius:99px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer}

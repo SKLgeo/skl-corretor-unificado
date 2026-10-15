@@ -4,7 +4,7 @@
 // ("skl-unificado-") e a limpeza só apaga caches com esse prefixo — nunca mexe
 // nos caches de outros sites da mesma conta (que usam outros nomes).
 const CACHE_PREFIX = "skl-unificado-";
-const CACHE_NAME = CACHE_PREFIX + "v22";
+const CACHE_NAME = CACHE_PREFIX + "v23";
 const CORE_ASSETS = [
   "./",
   "./index.html",

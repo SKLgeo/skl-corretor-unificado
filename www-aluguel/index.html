@@ -549,6 +549,18 @@
             <label data-car="vagas"><span>Vagas</span><input id="vagasInput" type="number" min="0" step="1" inputmode="numeric" /></label>
           </div>
         </div>
+        <div id="benfeitoriasBloco" class="benfeitorias-bloco" hidden>
+          <span class="campo-rotulo">Benfeitorias e estrutura</span>
+          <p class="muted-text">O que o imóvel tem: toque nas sugestões ou escreva e adicione. O detalhe é opcional (tamanho, capacidade, quantidade).</p>
+          <div id="benfeitoriasLista" class="benfeitorias-lista"></div>
+          <div class="benfeitorias-add">
+            <input id="benfeitoriaNomeInput" list="benfeitoriasSugestoes" placeholder="Ex.: Barracão" autocomplete="off" />
+            <input id="benfeitoriaDetalheInput" placeholder="Detalhe: 600 m², 500 t, 2 unidades..." autocomplete="off" />
+            <button id="benfeitoriaAddButton" type="button" class="secondary-button">+ Adicionar</button>
+          </div>
+          <div id="benfeitoriasRapidas" class="benfeitorias-rapidas"></div>
+          <datalist id="benfeitoriasSugestoes"></datalist>
+        </div>
         <div id="perimetroBloco" class="perimetro-bloco" hidden>
           <span class="campo-rotulo">Perímetro da área (KML / KMZ)</span>
           <p id="perimetroInfo" class="muted-text">Carregue o arquivo do perímetro (Google Earth, CAR, SIGEF ou do topógrafo). A área aparece no mapa do imóvel.</p>
