@@ -354,8 +354,11 @@
             renderQuadro();
         }));
     }
+    // Central no modo corretor vendo a tela de um corretor só (escolha no topo do modo corretor)
+    function foco() { const M = window.SKLModoCorretor; return M && M.ativo() && M.foco ? M.foco() : ""; }
+    const doFoco = id => { const f = foco(); return !f || id === f; };
     function negociacaoPassaFiltro(n) {
-        const corretor = central() ? $("crmCorretorFiltro").value : "";
+        const corretor = foco() || (central() ? $("crmCorretorFiltro").value : "");
         if (corretor && n.corretor_id !== corretor) return false;
         const termo = normal($("crmBuscaNeg").value.trim());
         if (!termo) return true;
@@ -511,7 +514,7 @@
     function renderAgenda() {
         const lista = $("crmAgenda");
         if (!lista) return;
-        const abertas = [ ...negs.values() ].filter(n => n.situacao === "aberta");
+        const abertas = [ ...negs.values() ].filter(n => n.situacao === "aberta" && doFoco(n.corretor_id));
         const fimAmanha = new Date(); fimAmanha.setDate(fimAmanha.getDate() + 1); fimAmanha.setHours(23, 59, 59, 999);
         const fimSemana = new Date(); fimSemana.setDate(fimSemana.getDate() + 7); fimSemana.setHours(23, 59, 59, 999);
         const grupos = [
@@ -644,7 +647,7 @@
         const agora = Date.now();
         const comAberta = new Set([ ...negs.values() ].filter(n => n.situacao === "aberta").map(n => n.cliente_id));
         const porCliente = new Map();
-        [ ...negs.values() ].filter(n => n.situacao === "perdida" && n.fechado_em).forEach(n => {
+        [ ...negs.values() ].filter(n => n.situacao === "perdida" && n.fechado_em && doFoco(n.corretor_id)).forEach(n => {
             const dias = (agora - new Date(n.fechado_em).getTime()) / DIA;
             if (dias < 60 || dias > 365 || comAberta.has(n.cliente_id)) return;
             const atual = porCliente.get(n.cliente_id);
@@ -657,9 +660,9 @@
         const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
         const limite = new Date(); limite.setDate(limite.getDate() + 7);
         const secao = (titulo, classe, itens) => itens.length ? `<section class="crm-agenda-grupo ${classe}"><h3>${h(titulo)} <span>${itens.length}</span></h3>${itens.join("")}</section>` : "";
-        const semRetorno = [ ...visitas.values() ].filter(v => v.situacao === "agendada" && new Date(v.agendada_para).getTime() < agora)
+        const semRetorno = [ ...visitas.values() ].filter(v => v.situacao === "agendada" && new Date(v.agendada_para).getTime() < agora && doFoco(v.corretor_id))
             .sort((a, b) => String(a.agendada_para).localeCompare(String(b.agendada_para)));
-        const lemb = [ ...lembretes.values() ].filter(l => !l.concluido_em && dataDoLembrete(l) <= limite).sort((a, b) => a.quando.localeCompare(b.quando));
+        const lemb = [ ...lembretes.values() ].filter(l => !l.concluido_em && dataDoLembrete(l) <= limite && doFoco(l.corretor_id)).sort((a, b) => a.quando.localeCompare(b.quando));
         const lembVencidos = lemb.filter(l => dataDoLembrete(l) <= hojeFim).length;
         const ja = new Set(grupos.slice(0, 2).flatMap(g => g[2].map(n => n.id)));
         const parados = abertas.filter(n => !ja.has(n.id) && agora - new Date(n.updated_at).getTime() > DIAS_PARADO * DIA)
@@ -745,7 +748,7 @@
         const perfil = $("crmPerfilCliFiltro").value;
         if (perfil && !(c.perfis || []).includes(perfil)) return false;
         if (central()) {
-            const cor = $("crmCorretorCliFiltro").value;
+            const cor = foco() || $("crmCorretorCliFiltro").value;
             if (cor === "__sem" && c.corretor_id) return false;
             if (cor && cor !== "__sem" && c.corretor_id !== cor) return false;
         }
@@ -1374,7 +1377,7 @@
     }
     function resumoImovel(c) {
         const partes = [];
-        if (Number(c.area_m2) > 0) partes.push(`${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
+        if (Number(c.area_m2) > 0) partes.push(window.SKLRural ? window.SKLRural.areaTexto(c) : `${Number(c.area_m2).toLocaleString("pt-BR")} m²`);
         if (Number(c.quartos) > 0) partes.push(`${c.quartos} quarto${c.quartos == 1 ? "" : "s"}${Number(c.suites) > 0 ? ` (${c.suites} suíte${c.suites == 1 ? "" : "s"})` : ""}`);
         if (Number(c.salas) > 0) partes.push(`${c.salas} sala${c.salas == 1 ? "" : "s"}`);
         if (Number(c.banheiros) > 0) partes.push(`${c.banheiros} banheiro${c.banheiros == 1 ? "" : "s"}`);

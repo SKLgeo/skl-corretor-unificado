@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="comissoes.css" />
   <link rel="stylesheet" href="financeiro.css" />
   <link rel="stylesheet" href="extras.css" />
+  <link rel="stylesheet" href="gestao.css" />
 </head>
 <body>
   <div id="bootView" class="boot-view"><img src="logo.png" alt="" /><span>Carregando…</span></div>
@@ -316,6 +317,18 @@
 
       <section id="page-interesses" class="page">
         <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel e de compra registrados pelos corretores, com a ficha de contato do cliente.</p>
+        <div class="crm-toolbar">
+          <input id="interesseBusca" type="search" placeholder="Buscar cliente, imóvel, celular, e-mail ou CPF" autocomplete="off" />
+          <select id="interesseTipoFiltro" aria-label="Tipo"><option value="">Alugar e comprar</option><option value="aluguel">Alugar</option><option value="compra">Comprar</option></select>
+          <select id="interesseSituacaoFiltro" aria-label="Situação">
+            <option value="">Todas as situações</option>
+            <option value="pendente">Pendente</option>
+            <option value="em_contato">Em contato</option>
+            <option value="concluido">Concluído</option>
+            <option value="descartado">Descartado</option>
+          </select>
+          <span id="interesseContagem" class="crm-contagem"></span>
+        </div>
         <div class="panel table-panel">
           <table><thead><tr><th>Imóvel</th><th>Tipo</th><th>Cliente</th><th>Telefone</th><th>CPF</th><th>E-mail</th><th>Observação</th><th>Data</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="interessesTableBody"></tbody></table>
           <div id="interessesTableEmpty" class="empty-state" hidden>Nenhum interesse registrado ainda.</div>
@@ -324,14 +337,26 @@
 
       <section id="page-corretores" class="page">
         <div class="page-actions">
-          <p>Corretores e pessoas do escritório: crie convites ou acessos diretos. Se a pessoa já tiver conta em outra base SKL (venda, por exemplo) com o mesmo e-mail, ela só ganha acesso a esta carteira também — continua entrando com a senha que já usa.</p>
+          <p>Corretores e pessoas do escritório: crie convites ou acessos diretos. Se a pessoa já tiver um acesso com o mesmo e-mail (em outra carteira, por exemplo), ela só ganha acesso a esta também — continua entrando com a senha que já usa.</p>
           <div style="display:flex;gap:10px">
             <button id="newInviteAluguelButton" class="primary-button">Novo convite</button>
             <button id="newDirectUserAluguelButton" class="secondary-button">Criar acesso direto (com prazo)</button>
           </div>
         </div>
+        <div class="crm-toolbar">
+          <input id="equipeBusca" type="search" placeholder="Buscar por nome ou e-mail" autocomplete="off" />
+          <select id="equipePapelFiltro" aria-label="Acesso"><option value="">Todos os acessos</option></select>
+          <select id="equipeSituacaoFiltro" aria-label="Situação">
+            <option value="">Todas as situações</option>
+            <option value="ativo">Ativos</option>
+            <option value="bloqueado">Bloqueados</option>
+            <option value="expirado">Com prazo vencido</option>
+          </select>
+          <span id="equipeContagem" class="crm-contagem"></span>
+        </div>
         <div class="panel table-panel">
           <table><thead><tr><th>Nome</th><th>E-mail</th><th>Acesso</th><th>Regra de comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
+          <div id="equipeVazio" class="empty-state" hidden>Ninguém encontrado com esses filtros.</div>
         </div>
         <article class="panel">
           <div class="panel-heading"><h2>Convites aguardando ativação</h2></div>
@@ -370,6 +395,9 @@
           <button type="button" class="fin-aba" data-fin-aba="regua">Régua de cobrança <b id="finReguaBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="encargos">Encargos <b id="finEncBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="chamados">Manutenção <b id="finChBadge" class="nav-badge" hidden>0</b></button>
+          <button type="button" class="fin-aba" data-fin-aba="receber">Comissões a receber</button>
+          <button type="button" class="fin-aba" data-fin-aba="despesas">Despesas e receitas <b id="finGestaoBadge" class="nav-badge" hidden>0</b></button>
+          <button type="button" class="fin-aba" data-fin-aba="resultado">Resultado (VGV · VGC · VLC)</button>
         </div>
         <div class="crm-toolbar fin-toolbar">
           <input id="finMes" type="month" title="Mês" />
@@ -1014,7 +1042,7 @@
       <button class="dialog-close" type="button" value="cancel">×</button>
       <span class="eyebrow">ACESSO DIRETO</span>
       <h2>Criar usuário já com senha</h2>
-      <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Cria o login pronto na hora. Se o e-mail já tiver conta em outra base SKL, a senha digitada é ignorada e só vinculamos o acesso a esta carteira.</p>
+      <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Cria o login pronto na hora. Se o e-mail já tiver um acesso, a senha digitada é ignorada e só vinculamos o acesso a esta carteira.</p>
       <label><span>Nome da pessoa</span><input id="directAluguelNameInput" required /></label>
       <label><span>CPF do usuário (opcional)</span><input id="directAluguelCpfInput" placeholder="000.000.000-00" /></label>
       <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
@@ -1076,7 +1104,7 @@
       <button class="dialog-close" type="button" value="cancel">×</button>
       <span class="eyebrow">REMOVER ACESSO</span>
       <h2>Remover acesso de <span id="removeUserAluguelName">—</span>?</h2>
-      <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Isso remove o acesso a ESTA carteira de aluguéis. Se a pessoa tiver login de outra base/linha SKL (venda, outra carteira), esse outro acesso continua funcionando normalmente.</p>
+      <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Isso remove o acesso a ESTA carteira de aluguéis. Se a pessoa tiver acesso a outra carteira, esse outro acesso continua funcionando normalmente.</p>
       <button id="confirmRemoveUserAluguelButton" type="button" class="danger-button">Remover acesso</button>
       <div id="removeUserAluguelMessage" class="form-message" hidden></div>
     </form>
@@ -1190,14 +1218,19 @@
   <div id="toast" class="toast" hidden></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="marca.js"></script>
+  <script src="marca-dagua.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
   <script src="avatar.js"></script>
   <script src="crm.js"></script>
   <script src="crm-painel.js"></script>
   <script src="corretor-ui.js"></script>
   <script src="comissoes.js"></script>
+  <script src="divisao.js"></script>
+  <script src="metas.js"></script>
   <script src="financeiro.js"></script>
   <script src="financeiro-extra.js"></script>
+  <script src="fin-gestao.js"></script>
+  <script src="painel.js"></script>
   <script src="integracoes.js"></script>
   <script src="rural.js"></script>
   <script src="perfis.js"></script>

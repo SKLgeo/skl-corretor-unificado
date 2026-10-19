@@ -6,6 +6,7 @@
     "use strict";
     const $ = id => document.getElementById(id);
     const CHAVE = "sklu_alug_modo_corretor";
+    const CHAVE_FOCO = "sklu_alug_modo_corretor_foco"; // Central vendo a tela de um corretor só
     // aba destacada para cada página
     const ABA = {
         hoje: "hoje", dashboard: "hoje", agenda: "hoje",
@@ -16,11 +17,19 @@
     let ctx = null;
     let ativo = false;
     let ligado = false;
+    let focoId = "";
 
     const h = v => ctx.h(v);
     const crm = () => window.SKLCRM && window.SKLCRM.interno;
     function lerEscolha() { try { return localStorage.getItem(CHAVE) === "1"; } catch { return false; } }
     function gravarEscolha(v) { try { v ? localStorage.setItem(CHAVE, "1") : localStorage.removeItem(CHAVE); } catch {} }
+    function lerFoco() { try { return localStorage.getItem(CHAVE_FOCO) || ""; } catch { return ""; } }
+    function gravarFoco(v) { try { v ? localStorage.setItem(CHAVE_FOCO, v) : localStorage.removeItem(CHAVE_FOCO); } catch {} }
+    const centralNoModo = () => ativo && !!ctx && ctx.central() && ctx.papel() !== "corretor";
+    // corretor escolhido no topo (só para a Central no modo corretor); "" = toda a equipe
+    function foco() { return centralNoModo() ? focoId : ""; }
+    const pessoaFoco = () => focoId ? (ctx.equipe() || []).find(u => u.id === focoId) || null : null;
+    const doFoco = id => { const f = foco(); return !f || id === f; };
 
     // Chamado ao entrar na carteira. Devolve a página inicial.
     function iniciar(contexto) {
@@ -28,6 +37,7 @@
         if (!ligado) { ligarEventos(); ligado = true; }
         const papel = ctx.papel();
         ativo = papel === "corretor" || (papel !== "financeiro" && lerEscolha());
+        focoId = lerFoco();
         aplicar();
         return ativo ? "hoje" : "dashboard";
     }
@@ -46,12 +56,55 @@
         botao.textContent = ativo ? "↩ Tela da Central" : "📱 Modo corretor";
         $("contaVoltarCentral").hidden = !papel || papel === "corretor";
         $("hojeAvisoCentral").hidden = !central;
+        renderFoco();
+    }
+    // barra "Ver a tela de" no topo do modo corretor (Central): escolhe um corretor e as telas mostram só o dele
+    function renderFoco() {
+        if (!ctx) return;
+        let barra = $("ctFoco");
+        if (!barra) {
+            barra = document.createElement("div");
+            barra.id = "ctFoco"; barra.className = "ct-foco"; barra.hidden = true;
+            barra.innerHTML = '<label><span>👁 Ver a tela de</span><select id="ctFocoSel" aria-label="Ver a tela de qual corretor"></select></label><small id="ctFocoDica"></small>';
+            $("corretorTabs").insertAdjacentElement("afterend", barra);
+            $("ctFocoSel").addEventListener("change", () => escolherFoco($("ctFocoSel").value));
+        }
+        barra.hidden = !centralNoModo();
+        if (barra.hidden) return;
+        const equipe = (ctx.equipe() || []).filter(u => u.papel === "corretor" && (u.active !== false || u.id === focoId))
+            .sort((a, b) => String(a.display_name).localeCompare(String(b.display_name)));
+        if (focoId && equipe.length && !equipe.some(u => u.id === focoId)) focoId = "";
+        $("ctFocoSel").innerHTML = '<option value="">Toda a equipe</option>' + equipe.map(u => '<option value="' + h(u.id) + '">' + h(u.display_name) + "</option>").join("");
+        $("ctFocoSel").value = focoId;
+        $("ctFocoDica").textContent = focoId ? "Você vê os clientes, negócios, agenda e cadastros só deste corretor." : "Você vê tudo da equipe junto. Escolha um corretor para ver a tela dele.";
+        barra.classList.toggle("com-foco", !!focoId);
+    }
+    function escolherFoco(id) {
+        focoId = id || "";
+        gravarFoco(focoId);
+        // os filtros de corretor das telas de Clientes e Negócios acompanham a escolha
+        [ "crmCorretorFiltro", "crmCorretorCliFiltro" ].forEach(sid => {
+            const sel = $(sid);
+            if (sel && [ ...sel.options ].some(o => o.value === focoId)) { sel.value = focoId; sel.dispatchEvent(new Event("change")); }
+        });
+        renderFoco();
+        const atual = document.querySelector(".page.active-page");
+        if (atual) ctx.showPage(atual.id.replace(/^page-/, ""));
+        if (ctx.recarregarCadastros) ctx.recarregarCadastros();
+        const p = pessoaFoco();
+        ctx.toast(p ? "Vendo a tela de " + p.display_name + "." : "Vendo toda a equipe.");
     }
     function alternar() {
         if (!ctx || !ctx.usuario() || ctx.papel() === "corretor" || ctx.papel() === "financeiro") return;
         ativo = !ativo;
         gravarEscolha(ativo);
         aplicar();
+        // fora do modo corretor, os filtros da Central voltam para "todos"
+        if (!ativo && focoId) [ "crmCorretorFiltro", "crmCorretorCliFiltro" ].forEach(sid => {
+            const sel = $(sid);
+            if (sel && sel.value === focoId) { sel.value = ""; sel.dispatchEvent(new Event("change")); }
+        });
+        if (ctx.recarregarCadastros) ctx.recarregarCadastros();
         ctx.showPage(ativo ? "hoje" : "dashboard");
         ctx.toast(ativo ? "Modo corretor ligado neste aparelho. Você continua vendo tudo da Central." : "Voltou para a tela da Central.");
     }
@@ -107,9 +160,12 @@
 
     function renderHoje() {
         const eu = ctx.usuario();
-        const central = ctx.central();
-        $("hojeAvatar").innerHTML = ctx.fotoHtml(eu.id, 56);
-        $("hojeSaudacao").textContent = `${saudacao()}, ${primeiroNome(eu.display_name)}`;
+        const p = foco() ? pessoaFoco() : null;
+        // vendo a tela de um corretor: a tela fica como a dele (sem as partes da Central)
+        const central = ctx.central() && !p;
+        $("hojeAvatar").innerHTML = ctx.fotoHtml(p ? p.id : eu.id, 56);
+        $("hojeSaudacao").textContent = p ? "Tela de " + p.display_name : `${saudacao()}, ${primeiroNome(eu.display_name)}`;
+        $("hojeAvisoCentral").hidden = !central;
         const data = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
         $("hojeData").textContent = `${data.charAt(0).toUpperCase()}${data.slice(1)} · ${ctx.carteiraNome()}`;
         renderAgendaHoje(central);
@@ -122,7 +178,7 @@
         const I = crm();
         const lista = $("hojeAgenda");
         if (!I) { lista.innerHTML = `<div class="hoje-vazio">Agenda indisponível no momento.</div>`; return; }
-        const abertas = [ ...I.negs.values() ].filter(n => n.situacao === "aberta");
+        const abertas = [ ...I.negs.values() ].filter(n => n.situacao === "aberta" && doFoco(n.corretor_id));
         const fazer = abertas.filter(n => [ "atrasada", "hoje" ].includes(I.situacaoAcao(n)))
             .sort((a, b) => String(a.proxima_acao_em).localeCompare(String(b.proxima_acao_em)));
         const atrasadas = fazer.filter(n => I.situacaoAcao(n) === "atrasada").length;
@@ -162,7 +218,7 @@
         const caixa = $("hojeNumeros");
         if (!I) { caixa.innerHTML = ""; return; }
         const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
-        const todas = [ ...I.negs.values() ];
+        const todas = [ ...I.negs.values() ].filter(n => doFoco(n.corretor_id));
         const abertas = todas.filter(n => n.situacao === "aberta");
         const ganhas = todas.filter(n => n.situacao === "ganha" && new Date(n.fechado_em) >= inicioMes);
         const semAcao = abertas.filter(n => I.situacaoAcao(n) === "sem").length;
@@ -170,7 +226,7 @@
         const itens = [
             [ "Negócios em andamento", abertas.length, soma(abertas) ? I.dinheiroCurto(soma(abertas)) : "", "negociacoes" ],
             [ "Fechados no mês", ganhas.length, soma(ganhas) ? I.dinheiroCurto(soma(ganhas)) : "", "negociacoes" ],
-            [ central ? "Clientes (equipe)" : "Meus clientes", I.clientes.size, "", "clientes" ],
+            [ central ? "Clientes (equipe)" : foco() ? "Clientes dele" : "Meus clientes", foco() ? [ ...I.clientes.values() ].filter(c => c.corretor_id === foco()).length : I.clientes.size, "", "clientes" ],
             [ "Sem próximo passo", semAcao, semAcao ? "agende um retorno" : "", "agenda" ]
         ];
         caixa.innerHTML = itens.map(([ rotulo, valor, sub, pagina ]) =>
@@ -179,16 +235,16 @@
     }
 
     function renderCadastrosResumo(central) {
-        const eu = ctx.usuario();
+        const eu = (foco() && pessoaFoco()) || ctx.usuario();
         const caixa = $("hojeCadastros");
         const imoveis = ctx.imoveis();
         let html = "";
         const I = crm();
         if (I && I.visitas) {
             const agora = Date.now();
-            const semRetorno = [ ...I.visitas.values() ].filter(v => v.situacao === "agendada" && new Date(v.agendada_para).getTime() < agora).length;
+            const semRetorno = [ ...I.visitas.values() ].filter(v => v.situacao === "agendada" && new Date(v.agendada_para).getTime() < agora && doFoco(v.corretor_id)).length;
             const fimHoje = new Date(); fimHoje.setHours(23, 59, 59, 999);
-            const lembrHoje = [ ...I.lembretes.values() ].filter(l => !l.concluido_em && new Date(l.quando + "T12:00:00") <= fimHoje).length;
+            const lembrHoje = [ ...I.lembretes.values() ].filter(l => !l.concluido_em && new Date(l.quando + "T12:00:00") <= fimHoje && doFoco(l.corretor_id)).length;
             if (semRetorno) html += `<button type="button" class="hoje-aviso" data-ir="agenda"><strong>${semRetorno} visita${semRetorno === 1 ? "" : "s"} aguardando o retorno</strong><span>Registrar como foi ›</span></button>`;
             if (lembrHoje) html += `<button type="button" class="hoje-aviso neutro" data-ir="agenda"><strong>${lembrHoje} lembrete${lembrHoje === 1 ? "" : "s"} de pós-venda para hoje</strong><span>Ver na agenda ›</span></button>`;
         }
@@ -220,7 +276,7 @@
             .filter(c => c.aprovacao === "aprovado" && (central ? c.status === "disponivel" : !OCULTOS_CORRETOR.includes(c.status)))
             .sort((a, b) => String(b.aprovado_em || b.created_at || "").localeCompare(String(a.aprovado_em || a.created_at || "")));
         // primeiro os do perfil de atuação do corretor (Alto padrão, Rural, Aluguéis...)
-        const meus = (ctx.usuario() || {}).perfis_atuacao || [];
+        const meus = ((foco() && pessoaFoco()) || ctx.usuario() || {}).perfis_atuacao || [];
         const ordenada = (window.SKLPerfis ? window.SKLPerfis.ordenar(lista, meus) : lista).slice(0, 10);
         $("hojeNovidadesBloco").hidden = !ordenada.length;
         $("hojeNovidades").innerHTML = ordenada.map(c => `<button type="button" class="hoje-imovel" data-imovel="${h(c.id)}">
@@ -246,5 +302,5 @@
         $("contaVersao").textContent = ctx.versao();
     }
 
-    window.SKLModoCorretor = { iniciar, sair, aoMostrar, render, ativo: () => ativo };
+    window.SKLModoCorretor = { iniciar, sair, aoMostrar, render, ativo: () => ativo, foco, atualizarEquipe: renderFoco };
 })();

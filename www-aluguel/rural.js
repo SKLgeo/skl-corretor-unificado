@@ -12,26 +12,34 @@
         alq_baiano: { sigla: "alq. baiano", nome: "Alqueire baiano (9,68 ha)", fator: 96800 },
         alq_norte: { sigla: "alq. do Norte", nome: "Alqueire do Norte (2,72 ha)", fator: 27225 }
     };
-    const TIPOS_RURAIS = [ "Fazenda", "Sítio", "Chácara rural", "Haras", "Área rural", "Terreno rural" ];
+    const TIPOS_RURAIS = [ "Fazenda", "Sítio", "Chácara rural", "Haras", "Rancho", "Área rural", "Terreno rural" ];
     const MAX_PONTOS = 4000;
 
     const numero = (v, casas) => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: casas == null ? 2 : casas });
     const fator = u => (UNIDADES[u] || UNIDADES.m2).fator;
 
-    // Área para mostrar: na unidade escolhida no cadastro (ex.: "48,4 ha"); sem unidade, em m².
+    // Área para mostrar. Urbano (casa, apto, lote, terreno): sempre em m². Rural: na unidade do cadastro, com o número
+    // exato (até 4 casas, ex.: "4,6064 ha"), sem arredondar.
     function areaTexto(c) {
         if (!c) return "";
-        const u = c.area_unidade && UNIDADES[c.area_unidade] ? c.area_unidade : "m2";
+        const u = c.rural && c.area_unidade && UNIDADES[c.area_unidade] ? c.area_unidade : "m2";
         if (u !== "m2" && c.area_valor != null && Number(c.area_valor) > 0) return `${numero(c.area_valor, 4)} ${UNIDADES[u].sigla}`;
-        return Number(c.area_m2) > 0 ? `${numero(c.area_m2)} m²` : "";
+        return Number(c.area_m2) > 0 ? `${numero(c.area_m2, c.rural ? 4 : 2)} m²` : "";
     }
-    // "= 48,4 ha · 484.000 m²" — a mesma área nas outras unidades usuais, para conferir
+    // A mesma área em outra unidade, até 4 casas (23,4571 ha → 234.571 m²)
+    function converter(valor, de, para) {
+        const n = Number(valor);
+        if (!Number.isFinite(n)) return null;
+        return Math.round(n * fator(de) / fator(para) * 10000) / 10000;
+    }
+    // "= 48,4 ha · 10 alq. goiano · 20 alq. paulista · 484.000 m²" — a mesma área nas outras unidades usuais (até 4 casas)
     function conversaoTexto(m2, unidadeAtual) {
         if (!(m2 > 0)) return "";
         const partes = [];
         if (unidadeAtual !== "ha") partes.push(`${numero(m2 / 10000, 4)} ha`);
         if (unidadeAtual !== "alq_mineiro" && m2 >= 4840) partes.push(`${numero(m2 / 48400, 4)} alq. goiano`);
-        if (unidadeAtual !== "m2") partes.push(`${numero(m2)} m²`);
+        if (unidadeAtual !== "alq_paulista" && m2 >= 2420) partes.push(`${numero(m2 / 24200, 4)} alq. paulista`);
+        if (unidadeAtual !== "m2") partes.push(`${numero(m2, 4)} m²`);
         return partes.length ? "= " + partes.join(" · ") : "";
     }
 
@@ -176,5 +184,5 @@
         return L.geoJSON(g, { style: Object.assign({ color: "#f5b400", weight: 3, fillColor: "#f5d000", fillOpacity: 0.18 }, opcoes || {}), interactive: false });
     }
 
-    window.SKLRural = { UNIDADES, TIPOS_RURAIS, fator, areaTexto, conversaoTexto, lerArquivo, areaM2, centro, paraKml, baixarKml, camada };
+    window.SKLRural = { UNIDADES, TIPOS_RURAIS, fator, converter, areaTexto, conversaoTexto, lerArquivo, areaM2, centro, paraKml, baixarKml, camada };
 })();

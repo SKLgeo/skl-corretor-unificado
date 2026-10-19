@@ -59,6 +59,7 @@
         contratos = []; cobrancas = []; repasses = []; clientes = new Map(); resumo = null;
         if (!$("finMes").value) $("finMes").value = hojeIso().slice(0, 7);
         if (window.SKLFinExtra) window.SKLFinExtra.iniciar(ctx);
+        if (window.SKLFinGestao) window.SKLFinGestao.iniciar(ctx);
         if (!ve) return Promise.resolve();
         ligarTempoReal();
         return carregar();
@@ -67,6 +68,7 @@
         if (canal && ctx) { ctx.sb.removeChannel(canal); }
         canal = null; contratos = []; cobrancas = []; repasses = []; clientes = new Map();
         if (window.SKLFinExtra) window.SKLFinExtra.sair();
+        if (window.SKLFinGestao) window.SKLFinGestao.sair();
     }
     function ligarTempoReal() {
         if (canal) ctx.sb.removeChannel(canal);
@@ -164,19 +166,23 @@
         const f = FILTROS[aba] || (window.SKLFinExtra && window.SKLFinExtra.filtros[aba]);
         $("finFiltro").hidden = !f;
         if (f) $("finFiltro").innerHTML = Object.entries(f).map(([ v, t ]) => `<option value="${v}">${h(t)}</option>`).join("");
-        $("finBusca").hidden = aba === "resumo";
+        $("finBusca").hidden = aba === "resumo" || !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
         $("finBusca").value = "";
         render();
     }
     function render() {
         if (!ctx) return;
         // Régua, Encargos e Chamados ficam em financeiro-extra.js
-        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba));
+        // Comissões a receber, Despesas e Resultado ficam em fin-gestao.js
+        const gestao = !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
+        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba)) || gestao;
         $("finResumo").hidden = aba !== "resumo";
         $("finLista").hidden = aba === "resumo" || extra;
         $("finMes").hidden = aba === "contratos" || extra;
         $("finNovoContrato").hidden = !podeGerir() || extra;
         if (window.SKLFinExtra) window.SKLFinExtra.render(aba);
+        if (window.SKLFinGestao) window.SKLFinGestao.render(aba);
+        if (gestao) $("finContagem").textContent = "";
         if (extra) return;
         if (aba === "resumo") return renderResumo();
         if (aba === "cobrancas") return renderCobrancas();

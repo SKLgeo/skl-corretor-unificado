@@ -48,11 +48,12 @@
         if (i.iptu && i.iptu.valor) extras.push("IPTU " + dinheiro(i.iptu.valor) + "/ano");
         else if (i.iptu && i.iptu.tipo === "incluso") extras.push("IPTU incluso");
         $("extras").textContent = extras.join(" · ");
-        // área grande (rural, gleba) em hectares
-        const areaHa = Number(i.area_m2) >= 10000;
-        const carac = [ [ areaHa ? Math.round(Number(i.area_m2) / 100) / 100 : i.area_m2, areaHa ? "hectares" : "m²" ], [ i.quartos, "quartos" ], [ i.suites, "suítes" ], [ i.banheiros, "banheiros" ], [ i.vagas, "vagas" ], [ i.salas, "salas" ] ].filter(x => x[0]);
+        // área: urbano sempre em m²; rural na unidade do cadastro, com o número exato (ex.: 4,6064 hectares)
+        const UNID = { ha: "hectares", alq_mineiro: "alq. goiano", alq_paulista: "alq. paulista", alq_baiano: "alq. baiano", alq_norte: "alq. do Norte" };
+        const areaRural = i.rural && UNID[i.area_unidade] && Number(i.area_valor) > 0;
+        const carac = [ [ areaRural ? i.area_valor : i.area_m2, areaRural ? UNID[i.area_unidade] : "m²" ], [ i.quartos, "quartos" ], [ i.suites, "suítes" ], [ i.banheiros, "banheiros" ], [ i.vagas, "vagas" ], [ i.salas, "salas" ] ].filter(x => x[0]);
         $("carac").innerHTML = "";
-        carac.forEach(([ v, r ]) => { const div = document.createElement("div"); div.innerHTML = "<strong></strong><span></span>"; div.firstChild.textContent = Number(v).toLocaleString("pt-BR"); div.lastChild.textContent = r; $("carac").appendChild(div); });
+        carac.forEach(([ v, r ]) => { const div = document.createElement("div"); div.innerHTML = "<strong></strong><span></span>"; div.firstChild.textContent = Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 4 }); div.lastChild.textContent = r; $("carac").appendChild(div); });
         $("carac").parentElement.hidden = !carac.length;
         $("descricao").textContent = i.descricao || "";
         $("descBox").hidden = !i.descricao;

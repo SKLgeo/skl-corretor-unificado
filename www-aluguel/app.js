@@ -29,7 +29,7 @@
     const TIPOS_RESIDENCIAIS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Chácara/Sítio" ];
     const TIPOS_COMERCIAIS = [ "Sala comercial", "Ponto comercial", "Galpão" ];
     // Imóvel rural: aba própria na busca, área em hectares/alqueires e perímetro em KML/KMZ (rural.js).
-    const TIPOS_RURAIS = [ "Fazenda", "Sítio", "Chácara rural", "Haras", "Área rural", "Terreno rural" ];
+    const TIPOS_RURAIS = [ "Fazenda", "Sítio", "Chácara rural", "Haras", "Rancho", "Área rural", "Terreno rural" ];
     const TIPOS_URBANOS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Sala comercial", "Ponto comercial", "Galpão", "Terreno", "Chácara/Sítio", "Outro" ];
     const TIPOS_DE_LOTE = [ "Terreno", "Terreno rural" ];
     const CARACTERISTICAS_POR_CATEGORIA = {
@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.10.3";
+    const APP_VERSION = "0.12.3";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -192,6 +192,8 @@
         $("newConstrucaoButton").addEventListener("click", () => openConstrucaoDialog(null));
         $("novoCadastroButton").addEventListener("click", () => openConstrucaoDialog(null));
         $("cadastrosFiltro").addEventListener("change", renderCadastros);
+        [ "equipeBusca", "equipePapelFiltro", "equipeSituacaoFiltro" ].forEach(id => $(id).addEventListener(id === "equipeBusca" ? "input" : "change", renderCorretores));
+        [ "interesseBusca", "interesseTipoFiltro", "interesseSituacaoFiltro" ].forEach(id => $(id).addEventListener(id === "interesseBusca" ? "input" : "change", renderInteresses));
         $("saveConstrucaoButton").addEventListener("click", () => salvarImovel());
         $("enviarCadastroButton").addEventListener("click", () => salvarImovel({ enviar: true }));
         $("aprovarCadastroButton").addEventListener("click", () => salvarImovel({ aprovar: true }));
@@ -219,8 +221,8 @@
             $("zonaFiltro").querySelectorAll("[data-zona]").forEach(x => x.classList.toggle("ativo", x === b));
             renderConstrucoes();
         }));
-        $("areaUnidadeInput").addEventListener("change", atualizarConversaoArea);
-        $("areaInput").addEventListener("input", atualizarConversaoArea);
+        $("areaUnidadeInput").addEventListener("change", () => { trocarUnidadeArea($("areaUnidadeInput").value); atualizarQualidade(); });
+        $("areaInput").addEventListener("input", () => { lembrarAreaDigitada(); atualizarConversaoArea(); });
         $("perimetroInput").addEventListener("change", carregarPerimetro);
         $("benfeitoriaAddButton").addEventListener("click", () => adicionarBenfeitoria($("benfeitoriaNomeInput").value, $("benfeitoriaDetalheInput").value));
         [ "benfeitoriaNomeInput", "benfeitoriaDetalheInput" ].forEach(id => $(id).addEventListener("keydown", e => {
@@ -708,7 +710,9 @@
             imoveis: () => [ ...construcoes.values() ],
             fotoHtml: (id, tamanho) => fotoDoUsuario(id, tamanho) || (window.SKLAvatar && currentUser ? window.SKLAvatar.html(currentUser.display_name, currentUser.foto_path, tamanho) : ""),
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); },
-            novoCadastro: () => openConstrucaoDialog(null)
+            novoCadastro: () => openConstrucaoDialog(null),
+            equipe: () => corretores,
+            recarregarCadastros: () => renderCadastros()
         };
     }
 
@@ -792,6 +796,8 @@
         atualizarChipsConta();
         const seguro = async (nome, fn) => { try { await fn(); } catch (e) { console.error("Falha ao iniciar " + nome, e); } };
         if (window.SKLComissoes) await seguro("comissões", () => window.SKLComissoes.iniciar(contextoComissoes()));
+        if (window.SKLDivisao) await seguro("divisão do negócio", () => window.SKLDivisao.iniciar(contextoComissoes()));
+        if (window.SKLMetas) await seguro("metas", () => window.SKLMetas.iniciar(contextoComissoes()));
         if (veTudo()) await loadCorretores();
         await loadConstrucoes();
         if (gerencia) await loadInteresses();
@@ -800,6 +806,7 @@
         connectRealtime();
         if (window.SKLCRM) await seguro("CRM", () => window.SKLCRM.iniciar(contextoCrm()));
         if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
+        if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
         const ctxExtras = contextoExtras();
         if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
@@ -810,6 +817,9 @@
     function logout() {
         if (window.SKLCRM) window.SKLCRM.sair();
         if (window.SKLFinanceiro) window.SKLFinanceiro.sair();
+        if (window.SKLDivisao) window.SKLDivisao.sair();
+        if (window.SKLMetas) window.SKLMetas.sair();
+        if (window.SKLPainel) window.SKLPainel.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         sb.auth.signOut();
         carteiraId = null;
@@ -1205,9 +1215,11 @@
         if (gerencia) {
             const filtro = $("cadastrosFiltro").value || "pendente";
             const idsCorretores = new Set(corretores.filter(u => u.papel === "corretor").map(u => u.id));
-            lista = [ ...construcoes.values() ].filter(c => filtro === "aprovado"
+            // modo corretor vendo a tela de um corretor: só os cadastros dele
+            const foco = window.SKLModoCorretor && window.SKLModoCorretor.ativo() ? window.SKLModoCorretor.foco() : "";
+            lista = [ ...construcoes.values() ].filter(c => (!foco || c.cadastrado_por === foco) && (filtro === "aprovado"
                 ? c.aprovacao === "aprovado" && idsCorretores.has(c.cadastrado_por)
-                : c.aprovacao === filtro);
+                : c.aprovacao === filtro));
             lista.sort((a, b) => String(b.enviado_em || b.updated_at).localeCompare(String(a.enviado_em || a.updated_at)));
         } else {
             lista = [ ...construcoes.values() ].filter(c => c.cadastrado_por && c.cadastrado_por === currentUser.id);
@@ -1365,7 +1377,9 @@
         }
         $("construcaoTipoInput").value = construcao?.tipo_imovel || (rural ? "Fazenda" : "Casa");
         $("loteInput").checked = !!construcao?.lote;
-        $("areaUnidadeInput").value = construcao?.area_unidade || (rural ? "ha" : "m2");
+        // urbano é sempre em m²; rural abre na unidade do cadastro (novo: hectares)
+        const unidadeArea = rural ? (construcao?.area_unidade || "ha") : "m2";
+        $("areaUnidadeInput").value = unidadeArea;
         $("construcaoValorInput").value = construcao?.valor_aluguel != null ? formatMoney(construcao.valor_aluguel) : "";
         $("construcaoValorVendaInput").value = construcao?.valor_venda != null ? formatMoney(construcao.valor_venda) : "";
         $("construcaoCodigoInput").value = construcao?.codigo || "";
@@ -1374,8 +1388,9 @@
         $("condominioValorInput").value = construcao?.valor_condominio != null ? formatMoney(construcao.valor_condominio) : "";
         $("iptuTipoInput").value = construcao?.iptu_tipo || "";
         $("iptuValorInput").value = construcao?.valor_iptu != null ? formatMoney(construcao.valor_iptu) : "";
-        $("areaInput").value = construcao && construcao.area_unidade && construcao.area_unidade !== "m2" && construcao.area_valor != null
+        $("areaInput").value = unidadeArea !== "m2" && construcao?.area_unidade === unidadeArea && construcao.area_valor != null
             ? construcao.area_valor : (construcao?.area_m2 ?? "");
+        lembrarAreaDigitada();
         $("salasInput").value = construcao?.salas ?? "";
         $("quartosInput").value = construcao?.quartos ?? "";
         $("suitesInput").value = construcao?.suites ?? "";
@@ -1475,7 +1490,8 @@
         $("perimetroBloco").hidden = !rural;
         $("benfeitoriasBloco").hidden = !rural;
         if (interativo) {
-            if (rural && $("areaUnidadeInput").value === "m2") $("areaUnidadeInput").value = "ha";
+            // virou rural: passa para hectares convertendo o número (300 m² → 0,03 ha); virou urbano: volta a m² (abaixo)
+            if (rural && $("areaUnidadeInput").value === "m2") trocarUnidadeArea("ha");
             if (TIPOS_DE_LOTE.includes(select.value)) $("loteInput").checked = true;
             if (!docsPendentes || !docsPendentes.quantidade()) renderDocsImovel(construcoes.get(editandoId) || null);
         }
@@ -1509,11 +1525,36 @@
         renderBenfeitorias();
     }
 
+    // Guarda a área digitada em m² com precisão total: trocar ha → alqueire → ha volta ao mesmo número, sem perder casas.
+    function lembrarAreaDigitada() {
+        const valor = numeroOuNulo($("areaInput").value);
+        const unidade = $("areaUnidadeInput").value || "m2";
+        $("areaInput").dataset.unidade = unidade;
+        $("areaInput").dataset.m2 = valor != null ? String(valor * window.SKLRural.fator(unidade)) : "";
+    }
+    // Troca a unidade e converte o número (23,4571 ha → 234.571 m²), até 4 casas
+    function trocarUnidadeArea(nova) {
+        const input = $("areaInput");
+        const anterior = input.dataset.unidade || "m2";
+        if (input.value !== "" && nova !== anterior) {
+            const m2 = input.dataset.m2 !== "" && input.dataset.m2 != null ? Number(input.dataset.m2) : null;
+            const valor = m2 != null && Number.isFinite(m2)
+                ? window.SKLRural.converter(m2, "m2", nova)
+                : window.SKLRural.converter(numeroOuNulo(input.value), anterior, nova);
+            if (valor != null) input.value = valor;
+        }
+        $("areaUnidadeInput").value = nova;
+        input.dataset.unidade = nova;
+        atualizarConversaoArea();
+    }
+
     function atualizarConversaoArea() {
         const valor = numeroOuNulo($("areaInput").value);
         const unidade = $("areaUnidadeInput").value || "m2";
         const m2 = valor > 0 ? valor * window.SKLRural.fator(unidade) : 0;
-        $("areaConversao").textContent = m2 > 0 && (unidade !== "m2" || m2 >= 10000) ? window.SKLRural.conversaoTexto(m2, unidade) : "";
+        // não lista todas as unidades juntas: no rural, trocar a unidade já converte o número; aqui só um lembrete em m²
+        $("areaConversao").textContent = m2 > 0 && zonaRuralNoForm() && unidade !== "m2"
+            ? `= ${m2.toLocaleString("pt-BR", { maximumFractionDigits: 4 })} m²` : "";
     }
 
     function definirPerimetro(geometria, nome) {
@@ -1571,6 +1612,7 @@
         if ($("areaUnidadeInput").value === "m2" && perimetroAreaM2 >= 10000) $("areaUnidadeInput").value = "ha";
         const unidade = $("areaUnidadeInput").value || "m2";
         $("areaInput").value = Math.round(perimetroAreaM2 / window.SKLRural.fator(unidade) * 10000) / 10000;
+        lembrarAreaDigitada();
         atualizarConversaoArea();
         atualizarQualidade();
     }
@@ -1615,15 +1657,10 @@
         const campos = camposDoImovel(tipo, lote);
         document.querySelectorAll("[data-car]").forEach(label => { label.hidden = !campos.includes(label.dataset.car); });
         $("areaRotulo").textContent = lote ? "Área do lote" : rural ? "Área total" : tipo === "Terreno" ? "Área do terreno" : "Área";
-        // hectare/alqueire: em imóvel rural, lote e terreno; o resto fica em m²
-        const comUnidade = rural || lote || TIPOS_DE_LOTE.includes(tipo);
+        // hectare/alqueire só em imóvel rural; urbano (inclusive lote e terreno) fica travado em m²
         const unidade = $("areaUnidadeInput");
-        if (!comUnidade && unidade.value && unidade.value !== "m2") {
-            const valor = numeroOuNulo($("areaInput").value);
-            if (valor != null) $("areaInput").value = Math.round(valor * window.SKLRural.fator(unidade.value) * 100) / 100;
-            unidade.value = "m2";
-        }
-        unidade.hidden = !comUnidade;
+        if (!rural && unidade.value && unidade.value !== "m2") trocarUnidadeArea("m2");
+        unidade.hidden = !rural;
         atualizarConversaoArea();
     }
 
@@ -1688,10 +1725,36 @@
         }
         if (c.rural) (c.benfeitorias || []).forEach(b => specs.push([ "🏗️", b.nome, b.detalhe || null ]));
         $("fichaSpecs").innerHTML = specs.map(([ icone, titulo, sub ]) => `<div class="unit-spec-item"><span class="unit-spec-icon">${icone}</span><div><strong>${h(titulo)}</strong>${sub ? `<small>${h(sub)}</small>` : ""}</div></div>`).join("");
+        if (c.rural && Number(c.area_m2) > 0) botaoVerAreaEm(c);
         const endereco = enderecoTexto(c);
         $("fichaEndereco").textContent = [ c.edificio, endereco ].filter(Boolean).join(" · ") || "Endereço não informado";
         $("fichaDescricao").textContent = c.descricao || "";
         $("fichaDescricao").hidden = !c.descricao;
+    }
+
+    // Rural: a ficha mostra só a área cadastrada; o botão "Ver em" troca a unidade mostrada (o cliente pergunta "quanto é em
+    // alqueire goiano?"). Só muda a tela, não o cadastro.
+    function botaoVerAreaEm(c) {
+        const chip = [ ...$("fichaSpecs").querySelectorAll(".unit-spec-item") ].find(el => el.querySelector(".unit-spec-icon")?.textContent === "📐");
+        if (!chip) return;
+        const forte = chip.querySelector("strong");
+        const cadastrada = c.area_valor != null && c.area_unidade && c.area_unidade !== "m2" ? c.area_unidade : "m2";
+        const U = window.SKLRural.UNIDADES;
+        const select = document.createElement("select");
+        select.className = "area-ver-em";
+        select.setAttribute("aria-label", "Ver a área em outra unidade");
+        select.innerHTML = Object.entries(U).map(([ k, u ]) => `<option value="${k}">${k === cadastrada ? `${h(u.sigla)} (cadastrada)` : h(u.sigla)}</option>`).join("");
+        select.value = cadastrada;
+        select.addEventListener("change", () => {
+            const u = select.value;
+            forte.textContent = u === cadastrada ? areaTexto(c)
+                : `${window.SKLRural.converter(Number(c.area_m2), "m2", u).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} ${U[u].sigla}`;
+        });
+        const rotulo = document.createElement("label");
+        rotulo.className = "area-ver-em-rotulo";
+        rotulo.append("Ver em ", select);
+        chip.querySelector("div").append(rotulo);
+        chip.classList.add("com-ver-em");
     }
 
     function coletarDadosFormulario() {
@@ -1991,8 +2054,9 @@
     async function uploadFotosNovas(construcaoIdAlvo) {
         const enviados = [];
         for (const item of fotosNovas) {
-            const path = `${carteiraId}/${construcaoIdAlvo}/${Date.now()}_${sanitizarNomeArquivo(item.file.name)}`;
-            const { error } = await sb.storage.from(FOTOS_BUCKET).upload(path, item.file, { upsert: false });
+            const arquivo = window.SKLMarcaDagua ? await window.SKLMarcaDagua.preparar(item.file) : item.file;
+            const path = `${carteiraId}/${construcaoIdAlvo}/${Date.now()}_${sanitizarNomeArquivo(arquivo.name)}`;
+            const { error } = await sb.storage.from(FOTOS_BUCKET).upload(path, arquivo, { upsert: false, contentType: arquivo.type || undefined });
             if (error) throw error;
             enviados.push({ path });
         }
@@ -2176,8 +2240,22 @@
 
     const INTERESSE_STATUS = { pendente: "Pendente", em_contato: "Em contato", concluido: "Concluído", descartado: "Descartado" };
 
+    function interessePassaFiltro(i) {
+        const tipo = $("interesseTipoFiltro").value, sit = $("interesseSituacaoFiltro").value;
+        if (tipo && (i.tipo === "compra" ? "compra" : "aluguel") !== tipo) return false;
+        if (sit && i.status !== sit) return false;
+        const termo = normalizar($("interesseBusca").value);
+        if (!termo) return true;
+        const imovel = construcoes.get(i.construcao_id);
+        if (normalizar([ i.cliente_nome, i.cliente_email, i.observacao, imovel && imovel.nome, imovel && imovel.codigo ].join(" ")).includes(termo)) return true;
+        const d = termo.replace(/\D/g, "");
+        return d.length >= 3 && (String(i.cliente_telefone || "").replace(/\D/g, "").includes(d) || String(i.cliente_cpf || "").replace(/\D/g, "").includes(d));
+    }
     function renderInteresses() {
-        const rows = [ ...interesses.values() ];
+        const todos = [ ...interesses.values() ];
+        const rows = todos.filter(interessePassaFiltro);
+        $("interesseContagem").textContent = rows.length === todos.length ? `${todos.length} interesse${todos.length === 1 ? "" : "s"}` : `${rows.length} de ${todos.length}`;
+        $("interessesTableEmpty").textContent = todos.length ? "Nenhum interesse com esses filtros." : "Nenhum interesse registrado ainda.";
         $("interessesTableEmpty").hidden = rows.length > 0;
         const podeAnonimizar = currentUser.papel === "administrador";
         const statusEncerrados = [ "concluido", "descartado" ];
@@ -2246,7 +2324,7 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, perfis(nome_exibicao, foto_path)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, contratado_em, perfis(nome_exibicao, foto_path)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
@@ -2259,13 +2337,15 @@
             expires_at: v.expira_em,
             percentual_comissao: v.percentual_comissao,
             regra_comissao_id: v.regra_comissao_id,
-            perfis_atuacao: v.perfis_atuacao || []
+            perfis_atuacao: v.perfis_atuacao || [],
+            contratado_em: v.contratado_em || null
         }));
         const { data: conviteRows } = await sb.from("convites_aluguel")
             .select("id, email, papel, percentual_comissao, token, expira_em")
             .eq("carteira_id", carteiraId).is("usado_em", null).gt("expira_em", (new Date).toISOString());
         invitesAluguel = conviteRows || [];
         renderCorretores();
+        if (window.SKLModoCorretor) window.SKLModoCorretor.atualizarEquipe();
     }
 
     function corretorStatusPill(user) {
@@ -2328,8 +2408,26 @@
             toast(error.message);
         }
     }
+    // busca e filtros da tela Equipe (como na tela Clientes)
+    function corretorPassaFiltro(user) {
+        const papel = $("equipePapelFiltro").value, sit = $("equipeSituacaoFiltro").value;
+        if (papel && user.papel !== papel) return false;
+        const expirado = !!user.expires_at && new Date(user.expires_at).getTime() < Date.now();
+        if (sit === "ativo" && (!user.active || expirado)) return false;
+        if (sit === "bloqueado" && user.active) return false;
+        if (sit === "expirado" && !expirado) return false;
+        const termo = normalizar($("equipeBusca").value);
+        return !termo || normalizar([ user.display_name, user.email ].join(" ")).includes(termo);
+    }
     function renderCorretores() {
-        $("corretorTableBody").innerHTML = corretores.map(user => {
+        const selPapel = $("equipePapelFiltro"), papelAtual = selPapel.value;
+        const papeis = [ ...new Set(corretores.map(u => u.papel)) ];
+        selPapel.innerHTML = '<option value="">Todos os acessos</option>' + papeis.map(p => `<option value="${h(p)}">${h(ROLE[p] || p)}</option>`).join("");
+        selPapel.value = papeis.includes(papelAtual) ? papelAtual : "";
+        const visiveis = corretores.filter(corretorPassaFiltro);
+        $("equipeContagem").textContent = visiveis.length === corretores.length ? `${corretores.length} pessoa${corretores.length === 1 ? "" : "s"}` : `${visiveis.length} de ${corretores.length}`;
+        $("equipeVazio").hidden = visiveis.length > 0 || !corretores.length;
+        $("corretorTableBody").innerHTML = visiveis.map(user => {
             const perfilHtml = window.SKLPerfis ? `<div class="perfil-linha">${window.SKLPerfis.chips(user.perfis_atuacao, "Sem perfil de atuação")}</div>` : "";
             const percentualTexto = window.SKLComissoes ? window.SKLComissoes.celulaRegra(user, canManageCorretor(user)) : (user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—");
             if (!canManageCorretor(user)) {
@@ -2411,7 +2509,7 @@
                 validade_horas: validadeRaw ? Number(validadeRaw) : null
             });
             await loadCorretores();
-            const aviso = data.reused_existing_account ? " Esse e-mail já tinha conta em outra base SKL — vinculamos o acesso a esta carteira usando a senha que a pessoa já usa." : "";
+            const aviso = data.reused_existing_account ? " Esse e-mail já tinha um acesso — vinculamos o acesso a esta carteira usando a senha que a pessoa já usa." : "";
             showMessage($("directUserAluguelMessage"), (data.expira_em ? `Acesso criado — expira em ${formatDate(data.expira_em)}.` : "Acesso criado sem prazo de validade.") + aviso, true);
             $("directAluguelNameInput").value = "";
             $("directAluguelCpfInput").value = "";

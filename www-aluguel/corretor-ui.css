@@ -112,3 +112,13 @@ body.modo-corretor .toast{left:16px;right:16px;max-width:none;bottom:calc(86px +
 }
 @media(pointer:coarse){body.modo-corretor .crm-dica{display:none}}
 @media print{.corretor-tabs{display:none!important}}
+
+/* Central no modo corretor: "Ver a tela de" (um corretor só) */
+.ct-foco{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0 0 14px;padding:10px 14px;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px rgba(6,27,46,.05)}
+.ct-foco[hidden]{display:none}
+.ct-foco label{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--navy-deep);font-size:14px}
+.ct-foco label span{white-space:nowrap}
+.ct-foco select{min-width:220px;max-width:100%;font:inherit;font-weight:700}
+.ct-foco small{color:var(--muted);font-size:12px}
+.ct-foco.com-foco{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 25%,transparent)}
+@media(max-width:600px){.ct-foco label{flex-wrap:wrap}.ct-foco select{min-width:0;width:100%}}

@@ -434,7 +434,8 @@
             + (grupos.size ? [ ...grupos.values() ].map(g => `<div class="crm-visita crm-visita-realizada"><span class="crm-visita-quando">${h(dinheiro(g.total))}</span>
                 <span class="crm-visita-info"><strong>${h(g.quem)}</strong><small>${h(g.parte)}${g.parcelas ? ` · ${g.n} parcela(s)` : ""}${g.pagas ? ` · ${g.pagas} paga(s)` : ""}</small></span></div>`).join("")
               : `<p class="muted-text">${n.valor == null ? "Informe o valor do negócio para calcular as comissões." : "Nenhuma comissão lançada para este negócio."}</p>`)
-            + (podeGerir() ? `<button type="button" class="secondary-button" data-com-recalcular>${grupos.size ? "Recalcular pela regra atual" : "Lançar comissões"}</button>` : "");
+            + (podeGerir() && !n.divisao_em ? `<button type="button" class="secondary-button" data-com-recalcular>${grupos.size ? "Recalcular pela regra atual" : "Lançar comissões"}</button>` : "");
+        if (window.SKLDivisao) window.SKLDivisao.desenharNaNegociacao(n, box);
         const b = box.querySelector("[data-com-recalcular]");
         if (b) b.addEventListener("click", async () => {
             if (grupos.size && !window.confirm("Apagar os lançamentos pendentes deste negócio e calcular de novo pela regra atual?")) return;
