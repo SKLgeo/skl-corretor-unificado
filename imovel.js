@@ -16,6 +16,26 @@
         $("foto").src = fotos[atual];
         $("contador").textContent = `${atual + 1}/${fotos.length}`;
         [ ...$("miniaturas").children ].forEach((m, k) => m.classList.toggle("ativa", k === atual));
+        if (!$("tela").hidden) desenharTela();
+    }
+    // foto em tela cheia: toque na foto abre; setas, arrastar o dedo, teclado; Voltar do celular fecha
+    function desenharTela() {
+        $("telaFoto").src = fotos[atual];
+        $("telaCont").textContent = `${atual + 1}/${fotos.length}`;
+        $("telaAnt").hidden = $("telaProx").hidden = fotos.length < 2;
+    }
+    function abrirTela() {
+        if (!fotos.length || !$("tela").hidden) return;
+        $("tela").hidden = false;
+        document.body.classList.add("tela-aberta");
+        desenharTela();
+        history.pushState({ tela: 1 }, "");
+    }
+    function fecharTela(doVoltar) {
+        if ($("tela").hidden) return;
+        $("tela").hidden = true;
+        document.body.classList.remove("tela-aberta");
+        if (!doVoltar && history.state && history.state.tela) history.back();
     }
     async function carregar() {
         if (!token || !codigo) return falha("Link incompleto.");
@@ -71,8 +91,31 @@
     }
     $("ant").addEventListener("click", () => mostrarFoto(atual - 1));
     $("prox").addEventListener("click", () => mostrarFoto(atual + 1));
-    let x0 = null;
-    $("foto").addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
-    $("foto").addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) mostrarFoto(atual + (dx < 0 ? 1 : -1)); x0 = null; });
+    // arrastar o dedo troca a foto; toque sem arrastar (na foto da página) abre em tela cheia
+    function deslize(el, aoTocar) {
+        let x0 = null, y0 = null;
+        el.addEventListener("touchstart", e => { if (e.touches.length > 1) { x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        el.addEventListener("touchend", e => {
+            if (x0 == null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            x0 = null;
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { mostrarFoto(atual + (dx < 0 ? 1 : -1)); e.preventDefault(); }
+            else if (aoTocar && Math.abs(dx) < 10 && Math.abs(dy) < 10) { aoTocar(); e.preventDefault(); }
+        });
+    }
+    deslize($("foto"), abrirTela);
+    deslize($("tela"));
+    $("foto").addEventListener("click", abrirTela);
+    $("telaFechar").addEventListener("click", () => fecharTela());
+    $("telaAnt").addEventListener("click", e => { e.stopPropagation(); mostrarFoto(atual - 1); });
+    $("telaProx").addEventListener("click", e => { e.stopPropagation(); mostrarFoto(atual + 1); });
+    $("tela").addEventListener("click", e => { if (e.target === $("tela")) fecharTela(); });
+    window.addEventListener("popstate", () => fecharTela(true));
+    document.addEventListener("keydown", e => {
+        if ($("tela").hidden) return;
+        if (e.key === "Escape") fecharTela();
+        else if (e.key === "ArrowLeft") mostrarFoto(atual - 1);
+        else if (e.key === "ArrowRight") mostrarFoto(atual + 1);
+    });
     carregar();
 })();
