@@ -348,10 +348,11 @@
 
       <section id="page-corretores" class="page">
         <div class="page-actions">
-          <p>Corretores e pessoas do escritório: crie convites ou acessos diretos. Se a pessoa já tiver um acesso com o mesmo e-mail (em outra carteira, por exemplo), ela só ganha acesso a esta também — continua entrando com a senha que já usa.</p>
+          <p>Corretores e pessoas do escritório: crie o acesso de cada um (e-mail e senha). Se a pessoa já tiver um acesso com o mesmo e-mail (em outra carteira, por exemplo), ela só ganha acesso a esta também — continua entrando com a senha que já usa.</p>
           <div style="display:flex;gap:10px">
-            <button id="newInviteAluguelButton" class="primary-button">Novo convite</button>
-            <button id="newDirectUserAluguelButton" class="secondary-button">Criar acesso direto (com prazo)</button>
+            <!-- convite por código desligado a pedido da Cerrado (20/10/2026); o código continua, é só tirar o hidden -->
+            <button id="newInviteAluguelButton" class="primary-button" hidden>Novo convite</button>
+            <button id="newDirectUserAluguelButton" class="primary-button">Criar acesso</button>
           </div>
         </div>
         <div class="crm-toolbar">
@@ -369,7 +370,7 @@
           <table><thead><tr><th>Nome</th><th>E-mail</th><th>Acesso</th><th>Regra de comissão</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="corretorTableBody"></tbody></table>
           <div id="equipeVazio" class="empty-state" hidden>Ninguém encontrado com esses filtros.</div>
         </div>
-        <article class="panel">
+        <article class="panel" id="convitesAluguelPainel" hidden>
           <div class="panel-heading"><h2>Convites aguardando ativação</h2></div>
           <div id="inviteAluguelList" class="invite-list"></div>
         </article>

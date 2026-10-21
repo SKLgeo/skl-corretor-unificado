@@ -85,3 +85,12 @@
 .bairro-filtro .bairro-sugestoes{right:auto;width:min(320px,100%)}
 #page-settings .settings-grid{align-items:start}
 .bairro-sugestoes{right:auto;width:min(320px,calc(100% - 8px))}
+
+/* Equipe → "Parceiros de fora" começa fechado (pedido da Cerrado, 20/10/2026) */
+.div-parc-painel>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.div-parc-painel>summary::-webkit-details-marker{display:none}
+.div-parc-painel>summary h2{margin:0}
+.div-parc-seta{font-size:18px;color:var(--muted);transition:transform .2s}
+.div-parc-painel[open] .div-parc-seta{transform:rotate(180deg)}
+.div-parc-painel:not([open]){padding-bottom:inherit}
+.div-parc-acoes{display:flex;justify-content:flex-end;margin:10px 0 4px}

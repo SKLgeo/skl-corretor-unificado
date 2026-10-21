@@ -7,6 +7,7 @@
     const $ = id => document.getElementById(id);
     const h = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     let ctx = null, parceiros = [], ligado = false;
+    let parceirosAberto = false;   // a lista de parceiros na Equipe começa fechada (abre ao tocar)
     let neg = null, boxAtual = null, linhas = [], previaTimer = null, previaSeq = 0, parceiroEditando = null, linhaDoParceiro = null;
 
     const podeGerir = () => !!ctx && ctx.podeGerir();
@@ -339,13 +340,16 @@
         let art = $("divParceirosPainel");
         if (!podeGerir()) { if (art) art.remove(); return; }
         if (!art) {
-            art = document.createElement("article");
+            art = document.createElement("details");
             art.id = "divParceirosPainel";
-            art.className = "panel";
+            art.className = "panel div-parc-painel";
+            art.addEventListener("toggle", () => { parceirosAberto = art.open; });
             const convites = $("inviteAluguelList") && $("inviteAluguelList").closest("article");
             pagina.insertBefore(art, convites || null);
         }
-        art.innerHTML = `<div class="panel-heading"><h2>Parceiros de fora</h2><button type="button" class="secondary-button" data-parc-novo>+ Novo parceiro</button></div>
+        art.open = parceirosAberto;
+        art.innerHTML = `<summary class="panel-heading"><h2>Parceiros de fora <small class="muted-text">(${parceiros.length})</small></h2><span class="div-parc-seta" aria-hidden="true">▾</span></summary>
+            <div class="div-parc-acoes"><button type="button" class="secondary-button" data-parc-novo>+ Novo parceiro</button></div>
             <p class="muted-text">Corretores autônomos e outras imobiliárias que dividem negócios com vocês. Não entram no app: aparecem só para escolher na divisão do negócio.</p>
             ${parceiros.length ? `<div class="table-panel"><table><thead><tr><th>Nome</th><th>CRECI</th><th>Contato</th><th>% padrão</th><th>Situação</th><th></th></tr></thead><tbody>
               ${parceiros.map(p => `<tr><td><strong>${h(p.nome)}</strong></td><td>${h(p.creci || "—")}</td><td>${h([ p.telefone, p.email ].filter(Boolean).join(" · ") || "—")}</td>
