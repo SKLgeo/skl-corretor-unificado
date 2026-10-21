@@ -247,3 +247,28 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
   .crm-visita-nova,.crm-lembrete-novo{grid-template-columns:1fr}
   .crm-visita{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Kanban único (venda + locação + captação) e configuração dos funis — pedidos da Cerrado, 20/10/2026 */
+.crm-card{background:var(--fundo,#fff)}
+.crm-quadro-todos .crm-card{border:1px solid rgba(20,59,76,.08);border-left:4px solid var(--cor,#64748b)}
+.crm-card-tipo{justify-self:start;font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#365560;background:rgba(255,255,255,.75);border:1px solid rgba(20,59,76,.15);border-radius:999px;padding:1px 8px}
+.crm-tab-cor{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;border:1px solid rgba(6,27,46,.25);vertical-align:-1px}
+.crm-config-funil{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:4px 0 6px}
+.crm-config-funil label{display:grid;gap:4px}
+.crm-config-funil input[type="color"]{width:56px;height:38px;padding:2px}
+.crm-config-check{display:flex !important;align-items:center;gap:6px;font-size:13px;white-space:nowrap}
+.crm-config-check input{width:auto}
+.crm-config-cab{display:grid;grid-template-columns:42px 1fr 96px;gap:6px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;padding-right:120px}
+.crm-config-meta{display:flex;align-items:center;gap:3px;flex:none;width:96px}
+.crm-config-meta input{width:62px !important;flex:none !important;text-align:right}
+.crm-config-meta.vazia{font-size:11px;color:var(--muted);justify-content:center}
+.painel-meta{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;border-radius:999px;padding:0 7px;background:#eef2f5;color:#4b5f66}
+.painel-meta.ok{background:#dff4e8;color:#247346}
+.painel-meta.abaixo{background:#fde8e6;color:#9a3b34}
+.fg-programado{color:#1e6a99 !important;font-weight:700}
+
+.whats-button{background:#1f9d55 !important;border-color:#1f9d55 !important;color:#fff !important}
+#crmConfigPanel{grid-column:1/-1}
+#crmConfigPanel .crm-config-lista,#crmConfigPanel .crm-config-cab{max-width:760px}
+#crmFunilTabs{overflow-x:auto;flex-wrap:nowrap;max-width:100%;scrollbar-width:none}
+#crmFunilTabs button{white-space:nowrap;flex:0 0 auto}

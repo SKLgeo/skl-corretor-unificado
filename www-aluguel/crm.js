@@ -19,6 +19,9 @@
 
     let ctx = null;
     let funis = [], etapas = [], motivos = [];
+    let funisTodos = [];           // inclusive os desligados (só Configurações)
+    const TODOS = "__todos";       // aba do Kanban com venda, locação e captação juntas
+    const COR_FUNIL = { venda: "#ffffff", locacao: "#e0f2fe", captacao: "#ffedd5" };
     const clientes = new Map();
     const negs = new Map();
     let funilAtual = null;
@@ -144,6 +147,12 @@
         const p = padraoDe(n);
         return p ? `<span class="crm-selo crm-selo-${p}">${PADROES[p]}</span>` : "";
     }
+    // "Outro": mostra o que a pessoa escreveu no lugar do nome do motivo
+    function nomeMotivoPerda(n) {
+        const m = motivos.find(x => x.id === n.motivo_perda_id);
+        if (!m) return "";
+        return m.permite_texto && n.motivo_perda_texto ? "Outro: " + n.motivo_perda_texto : m.nome;
+    }
     function corretorDe(id) {
         return id ? ctx.nomeDoUsuario(id) : "Sem corretor";
     }
@@ -165,7 +174,7 @@
     function sair() {
         if (canal) { ctx.sb.removeChannel(canal); canal = null; }
         if (timer) { clearInterval(timer); timer = null; }
-        funis = []; etapas = []; motivos = [];
+        funis = []; funisTodos = []; etapas = []; motivos = [];
         clientes.clear(); negs.clear(); visitas.clear(); lembretes.clear(); roleta = null;
         funilAtual = null;
     }
@@ -174,7 +183,7 @@
         const cid = ctx.carteiraId();
         const sb = ctx.sb;
         const [ f, e, m, c, n, cfg, vis, lem, rol ] = await Promise.all([
-            sb.from("crm_funis").select("*").eq("carteira_id", cid).eq("ativo", true).order("ordem"),
+            sb.from("crm_funis").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_etapas").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_motivos_perda").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_clientes").select("*").eq("carteira_id", cid).order("nome").limit(5000),
@@ -186,7 +195,8 @@
         ]);
         const falha = [ f, e, m, c, n ].find(r => r.error);
         if (falha) { console.warn("CRM:", falha.error); return; }
-        funis = f.data || [];
+        funisTodos = f.data || [];
+        funis = funisTodos.filter(x => x.ativo);
         etapas = e.data || [];
         motivos = m.data || [];
         clientes.clear(); (c.data || []).forEach(x => clientes.set(x.id, x));
@@ -195,7 +205,7 @@
         lembretes.clear(); ((lem && lem.data) || []).forEach(x => lembretes.set(x.id, x));
         roleta = (rol && rol.data) || null;
         if (cfg && cfg.data && cfg.data.faixas_padrao) faixas = cfg.data.faixas_padrao;
-        if (!funilAtual || !funil(funilAtual)) funilAtual = funis[0] ? funis[0].id : null;
+        if (!funilAtual || (funilAtual !== TODOS && !funil(funilAtual))) funilAtual = funis.length > 1 ? TODOS : (funis[0] ? funis[0].id : null);
         if (window.SKLCRMPainel) window.SKLCRMPainel.invalidar();
         renderTudo();
     }
@@ -305,12 +315,13 @@
         $("crmMotConfirmar").addEventListener("click", confirmarMovimento);
         $("crmAddEtapa").addEventListener("click", () => {
             const abertas = configEtapas.filter(e => e.tipo === "aberta");
-            configEtapas.splice(abertas.length, 0, { id: null, nome: "", tipo: "aberta", cor: "#1e8fd6" });
+            configEtapas.splice(abertas.length, 0, { id: null, nome: "", tipo: "aberta", cor: "#1e8fd6", meta_conversao: "" });
             desenharConfigEtapas();
         });
         $("crmSalvarEtapas").addEventListener("click", salvarEtapas);
-        $("crmConfigFunil").addEventListener("change", () => { carregarConfigEtapas(); desenharConfigEtapas(); });
-        $("crmAddMotivo").addEventListener("click", () => { configMotivos.push({ id: null, nome: "", ativo: true }); desenharConfigMotivos(); });
+        $("crmConfigFunil").addEventListener("change", () => { carregarConfigFunil(); carregarConfigEtapas(); desenharConfigEtapas(); });
+        $("crmSalvarFunil").addEventListener("click", salvarFunil);
+        $("crmAddMotivo").addEventListener("click", () => { configMotivos.push({ id: null, nome: "", ativo: true, permite_texto: false }); desenharConfigMotivos(); });
         $("crmSalvarMotivos").addEventListener("click", salvarMotivos);
         $("crmSalvarFaixas").addEventListener("click", salvarFaixas);
         [ "crmFaixaVendaMedio", "crmFaixaVendaAlto", "crmFaixaLocacaoMedio", "crmFaixaLocacaoAlto" ].forEach(id => $(id).addEventListener("input", previaFaixas));
@@ -347,7 +358,8 @@
         });
     }
     function renderTabs() {
-        $("crmFunilTabs").innerHTML = funis.map(f => `<button type="button" data-funil="${h(f.id)}" class="${f.id === funilAtual ? "ativo" : ""}">${h(f.nome)}</button>`).join("");
+        const abas = (funis.length > 1 ? [ { id: TODOS, nome: "Todos" } ] : []).concat(funis);
+        $("crmFunilTabs").innerHTML = abas.map(f => `<button type="button" data-funil="${h(f.id)}" class="${f.id === funilAtual ? "ativo" : ""}">${f.id === TODOS ? "" : `<i class="crm-tab-cor" style="background:${h(corDoFunil(f))}"></i>`}${h(f.nome)}</button>`).join("");
         $("crmFunilTabs").querySelectorAll("[data-funil]").forEach(b => b.addEventListener("click", () => {
             funilAtual = b.dataset.funil;
             renderTabs();
@@ -377,12 +389,14 @@
             $("crmResumoFunil").innerHTML = "";
             return;
         }
-        const colunas = etapasDoFunil(funilAtual);
+        const todos = funilAtual === TODOS;
+        const colunas = todos ? colunasUnificadas() : etapasDoFunil(funilAtual).map(e => ({ chave: e.id, nome: e.nome, tipo: e.tipo, cor: e.cor, ids: [ e.id ] }));
         const limite = Date.now() - 30 * DIA;
-        const doFunil = [ ...negs.values() ].filter(n => n.funil_id === funilAtual && negociacaoPassaFiltro(n));
+        const doFunil = [ ...negs.values() ].filter(n => (todos ? !!funil(n.funil_id) : n.funil_id === funilAtual) && negociacaoPassaFiltro(n));
         renderResumo(doFunil);
+        quadro.classList.toggle("crm-quadro-todos", todos);
         quadro.innerHTML = colunas.map(et => {
-            let itens = doFunil.filter(n => n.etapa_id === et.id);
+            let itens = doFunil.filter(n => et.ids.includes(n.etapa_id));
             if (et.tipo !== "aberta") itens = itens.filter(n => new Date(n.fechado_em || n.updated_at).getTime() >= limite);
             itens.sort((a, b) => {
                 const sa = situacaoAcao(a), sb2 = situacaoAcao(b);
@@ -391,7 +405,7 @@
                 return String(b.updated_at).localeCompare(String(a.updated_at));
             });
             const total = itens.reduce((s, n) => s + (Number(n.valor) || 0), 0);
-            return `<section class="crm-coluna crm-coluna-${et.tipo}" data-etapa="${h(et.id)}" style="--cor:${h(et.cor || "#64748b")}">
+            return `<section class="crm-coluna crm-coluna-${et.tipo}" data-etapa="${h(et.chave)}" style="--cor:${h(et.cor || "#64748b")}">
               <header><strong>${h(et.nome)}</strong><span>${itens.length}${total ? " · " + dinheiroCurto(total) : ""}</span></header>
               <div class="crm-coluna-corpo">${itens.map(cartao).join("") || `<p class="crm-vazio">—</p>`}</div>
             </section>`;
@@ -412,10 +426,41 @@
                 ev.preventDefault();
                 col.classList.remove("alvo");
                 const id = ev.dataTransfer.getData("text/plain");
-                if (id) moverPara(id, col.dataset.etapa);
+                if (!id) return;
+                if (!todos) { moverPara(id, col.dataset.etapa); return; }
+                // Kanban único: a coluna junta etapas de funis diferentes; usa a etapa do funil do cartão
+                const n = negs.get(id);
+                const col2 = colunas.find(c => c.chave === col.dataset.etapa);
+                const alvo = n && col2 && col2.ids.map(etapa).find(e => e && e.funil_id === n.funil_id);
+                if (alvo) moverPara(id, alvo.id);
+                else if (n && col2) ctx.toast(`O funil de ${(funil(n.funil_id) || {}).nome || "esta negociação"} não tem a etapa "${col2.nome}".`);
             });
         });
     }
+    // Colunas do Kanban único: etapas com o mesmo nome viram uma coluna só (na ordem dos funis);
+    // todas as etapas de fechamento juntas em "Fechado" e todas as de perda em "Perdido".
+    function chaveEtapa(e) { return e.tipo === "aberta" ? "a:" + normal(e.nome).trim() : e.tipo; }
+    function colunasUnificadas() {
+        const abertas = [];
+        funis.forEach(f => {
+            const lista = etapasDoFunil(f.id).filter(e => e.tipo === "aberta");
+            lista.forEach((e, n) => {
+                const k = chaveEtapa(e);
+                const i = abertas.findIndex(c => c.chave === k);
+                if (i >= 0) { abertas[i].ids.push(e.id); return; }
+                // etapa só deste funil: entra antes da próxima etapa dele que já é coluna (ou no fim)
+                const prox = lista.slice(n + 1).map(x => abertas.findIndex(c => c.chave === chaveEtapa(x))).find(j => j >= 0);
+                abertas.splice(prox == null ? abertas.length : prox, 0, { chave: k, nome: e.nome, tipo: "aberta", cor: e.cor, ids: [ e.id ] });
+            });
+        });
+        const fim = [ [ "ganho", "Fechado", "#2f8a56" ], [ "perdido", "Perdido", "#bd5147" ] ].map(([ tipo, nome, cor ]) => {
+            const ets = funis.flatMap(f => etapasDoFunil(f.id).filter(e => e.tipo === tipo));
+            const nomes = [ ...new Set(ets.map(e => e.nome)) ];
+            return { chave: tipo, nome: nomes.length === 1 ? nomes[0] : nome, tipo, cor: (ets[0] && ets[0].cor) || cor, ids: ets.map(e => e.id) };
+        });
+        return abertas.concat(fim);
+    }
+    function corDoFunil(f) { return (f && (f.cor || COR_FUNIL[f.finalidade])) || "#ffffff"; }
     function cartao(n) {
         const c = clientes.get(n.cliente_id);
         const sit = situacaoAcao(n);
@@ -424,10 +469,12 @@
         const acao = n.situacao === "aberta" && sit !== "sem"
             ? `<div class="crm-card-acao ${sit}">◷ ${h(dataHora(n.proxima_acao_em))}${n.proxima_acao_texto ? " · " + h(n.proxima_acao_texto) : ""}</div>`
             : (n.situacao === "aberta" ? `<div class="crm-card-acao sem">Sem próxima ação</div>` : "");
-        const perda = n.situacao === "perdida" ? `<div class="crm-card-perda">${h((motivos.find(m => m.id === n.motivo_perda_id) || {}).nome || "Perdida")}</div>` : "";
+        const perda = n.situacao === "perdida" ? `<div class="crm-card-perda">${h(nomeMotivoPerda(n) || "Perdida")}</div>` : "";
         const corretor = central() ? `<div class="crm-card-corretor">${ctx.fotoDoUsuario(n.corretor_id, 20)}<span>${h(corretorDe(n.corretor_id))}</span></div>` : "";
-        return `<article class="crm-card" draggable="true" data-neg="${h(n.id)}">
-          <strong>${h(c ? c.nome : "Cliente")}</strong>${seloPadrao(n)}
+        const f = funil(n.funil_id);
+        const tipo = funilAtual === TODOS && f ? `<span class="crm-card-tipo">${h(f.nome)}</span>` : "";
+        return `<article class="crm-card" draggable="true" data-neg="${h(n.id)}" style="--fundo:${h(corDoFunil(f))}">
+          ${tipo}<strong>${h(c ? c.nome : "Cliente")}</strong>${seloPadrao(n)}
           ${n.titulo || n.construcao_id ? `<small>${h(n.titulo || imovelNome(n.construcao_id))}</small>` : ""}
           <div class="crm-card-linha"><span class="crm-valor">${h(dinheiro(n.valor))}</span><span class="crm-dias" title="Tempo nesta etapa">${et && et.tipo === "aberta" ? (dias ? dias + " d" : "hoje") : h(dataCurta(n.fechado_em))}</span></div>
           ${acao}${perda}${corretor}
@@ -467,12 +514,20 @@
         $("crmMotTitulo").textContent = `${c ? c.nome : "Negociação"} → ${para.nome}`;
         $("crmMotPerdaLabel").hidden = !perda;
         $("crmMotPerda").innerHTML = `<option value="">Escolha o motivo</option>` + motivos.filter(m => m.ativo).map(m => `<option value="${h(m.id)}">${h(m.nome)}</option>`).join("");
-        $("crmMotTextoRotulo").textContent = perda ? "Detalhe (opcional)" : "Por que a negociação está voltando?";
+        $("crmMotPerda").onchange = atualizarRotuloMotivo;
+        atualizarRotuloMotivo();
+        if (!perda) $("crmMotTextoRotulo").textContent = "Por que a negociação está voltando?";
         $("crmMotTexto").value = "";
         $("crmMotConfirmar").textContent = perda ? "Marcar como perdida" : "Voltar etapa";
         $("crmMotConfirmar").className = perda ? "danger-button" : "primary-button";
         $("crmMotMsg").hidden = true;
         $("crmMotivoDialog").showModal();
+    }
+    function motivoEscolhido() { return motivos.find(m => m.id === $("crmMotPerda").value) || null; }
+    function atualizarRotuloMotivo() {
+        const m = motivoEscolhido();
+        $("crmMotTextoRotulo").textContent = m && m.permite_texto ? "Escreva o motivo da perda" : "Detalhe (opcional)";
+        if (m && m.permite_texto) $("crmMotTexto").focus();
     }
     async function confirmarMovimento() {
         if (!movimentoPendente) return;
@@ -481,6 +536,7 @@
         const motivoPerda = $("crmMotPerda").value || null;
         const texto = $("crmMotTexto").value.trim() || null;
         if (perda && !motivoPerda) { msg($("crmMotMsg"), "Escolha o motivo da perda."); return; }
+        if (perda && motivoEscolhido() && motivoEscolhido().permite_texto && !texto) { msg($("crmMotMsg"), "Escreva qual foi o motivo da perda."); return; }
         if (!perda && !texto) { msg($("crmMotMsg"), "Informe o motivo para voltar a etapa."); return; }
         $("crmMotConfirmar").disabled = true;
         const ok = await executarMovimento(neg, para, texto, motivoPerda, $("crmMotMsg"));
@@ -1188,7 +1244,8 @@
         $("crmNegContato").innerHTML = c ? linksContato(c) : "";
         if (c && !negAberta) {
             const tipos = c.tipos || [];
-            const alvo = tipos.includes("inquilino") && !tipos.includes("comprador") ? "locacao" : (tipos.includes("comprador") ? "venda" : null);
+            const alvo = tipos.includes("inquilino") && !tipos.includes("comprador") ? "locacao" : (tipos.includes("comprador") ? "venda"
+                : (tipos.includes("proprietario") || tipos.includes("vendedor") ? "captacao" : null));
             const f = alvo && funis.find(x => x.finalidade === alvo);
             if (f) { $("crmNegFunil").value = f.id; preencherSelectImoveis(f.id, $("crmNegImovel").value); }
             if (central()) $("crmNegCorretor").value = c.corretor_id || "";
@@ -1198,7 +1255,7 @@
         negAberta = id;
         const n = id ? negs.get(id) : null;
         if (id && !n) { ctx.toast("Negociação não encontrada."); return; }
-        const base = n || { funil_id: funilAtual, ...(padrao || {}) };
+        const base = n || { funil_id: funilAtual === TODOS ? null : funilAtual, ...(padrao || {}) };
         $("crmNegMsg").hidden = true;
         $("crmNegEyebrow").textContent = n ? (funil(n.funil_id) || {}).nome?.toUpperCase() || "NEGOCIAÇÃO" : "NOVA NEGOCIAÇÃO";
         const cli = clientes.get(base.cliente_id);
@@ -1544,7 +1601,7 @@
                 $("crmNegDialog").close();
             } else {
                 ctx.toast("Negociação criada. Registre o primeiro atendimento.");
-                funilAtual = data.funil_id;
+                if (funilAtual !== TODOS) funilAtual = data.funil_id;
                 renderTabs(); renderQuadro();
                 abrirNegociacao(data.id);
             }
@@ -1606,11 +1663,12 @@
     function renderConfig() {
         const sel = $("crmConfigFunil");
         const atual = sel.value;
-        sel.innerHTML = funis.map(f => `<option value="${h(f.id)}">Funil de ${h(f.nome)}</option>`).join("");
-        sel.value = funis.some(f => f.id === atual) ? atual : (funis[0] ? funis[0].id : "");
+        sel.innerHTML = funisTodos.map(f => `<option value="${h(f.id)}">Funil de ${h(f.nome)}${f.ativo ? "" : " (desligado)"}</option>`).join("");
+        sel.value = funisTodos.some(f => f.id === atual) ? atual : (funisTodos[0] ? funisTodos[0].id : "");
+        carregarConfigFunil();
         carregarConfigEtapas();
         desenharConfigEtapas();
-        configMotivos = motivos.filter(m => m.ativo).map(m => ({ id: m.id, nome: m.nome, ativo: true }));
+        configMotivos = motivos.filter(m => m.ativo).map(m => ({ id: m.id, nome: m.nome, ativo: true, permite_texto: !!m.permite_texto }));
         desenharConfigMotivos();
         [ [ "venda", "Venda" ], [ "locacao", "Locacao" ] ].forEach(([ k, sufixo ]) => {
             $("crmFaixa" + sufixo + "Medio").value = dinheiro(faixas[k] && faixas[k].medio);
@@ -1637,8 +1695,24 @@
         renderTudo();
         ctx.toast("Faixas de padrão salvas.");
     }
+    function carregarConfigFunil() {
+        const f = funisTodos.find(x => x.id === $("crmConfigFunil").value);
+        $("crmFunilNome").value = f ? f.nome : "";
+        $("crmFunilCor").value = f ? corDoFunil(f) : "#ffffff";
+        $("crmFunilAtivo").checked = !!(f && f.ativo);
+    }
+    async function salvarFunil() {
+        const id = $("crmConfigFunil").value;
+        if (!id) return;
+        $("crmSalvarFunil").disabled = true;
+        const { error } = await ctx.sb.rpc("crm_configurar_funil", { p_funil: id, p_nome: $("crmFunilNome").value.trim(), p_cor: $("crmFunilCor").value, p_ativo: $("crmFunilAtivo").checked });
+        $("crmSalvarFunil").disabled = false;
+        if (error) { ctx.toast(erro(error)); return; }
+        ctx.toast("Funil salvo.");
+        await carregar();
+    }
     function carregarConfigEtapas() {
-        configEtapas = etapasDoFunil($("crmConfigFunil").value).map(e => ({ id: e.id, nome: e.nome, tipo: e.tipo, cor: e.cor || "#64748b" }));
+        configEtapas = etapasDoFunil($("crmConfigFunil").value).map(e => ({ id: e.id, nome: e.nome, tipo: e.tipo, cor: e.cor || "#64748b", meta_conversao: e.meta_conversao == null ? "" : String(e.meta_conversao) }));
         const ordemTipo = { aberta: 0, ganho: 1, perdido: 2 };
         configEtapas.sort((a, b) => ordemTipo[a.tipo] - ordemTipo[b.tipo]);
     }
@@ -1647,9 +1721,12 @@
         const abertas = configEtapas.filter(e => e.tipo === "aberta").length;
         box.innerHTML = configEtapas.map((e, i) => {
             const fixa = e.tipo !== "aberta";
+            const temMeta = i > 0 && e.tipo !== "perdido";
             return `<div class="crm-config-linha">
               <input type="color" value="${h(e.cor)}" data-i="${i}" data-campo="cor" aria-label="Cor" />
               <input value="${h(e.nome)}" data-i="${i}" data-campo="nome" placeholder="Nome da etapa" />
+              ${temMeta ? `<label class="crm-config-meta" title="% que se espera passar da etapa anterior para esta"><input value="${h(e.meta_conversao)}" data-i="${i}" data-campo="meta_conversao" inputmode="decimal" placeholder="—" aria-label="Meta de conversão (%)" /><span>%</span></label>`
+                : `<span class="crm-config-meta vazia">${i === 0 ? "início" : ""}</span>`}
               ${fixa ? `<span class="crm-config-fixa">${e.tipo === "ganho" ? "fechado" : "perdido"}</span>` : `
               <button type="button" class="text-button" data-mover="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
               <button type="button" class="text-button" data-mover="${i}" data-dir="1" ${i >= abertas - 1 ? "disabled" : ""} aria-label="Descer">↓</button>
@@ -1666,8 +1743,11 @@
     }
     async function salvarEtapas() {
         if (configEtapas.some(e => !e.nome.trim())) { ctx.toast("Toda etapa precisa de nome."); return; }
+        const metaRuim = e => e.meta_conversao !== "" && e.meta_conversao != null && !(Number(String(e.meta_conversao).replace(",", ".")) >= 0 && Number(String(e.meta_conversao).replace(",", ".")) <= 100);
+        if (configEtapas.some(metaRuim)) { ctx.toast("A meta de conversão vai de 0 a 100%."); return; }
         $("crmSalvarEtapas").disabled = true;
-        const { error } = await ctx.sb.rpc("crm_salvar_etapas", { p_funil: $("crmConfigFunil").value, p_etapas: configEtapas.map(e => ({ id: e.id, nome: e.nome.trim(), tipo: e.tipo, cor: e.cor })) });
+        const { error } = await ctx.sb.rpc("crm_salvar_etapas", { p_funil: $("crmConfigFunil").value, p_etapas: configEtapas.map(e => ({ id: e.id, nome: e.nome.trim(), tipo: e.tipo, cor: e.cor,
+            meta_conversao: e.meta_conversao === "" || e.meta_conversao == null ? null : Number(String(e.meta_conversao).replace(",", ".")) })) });
         $("crmSalvarEtapas").disabled = false;
         if (error) { ctx.toast(erro(error)); return; }
         ctx.toast("Etapas salvas.");
@@ -1677,14 +1757,16 @@
         const box = $("crmConfigMotivos");
         box.innerHTML = configMotivos.map((m, i) => `<div class="crm-config-linha">
             <input value="${h(m.nome)}" data-i="${i}" placeholder="Motivo" />
+            <label class="crm-config-check" title="Quem marcar este motivo escreve qual foi"><input type="checkbox" data-texto="${i}" ${m.permite_texto ? "checked" : ""} /> pede texto</label>
             <button type="button" class="text-button crm-remover" data-remover="${i}" aria-label="Remover">✕</button>
           </div>`).join("");
         box.querySelectorAll("input[data-i]").forEach(inp => inp.addEventListener("input", () => { configMotivos[+inp.dataset.i].nome = inp.value; }));
+        box.querySelectorAll("[data-texto]").forEach(cb => cb.addEventListener("change", () => { configMotivos[+cb.dataset.texto].permite_texto = cb.checked; }));
         box.querySelectorAll("[data-remover]").forEach(b => b.addEventListener("click", () => { configMotivos.splice(+b.dataset.remover, 1); desenharConfigMotivos(); }));
     }
     async function salvarMotivos() {
         $("crmSalvarMotivos").disabled = true;
-        const { error } = await ctx.sb.rpc("crm_salvar_motivos", { p_carteira: ctx.carteiraId(), p_motivos: configMotivos.filter(m => m.nome.trim()).map(m => ({ id: m.id, nome: m.nome.trim(), ativo: true })) });
+        const { error } = await ctx.sb.rpc("crm_salvar_motivos", { p_carteira: ctx.carteiraId(), p_motivos: configMotivos.filter(m => m.nome.trim()).map(m => ({ id: m.id, nome: m.nome.trim(), ativo: true, permite_texto: !!m.permite_texto })) });
         $("crmSalvarMotivos").disabled = false;
         if (error) { ctx.toast(erro(error)); return; }
         ctx.toast("Motivos salvos.");

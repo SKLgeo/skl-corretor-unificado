@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.12.3";
+    const APP_VERSION = "0.13.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -96,6 +96,7 @@
     let bairrosFiltro = [];
     let faixaValor = null;
     let notaMinimaCadastro = null;
+    let pesosQualidade = null;   // peso de cada item da nota (Configurações); sem peso = 10
     let modoDialogo = "leitura";
 
     let editandoId = null;
@@ -166,6 +167,8 @@
         $("backFromRecoverButton").addEventListener("click", () => mostrarRecuperarSenha(false));
         $("recoverForm").addEventListener("submit", enviarRecuperarSenha);
         $("recoverNewPasswordForm").addEventListener("submit", salvarNovaSenha);
+        $("conviteForm").addEventListener("submit", ativarConvite);
+        $("conviteVoltarButton").addEventListener("click", () => { conviteToken = ""; history.replaceState(null, "", location.pathname); mostrarRecuperarSenha(false); });
         sb.auth.onAuthStateChange(evento => { if (evento === "PASSWORD_RECOVERY") { modoRecuperacao = true; mostrarNovaSenha(); } });
         $("logoutButton").addEventListener("click", logout);
         document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
@@ -181,9 +184,11 @@
         });
         $("construcaoSearchInput").addEventListener("input", renderConstrucoes);
         $("construcaoStatusFilter").addEventListener("change", renderConstrucoes);
-        $("bairroFiltroInput").addEventListener("change", adicionarBairroFiltro);
+        // bairro: digita e escolhe na lista curta (em vez da lista enorme do navegador)
+        autocompletarBairro($("bairroFiltroInput"), nome => { $("bairroFiltroInput").value = nome; adicionarBairroFiltro(); }, adicionarBairroFiltro);
+        autocompletarBairro($("bairroInput"), nome => { $("bairroInput").value = nome; $("bairroInput").dispatchEvent(new Event("input", { bubbles: true })); });
         $("bairroFiltroInput").addEventListener("keydown", event => {
-            if (event.key === "Enter") { event.preventDefault(); adicionarBairroFiltro(); }
+            if (event.key === "Enter" && !event.defaultPrevented) { event.preventDefault(); adicionarBairroFiltro(); }
         });
         $("valorMinRange").addEventListener("input", () => aoMoverFaixa("min"));
         $("valorMaxRange").addEventListener("input", () => aoMoverFaixa("max"));
@@ -200,6 +205,8 @@
         $("recusarCadastroButton").addEventListener("click", abrirRecusarCadastro);
         $("confirmRecusarButton").addEventListener("click", confirmarRecusarCadastro);
         $("salvarNotaMinimaButton").addEventListener("click", salvarNotaMinima);
+        $("salvarPesosQualidade").addEventListener("click", () => salvarPesosQualidade(false));
+        $("padraoPesosQualidade").addEventListener("click", () => salvarPesosQualidade(true));
         $("finalidadeAluguelInput").addEventListener("change", atualizarCamposFinalidade);
         $("finalidadeVendaInput").addEventListener("change", atualizarCamposFinalidade);
         $("condominioTipoInput").addEventListener("change", atualizarCamposCusto);
@@ -271,6 +278,7 @@
         });
         $("newInviteAluguelButton").addEventListener("click", () => {
             $("inviteAluguelNameInput").value = "";
+            $("inviteAluguelTelInput").value = "";
             $("inviteAluguelPercentualInput").value = "";
             restrictRoleOptionsForCaller($("inviteAluguelRoleInput"));
             $("inviteAluguelResult").hidden = true;
@@ -279,6 +287,7 @@
         $("createInviteAluguelButton").addEventListener("click", createInviteAluguel);
         $("newDirectUserAluguelButton").addEventListener("click", () => {
             $("directAluguelNameInput").value = "";
+            $("directAluguelTelInput").value = "";
             $("directAluguelEmailInput").value = "";
             $("directAluguelPasswordInput").value = "";
             $("directAluguelPercentualInput").value = "";
@@ -409,8 +418,16 @@
         return partes.length ? partes.join(", ") : (c.endereco || "");
     }
 
-    // Nota de qualidade do cadastro: 10 itens de 10%, 20% por estrela. A mesma regra está no banco
-    // (função qualidade_imovel), que é quem vale na hora de enviar para aprovação.
+    // Nota de qualidade do cadastro: 10 itens, cada um com o peso que a imobiliária definir em Configurações
+    // (sem peso = 10 cada); 20% por estrela. A mesma regra está no banco (função qualidade_imovel), que é quem
+    // vale na hora de enviar para aprovação.
+    const ITENS_QUALIDADE = [
+        [ "tipo", "Tipo do imóvel" ], [ "bairro", "Bairro (localidade no rural)" ], [ "endereco", "Endereço completo (rua, número e cidade)" ],
+        [ "mapa", "Localização no mapa" ], [ "valor", "Valor (venda e/ou aluguel)" ], [ "custos", "Condomínio e IPTU (perímetro KML no rural)" ],
+        [ "descricao", "Descrição com 150 caracteres ou mais" ], [ "fotos_min", "Pelo menos 3 fotos" ], [ "fotos_mais", "8 fotos ou mais" ],
+        [ "caracteristicas", "Características (área, quartos, banheiros, vagas...)" ]
+    ];
+    const pesoItem = chave => { const v = pesosQualidade && pesosQualidade[chave]; return v == null ? 10 : Math.max(0, Number(v) || 0); };
     function qualidadeImovel(c, totalFotos) {
         const vazio = v => !String(v == null ? "" : v).trim();
         const fotos = totalFotos != null ? totalFotos : (c.fotos || []).length;
@@ -419,23 +436,27 @@
         // lote (sem construção): 1 foto já cumpre os dois itens de fotos
         const rural = !!c.rural, lote = !!c.lote;
         const itens = [
-            [ !vazio(c.tipo_imovel), "tipo do imóvel" ],
-            [ !vazio(c.bairro), rural ? "localidade / região" : "bairro" ],
+            [ !vazio(c.tipo_imovel), "tipo do imóvel", "tipo" ],
+            [ !vazio(c.bairro), rural ? "localidade / região" : "bairro", "bairro" ],
             rural
-                ? [ !vazio(c.logradouro) && !vazio(c.cidade), "acesso (estrada ou rodovia) e cidade" ]
-                : [ !vazio(c.logradouro) && !vazio(c.numero) && !vazio(c.cidade), "endereço completo (rua, número e cidade)" ],
-            [ c.latitude != null && c.longitude != null, "localização no mapa" ],
-            [ (c.para_aluguel === false || Number(c.valor_aluguel) > 0) && (!c.para_venda || Number(c.valor_venda) > 0), "valor" ],
+                ? [ !vazio(c.logradouro) && !vazio(c.cidade), "acesso (estrada ou rodovia) e cidade", "endereco" ]
+                : [ !vazio(c.logradouro) && !vazio(c.numero) && !vazio(c.cidade), "endereço completo (rua, número e cidade)", "endereco" ],
+            [ c.latitude != null && c.longitude != null, "localização no mapa", "mapa" ],
+            [ (c.para_aluguel === false || Number(c.valor_aluguel) > 0) && (!c.para_venda || Number(c.valor_venda) > 0), "valor", "valor" ],
             rural
-                ? [ !!c.perimetro, "perímetro da área (KML/KMZ)" ]
-                : [ custoOk(c.condominio_tipo, c.valor_condominio) && custoOk(c.iptu_tipo, c.valor_iptu), "condomínio e IPTU" ],
-            [ String(c.descricao || "").trim().length >= 150, "descrição com 150 caracteres ou mais" ],
-            [ fotos >= (lote ? 1 : 3), lote ? "pelo menos 1 foto" : "pelo menos 3 fotos" ],
-            [ fotos >= (lote ? 1 : 8), lote ? "pelo menos 1 foto" : "8 fotos ou mais" ],
-            [ caracteristicasCompletas(c), rotuloCaracteristicas(c.tipo_imovel, c) ]
+                ? [ !!c.perimetro, "perímetro da área (KML/KMZ)", "custos" ]
+                : [ custoOk(c.condominio_tipo, c.valor_condominio) && custoOk(c.iptu_tipo, c.valor_iptu), "condomínio e IPTU", "custos" ],
+            [ String(c.descricao || "").trim().length >= 150, "descrição com 150 caracteres ou mais", "descricao" ],
+            [ fotos >= (lote ? 1 : 3), lote ? "pelo menos 1 foto" : "pelo menos 3 fotos", "fotos_min" ],
+            [ fotos >= (lote ? 1 : 8), lote ? "pelo menos 1 foto" : "8 fotos ou mais", "fotos_mais" ],
+            [ caracteristicasCompletas(c), rotuloCaracteristicas(c.tipo_imovel, c), "caracteristicas" ]
         ];
-        const pct = itens.filter(([ ok ]) => ok).length * 10;
-        return { pct, estrelas: Math.floor(pct / 20), faltando: [ ...new Set(itens.filter(([ ok ]) => !ok).map(([ , rotulo ]) => rotulo)) ] };
+        const total = itens.reduce((s, it) => s + pesoItem(it[2]), 0);
+        const feito = itens.filter(([ ok ]) => ok).reduce((s, it) => s + pesoItem(it[2]), 0);
+        const pct = total > 0 ? Math.round(feito * 100 / total) : 100;
+        // o que falta, do item que mais pesa para o que menos pesa (item com peso 0 não aparece)
+        const faltando = itens.filter(([ ok, , k ]) => !ok && pesoItem(k) > 0).sort((a, b) => pesoItem(b[2]) - pesoItem(a[2])).map(([ , rotulo ]) => rotulo);
+        return { pct, estrelas: Math.floor(pct / 20), faltando: [ ...new Set(faltando) ] };
     }
     function showMessage(element, message, success = false) {
         element.textContent = message;
@@ -476,7 +497,95 @@
             $("recoverNewPasswordButton").disabled = false;
         }
     }
+    // Convite da equipe: o link enviado pelo WhatsApp tem ?convite=<código>; a pessoa cria o próprio acesso aqui.
+    let conviteToken = new URLSearchParams(location.search).get("convite") || "";
+    function mostrarConvite() {
+        $("appView").hidden = true;
+        $("carteiraPicker").hidden = true;
+        $("loginView").hidden = false;
+        [ "loginForm", "recoverForm", "recoverNewPasswordForm" ].forEach(id => { $(id).hidden = true; });
+        $("conviteForm").hidden = false;
+        $("conviteMessage").hidden = true;
+    }
+    async function ativarConvite(event) {
+        event.preventDefault();
+        const email = $("conviteEmailInput").value.trim(), senha = $("convitePasswordInput").value;
+        $("conviteSubmitButton").disabled = true;
+        try {
+            const data = await invokeConvitesAluguel({ action: "ativar_convite", token: conviteToken, email, password: senha, display_name: $("conviteNomeInput").value.trim() });
+            conviteToken = "";
+            history.replaceState(null, "", location.pathname);
+            if (data && data.reused_existing_account) {
+                $("conviteForm").hidden = true;
+                $("loginForm").hidden = false;
+                $("emailInput").value = email;
+                showMessage($("loginMessage"), "Esse e-mail já tinha acesso. O convite foi ligado à sua conta: entre com a senha que você já usa.", true);
+                return;
+            }
+            const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+            if (error) throw error;
+            lembrarEmail(email);
+            $("conviteForm").hidden = true;
+            $("loginForm").hidden = false;
+            await resolverCarteiraEEntrar();
+        } catch (error) {
+            showMessage($("conviteMessage"), traduzErro(error.message));
+        } finally {
+            $("conviteSubmitButton").disabled = false;
+        }
+    }
+    // Endereço do app que vai na mensagem do WhatsApp (o link do cliente; no programa do Windows, o link web)
+    function linkDoApp() {
+        if (MARCA.link) return MARCA.link;
+        return /^https?:/.test(location.protocol) ? location.origin + location.pathname : LINK_RECUPERAR_SENHA;
+    }
+    function nomeDaImobiliaria() { return MARCA.nome || carteiraNomeAtual || "imobiliária"; }
+    function celularDigitos(t) {
+        let d = String(t || "").replace(/\D/g, "");
+        if (d.length >= 12 && d.startsWith("55")) d = d.slice(2);
+        return d;
+    }
+    function formatarCelular(t) {
+        const d = celularDigitos(t);
+        if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+        if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+        return t || "";
+    }
+    // abre o WhatsApp (o app instalado no computador ou no celular) com a mensagem pronta
+    function abrirWhatsApp(telefone, texto) {
+        const d = celularDigitos(telefone);
+        const url = (d.length >= 10 ? `https://wa.me/55${d}` : "https://wa.me/") + "?text=" + encodeURIComponent(texto);
+        window.open(url, "_blank", "noopener");
+    }
+    function textoConvite(nome, token, expira) {
+        const sep = linkDoApp().includes("?") ? "&" : "?";
+        return `Olá${nome ? ", " + nome.split(" ")[0] : ""}! Você foi convidado(a) para a equipe da ${nomeDaImobiliaria()}.\n\n`
+            + `Para criar seu acesso, abra o link abaixo e cadastre seu e-mail e uma senha:\n${linkDoApp()}${sep}convite=${encodeURIComponent(token)}\n\n`
+            + (expira ? `O convite vale até ${formatDate(expira)}.` : "");
+    }
+    function textoAcesso(nome, email) {
+        return `Olá${nome ? ", " + nome.split(" ")[0] : ""}! Seu acesso ao sistema da ${nomeDaImobiliaria()} está pronto.\n\n`
+            + `Abra: ${linkDoApp()}\nEntre com o e-mail ${email}.\nA senha inicial a gente passa para você separadamente. Se esquecer, use "Esqueci minha senha" na tela de entrada.`;
+    }
+    async function salvarCelularEquipe(usuarioId, telefone) {
+        const { error } = await sb.rpc("equipe_definir_telefone", { p_carteira: carteiraId, p_usuario: usuarioId, p_telefone: telefone || null });
+        if (error) throw error;
+    }
+    async function editarCelular(usuarioId) {
+        const user = corretores.find(u => u.id === usuarioId);
+        if (!user) return;
+        const novo = window.prompt(`Celular / WhatsApp de ${user.display_name} (com DDD):`, formatarCelular(user.telefone));
+        if (novo === null) return;
+        try {
+            await salvarCelularEquipe(usuarioId, novo.trim());
+            await loadCorretores();
+            toast(novo.trim() ? "Celular salvo." : "Celular retirado.");
+        } catch (error) {
+            toast(traduzErro(error.message));
+        }
+    }
     function mostrarRecuperarSenha(mostrar) {
+        $("conviteForm").hidden = true;
         $("recoverNewPasswordForm").hidden = true;
         $("loginForm").hidden = mostrar;
         $("recoverForm").hidden = !mostrar;
@@ -581,6 +690,7 @@
 
     async function restoreSession() {
         if (modoRecuperacao) return mostrarNovaSenha();
+        if (conviteToken) return mostrarConvite();
         clearTimeout(tentativaTimer);
         tentativaTimer = null;
         let data = null;
@@ -866,9 +976,47 @@
 
     async function carregarConfigCarteira() {
         notaMinimaCadastro = null;
-        const { data } = await sb.from("carteiras_aluguel").select("nota_minima_cadastro").eq("id", carteiraId).maybeSingle();
+        const { data } = await sb.from("carteiras_aluguel").select("nota_minima_cadastro, pesos_qualidade").eq("id", carteiraId).maybeSingle();
         notaMinimaCadastro = data?.nota_minima_cadastro ?? null;
+        pesosQualidade = data?.pesos_qualidade || null;
         $("notaMinimaSelect").value = notaMinimaCadastro == null ? "" : String(notaMinimaCadastro);
+        desenharPesosQualidade();
+    }
+    // Configurações → "Peso de cada item da nota": a imobiliária decide o que é mais importante no cadastro
+    function desenharPesosQualidade() {
+        const box = $("pesosQualidadeLista");
+        if (!box) return;
+        box.innerHTML = ITENS_QUALIDADE.map(([ k, rotulo ]) => `<label class="peso-linha"><span>${h(rotulo)}</span>
+            <input type="number" min="0" max="100" step="1" data-peso="${k}" value="${pesoItem(k)}" /><small data-peso-pct="${k}"></small></label>`).join("");
+        box.querySelectorAll("[data-peso]").forEach(inp => inp.addEventListener("input", atualizarPesosPrevia));
+        atualizarPesosPrevia();
+    }
+    function lerPesosQualidade() {
+        const v = {};
+        $("pesosQualidadeLista").querySelectorAll("[data-peso]").forEach(inp => { v[inp.dataset.peso] = Math.max(0, Math.min(100, Number(inp.value) || 0)); });
+        return v;
+    }
+    function atualizarPesosPrevia() {
+        const v = lerPesosQualidade(), total = Object.values(v).reduce((s, x) => s + x, 0);
+        Object.entries(v).forEach(([ k, x ]) => { const el = $("pesosQualidadeLista").querySelector(`[data-peso-pct="${k}"]`); if (el) el.textContent = total ? Math.round(x * 100 / total) + "% da nota" : "—"; });
+        $("pesosQualidadeTotal").textContent = total ? `Soma dos pesos: ${total}. Cada item vale o peso dele dividido pela soma.` : "Dê peso a pelo menos um item.";
+    }
+    async function salvarPesosQualidade(padrao) {
+        const pesos = padrao ? null : lerPesosQualidade();
+        if (pesos && !Object.values(pesos).some(x => x > 0)) return toast("Dê peso a pelo menos um item.");
+        $("salvarPesosQualidade").disabled = true;
+        try {
+            const { error } = await sb.rpc("configurar_pesos_qualidade", { p_carteira_id: carteiraId, p_pesos: pesos });
+            if (error) throw error;
+            pesosQualidade = pesos;
+            desenharPesosQualidade();
+            renderConstrucoes();
+            toast(padrao ? "Pesos voltaram ao padrão (todos iguais)." : "Pesos da nota salvos. As estrelas dos imóveis já foram recalculadas.");
+        } catch (error) {
+            toast(traduzErro(error.message));
+        } finally {
+            $("salvarPesosQualidade").disabled = false;
+        }
     }
 
     async function salvarNotaMinima() {
@@ -1019,11 +1167,68 @@
         return nomes;
     }
 
+    // Lista de sugestões de bairro embaixo do campo: até 8, sem acento, pelo começo de qualquer palavra, com quantos imóveis tem.
+    function bairrosComContagem() {
+        const mapa = new Map();
+        [ ...construcoes.values() ].forEach(c => {
+            const b = String(c.bairro || "").trim();
+            if (!b) return;
+            const k = normalizar(b), r = mapa.get(k) || { nome: b, qtd: 0 };
+            r.qtd++; mapa.set(k, r);
+        });
+        return [ ...mapa.values() ];
+    }
+    function sugestoesBairro(texto) {
+        const t = normalizar(texto).trim();
+        const lista = bairrosComContagem();
+        if (!t) return lista.sort((a, b) => b.qtd - a.qtd).slice(0, 8);
+        const pontua = n => { const x = normalizar(n); return x.startsWith(t) ? 0 : x.split(/[\s-]+/).some(p => p.startsWith(t)) ? 1 : x.includes(t) ? 2 : 9; };
+        return lista.map(b => ({ ...b, p: pontua(b.nome) })).filter(b => b.p < 9)
+            .sort((a, b) => a.p - b.p || b.qtd - a.qtd || a.nome.localeCompare(b.nome, "pt-BR")).slice(0, 8);
+    }
+    function autocompletarBairro(input, aoEscolher, aoEnter) {
+        const caixa = document.createElement("div");
+        caixa.className = "bairro-sugestoes";
+        caixa.hidden = true;
+        caixa.setAttribute("role", "listbox");
+        input.parentNode.style.position = input.parentNode.style.position || "relative";
+        input.insertAdjacentElement("afterend", caixa);
+        let itens = [], ativo = -1;
+        const fechar = () => { caixa.hidden = true; ativo = -1; input.setAttribute("aria-expanded", "false"); };
+        const desenhar = () => {
+            itens = sugestoesBairro(input.value);
+            if (!itens.length) { caixa.innerHTML = input.value.trim() ? `<div class="bairro-sug-vazio">Nenhum imóvel nesse bairro</div>` : ""; caixa.hidden = !input.value.trim(); return; }
+            caixa.innerHTML = itens.map((b, i) => `<button type="button" role="option" class="${i === ativo ? "ativo" : ""}" data-i="${i}"><span>${h(b.nome)}</span><small>${b.qtd}</small></button>`).join("");
+            caixa.hidden = false;
+            caixa.style.top = (input.offsetTop + input.offsetHeight + 2) + "px";
+            caixa.style.left = input.offsetLeft + "px";
+            input.setAttribute("aria-expanded", "true");
+            caixa.querySelectorAll("[data-i]").forEach(b => b.addEventListener("mousedown", ev => { ev.preventDefault(); escolher(Number(b.dataset.i)); }));
+        };
+        const escolher = i => { const b = itens[i]; fechar(); if (b) aoEscolher(b.nome); };
+        input.addEventListener("input", () => { ativo = -1; desenhar(); });
+        input.addEventListener("focus", desenhar);
+        input.addEventListener("blur", () => setTimeout(fechar, 120));
+        input.addEventListener("keydown", ev => {
+            if (caixa.hidden && ev.key === "ArrowDown") { desenhar(); return; }
+            if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+                if (!itens.length) return;
+                ev.preventDefault();
+                ativo = (ativo + (ev.key === "ArrowDown" ? 1 : -1) + itens.length) % itens.length;
+                desenhar();
+            } else if (ev.key === "Enter" && !caixa.hidden && itens.length) {
+                ev.preventDefault();
+                escolher(ativo >= 0 ? ativo : 0);
+            } else if (ev.key === "Escape") { fechar(); }
+            else if (ev.key === "Enter" && aoEnter) { ev.preventDefault(); aoEnter(); }
+        });
+    }
     function adicionarBairroFiltro() {
         const input = $("bairroFiltroInput");
         const texto = input.value.trim();
         if (!texto) return;
-        const encontrado = atualizarListaBairros().find(n => normalizar(n) === normalizar(texto));
+        // aceita o nome completo ou a 1ª sugestão do que foi digitado ("vila aur" → Vila Aurora)
+        const encontrado = atualizarListaBairros().find(n => normalizar(n) === normalizar(texto)) || (sugestoesBairro(texto)[0] || {}).nome;
         if (!encontrado) { toast("Bairro não encontrado entre os imóveis cadastrados."); return; }
         if (bairrosFiltro.some(b => normalizar(b) === normalizar(encontrado))) { input.value = ""; return; }
         if (bairrosFiltro.length >= 3) { toast("Escolha no máximo 3 bairros."); return; }
@@ -2324,13 +2529,14 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, contratado_em, perfis(nome_exibicao, foto_path)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, contratado_em, perfis(nome_exibicao, foto_path, telefone)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
             id: v.usuario_id,
             display_name: v.perfis?.nome_exibicao || "—",
             foto_path: v.perfis?.foto_path || null,
+            telefone: v.perfis?.telefone || null,
             email: v.email,
             papel: v.papel,
             active: v.ativo,
@@ -2341,7 +2547,7 @@
             contratado_em: v.contratado_em || null
         }));
         const { data: conviteRows } = await sb.from("convites_aluguel")
-            .select("id, email, papel, percentual_comissao, token, expira_em")
+            .select("id, email, papel, percentual_comissao, token, expira_em, telefone")
             .eq("carteira_id", carteiraId).is("usado_em", null).gt("expira_em", (new Date).toISOString());
         invitesAluguel = conviteRows || [];
         renderCorretores();
@@ -2417,7 +2623,8 @@
         if (sit === "bloqueado" && user.active) return false;
         if (sit === "expirado" && !expirado) return false;
         const termo = normalizar($("equipeBusca").value);
-        return !termo || normalizar([ user.display_name, user.email ].join(" ")).includes(termo);
+        const d = termo.replace(/\D/g, "");
+        return !termo || normalizar([ user.display_name, user.email ].join(" ")).includes(termo) || (d.length >= 3 && celularDigitos(user.telefone).includes(d));
     }
     function renderCorretores() {
         const selPapel = $("equipePapelFiltro"), papelAtual = selPapel.value;
@@ -2431,19 +2638,28 @@
             const perfilHtml = window.SKLPerfis ? `<div class="perfil-linha">${window.SKLPerfis.chips(user.perfis_atuacao, "Sem perfil de atuação")}</div>` : "";
             const percentualTexto = window.SKLComissoes ? window.SKLComissoes.celulaRegra(user, canManageCorretor(user)) : (user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—");
             if (!canManageCorretor(user)) {
-                return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button> <button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button>` : "—"}</td></tr>`;
+                return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button> <button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button>` : "—"}</td></tr>`;
             }
             const toggleLabel = user.active ? "Desativar" : "Reativar";
-            return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
+            return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${user.telefone ? `<button class="row-button whats-button" data-user-whats="${h(user.id)}" title="Mandar o link do app pelo WhatsApp">WhatsApp</button>` : ""}<button class="row-button" data-user-cel="${h(user.id)}">Celular</button><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
         }).join("");
         if (window.SKLComissoes) window.SKLComissoes.ligarCelulas($("corretorTableBody"));
         $("corretorTableBody").querySelectorAll("[data-user-foto]").forEach(button => button.addEventListener("click", () => trocarFotoUsuario(button.dataset.userFoto)));
+        $("corretorTableBody").querySelectorAll("[data-user-cel]").forEach(button => button.addEventListener("click", () => editarCelular(button.dataset.userCel)));
+        $("corretorTableBody").querySelectorAll("[data-user-whats]").forEach(button => button.addEventListener("click", () => {
+            const user = corretores.find(u => u.id === button.dataset.userWhats);
+            if (user) abrirWhatsApp(user.telefone, textoAcesso(user.display_name, user.email || ""));
+        }));
         $("corretorTableBody").querySelectorAll("[data-user-perfil]").forEach(button => button.addEventListener("click", () => abrirPerfilAtuacao(button.dataset.userPerfil)));
         $("corretorTableBody").querySelectorAll("[data-corretor-percentual]").forEach(button => button.addEventListener("click", () => openEditPercentual(button.dataset.corretorPercentual)));
         $("corretorTableBody").querySelectorAll("[data-corretor-reset]").forEach(button => button.addEventListener("click", () => openResetPasswordAluguel(button.dataset.corretorReset)));
         $("corretorTableBody").querySelectorAll("[data-corretor-toggle]").forEach(button => button.addEventListener("click", () => toggleCorretorStatus(button.dataset.corretorToggle, button.dataset.nextActive === "1")));
         $("corretorTableBody").querySelectorAll("[data-corretor-remove]").forEach(button => button.addEventListener("click", () => openRemoveUserAluguel(button.dataset.corretorRemove, button.dataset.corretorName)));
-        $("inviteAluguelList").innerHTML = invitesAluguel.length ? invitesAluguel.map(invite => `<div class="invite-row"><span><strong>${h(invite.email)}</strong><br><small>${h(ROLE[invite.papel])}${invite.percentual_comissao != null ? " · " + h(invite.percentual_comissao) + "% comissão" : ""} · expira ${h(formatDate(invite.expira_em))}</small></span><code class="invite-code">${h(invite.token || "")}</code></div>`).join("") : '<div class="empty-state">Nenhum convite pendente.</div>';
+        $("inviteAluguelList").innerHTML = invitesAluguel.length ? invitesAluguel.map(invite => `<div class="invite-row"><span><strong>${h(invite.email || (invite.telefone ? formatarCelular(invite.telefone) : "Convite"))}</strong><br><small>${h(ROLE[invite.papel])}${invite.percentual_comissao != null ? " · " + h(invite.percentual_comissao) + "% comissão" : ""} · expira ${h(formatDate(invite.expira_em))}</small></span><code class="invite-code">${h(invite.token || "")}</code><button type="button" class="row-button whats-button" data-convite-whats="${h(invite.id)}">${invite.telefone ? "WhatsApp" : "Enviar"}</button></div>`).join("") : '<div class="empty-state">Nenhum convite pendente.</div>';
+        $("inviteAluguelList").querySelectorAll("[data-convite-whats]").forEach(button => button.addEventListener("click", () => {
+            const c = invitesAluguel.find(i => i.id === button.dataset.conviteWhats);
+            if (c) abrirWhatsApp(c.telefone, textoConvite("", c.token, c.expira_em));
+        }));
     }
 
     // Perfil de atuação (Econômico, Médio, Alto padrão, Rural, Aluguéis, Vendas): a Central define o de qualquer um; o corretor, o próprio.
@@ -2486,9 +2702,15 @@
                 papel: $("inviteAluguelRoleInput").value,
                 percentual_comissao: $("inviteAluguelPercentualInput").value || null
             });
+            const tel = $("inviteAluguelTelInput").value.trim();
+            const nome = $("inviteAluguelNameInput").value.trim();
+            let avisoTel = "";
+            if (tel) { const r = await sb.rpc("convite_aluguel_definir_telefone", { p_convite: data.convite.id, p_telefone: tel }); if (r.error) avisoTel = " (celular não salvo: " + traduzErro(r.error.message) + ")"; }
             await loadCorretores();
-            $("inviteAluguelResult").innerHTML = `Código: <strong>${h(data.convite.token)}</strong><br><small>Envie este código somente à pessoa autorizada.</small>`;
+            $("inviteAluguelResult").innerHTML = `Código: <strong>${h(data.convite.token)}</strong><br><small>Envie somente à pessoa autorizada. O link abre a tela "Criar meu acesso".${h(avisoTel)}</small>
+              <div style="margin-top:8px"><button type="button" id="inviteAluguelWhats" class="primary-button whats-button">Enviar convite pelo WhatsApp</button></div>`;
             $("inviteAluguelResult").hidden = false;
+            $("inviteAluguelWhats").addEventListener("click", () => abrirWhatsApp(tel, textoConvite(nome, data.convite.token, data.convite.expira_em)));
         } catch (error) {
             showMessage($("inviteAluguelResult"), traduzErro(error.message));
         }
@@ -2508,9 +2730,21 @@
                 percentual_comissao: $("directAluguelPercentualInput").value || null,
                 validade_horas: validadeRaw ? Number(validadeRaw) : null
             });
+            const tel = $("directAluguelTelInput").value.trim(), nome = $("directAluguelNameInput").value.trim(), email = $("directAluguelEmailInput").value.trim();
+            let avisoTel = "";
+            if (tel && data.usuario_id) { try { await salvarCelularEquipe(data.usuario_id, tel); } catch (e) { avisoTel = " Celular não salvo: " + traduzErro(e.message); } }
             await loadCorretores();
             const aviso = data.reused_existing_account ? " Esse e-mail já tinha um acesso — vinculamos o acesso a esta carteira usando a senha que a pessoa já usa." : "";
-            showMessage($("directUserAluguelMessage"), (data.expira_em ? `Acesso criado — expira em ${formatDate(data.expira_em)}.` : "Acesso criado sem prazo de validade.") + aviso, true);
+            showMessage($("directUserAluguelMessage"), (data.expira_em ? `Acesso criado — expira em ${formatDate(data.expira_em)}.` : "Acesso criado sem prazo de validade.") + aviso + avisoTel, true);
+            if (tel) {
+                const b = document.createElement("button");
+                b.type = "button"; b.className = "primary-button whats-button"; b.style.marginTop = "8px";
+                b.textContent = "Enviar acesso pelo WhatsApp (sem a senha)";
+                b.addEventListener("click", () => abrirWhatsApp(tel, textoAcesso(nome, email)));
+                $("directUserAluguelMessage").appendChild(document.createElement("br"));
+                $("directUserAluguelMessage").appendChild(b);
+            }
+            $("directAluguelTelInput").value = "";
             $("directAluguelNameInput").value = "";
             $("directAluguelCpfInput").value = "";
             $("directAluguelEmailInput").value = "";

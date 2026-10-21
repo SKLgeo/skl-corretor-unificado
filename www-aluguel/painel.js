@@ -1,6 +1,8 @@
 // Painel visual da imobiliária (botão "📊 Painel" no topo, só Central/admin/gestor/financeiro). Abre por cima do app,
 // em tela cheia, e mostra os números do período em cartões: VGV, negócios, comissões por mês, calendário de vencimentos,
-// margem, metas da equipe, venda × locação, VGC por corretor, próximos recebimentos e despesas por plano de contas.
+// margem, metas da equipe, venda × locação, VGC por corretor, pendências (com baixa e data programada ali mesmo),
+// despesas por plano de contas (barras ou pizza), funil de conversão com meta e segmento que mais fecha.
+// Cada quadro tem os próprios botões de período (semana, mês, trimestre, ano...); o seletor do topo muda todos.
 // Os números vêm das mesmas funções do Financeiro e das Metas (fin_indicadores_imobiliaria, metas_painel) e dos
 // negócios carregados pelo CRM. Gráficos em SVG desenhados aqui (sem biblioteca), com dica ao passar o mouse e tabela.
 (function () {
@@ -20,6 +22,11 @@
     }
     const MESES = [ "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez" ];
     let ctx = null, montado = false, periodo = "ano", filtro = "todos", ultimo = null, redesenhar = null;
+    let per = {};                  // período escolhido em cada quadro (sem escolha = o do topo)
+    let indCache = new Map();      // fin_indicadores_imobiliaria por período
+    let modoTabela = {}, modoDesp = "barras", abaPend = "receber", mesSeg = "";
+    const PERIODOS = [ [ "semana", "Semana" ], [ "mes", "Mês" ], [ "trimestre", "Trim." ], [ "ano", "Ano" ], [ "12m", "12 m" ], [ "tudo", "Tudo" ] ];
+    const PERIODOS_SEG = [ [ "12m", "12 meses" ], [ "24m", "24 meses" ], [ "tudo", "Tudo" ], [ "mesames", "Mês a mês" ] ];
 
     const pode = () => !!ctx && ctx.veTudo();
     const dinheiro = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -85,7 +92,7 @@
                 <div class="pg-titulo"><img id="pgLogo" class="pg-logo" alt="" hidden /><div><span class="pg-sobre">PAINEL DA IMOBILIÁRIA</span><h1 id="pgTitulo">Visão geral</h1></div></div>
                 <div class="pg-topo-acoes">
                   <select id="pgPeriodo" aria-label="Período">
-                    <option value="mes">Este mês</option><option value="trimestre">Este trimestre</option>
+                    <option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="trimestre">Este trimestre</option>
                     <option value="ano" selected>Este ano</option><option value="12m">Últimos 12 meses</option><option value="tudo">Todo o período</option>
                   </select>
                   <button type="button" class="pg-fechar" data-pg-fechar aria-label="Fechar">×</button>
@@ -102,7 +109,7 @@
             p.querySelectorAll("[data-pg-filtro]").forEach(x => x.classList.toggle("ativo", x === b));
             if (ultimo) desenhar(ultimo);
         }));
-        $("pgPeriodo").addEventListener("change", () => { periodo = $("pgPeriodo").value; carregar(); });
+        $("pgPeriodo").addEventListener("change", () => { periodo = $("pgPeriodo").value; per = {}; carregar(); });
         document.addEventListener("keydown", e => { if (e.key === "Escape" && !p.hidden) fechar(); });
         let t = null;
         window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (!p.hidden && redesenhar) redesenhar(); }, 150); });
@@ -129,31 +136,47 @@
     }
 
     // ------------------------------------------------------------------ dados
-    function intervalo() {
+    const pad = n => String(n).padStart(2, "0");
+    const fimMes = (ano, mes) => `${ano}-${pad(mes)}-${pad(new Date(ano, mes, 0).getDate())}`;
+    function intervaloDe(p) {
         const hoje = hojeIso(), [ a, m ] = hoje.split("-").map(Number);
-        const fimMes = (ano, mes) => `${ano}-${String(mes).padStart(2, "0")}-${String(new Date(ano, mes, 0).getDate()).padStart(2, "0")}`;
-        if (periodo === "mes") return [ `${a}-${String(m).padStart(2, "0")}-01`, fimMes(a, m) ];
-        if (periodo === "trimestre") { const t = Math.floor((m - 1) / 3); return [ `${a}-${String(t * 3 + 1).padStart(2, "0")}-01`, fimMes(a, t * 3 + 3) ]; }
-        if (periodo === "ano") return [ `${a}-01-01`, `${a}-12-31` ];
-        if (periodo === "12m") { const d = new Date(a, m - 12, 1); return [ `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`, fimMes(a, m) ]; }
+        if (p === "semana") { // segunda a domingo
+            const d = new Date(hoje + "T12:00:00"), dow = (d.getDay() + 6) % 7;
+            const seg = new Date(d.getTime() - dow * 86400000), dom = new Date(seg.getTime() + 6 * 86400000);
+            return [ isoLocal(seg), isoLocal(dom) ];
+        }
+        if (p === "mes") return [ `${a}-${pad(m)}-01`, fimMes(a, m) ];
+        if (p === "trimestre") { const t = Math.floor((m - 1) / 3); return [ `${a}-${pad(t * 3 + 1)}-01`, fimMes(a, t * 3 + 3) ]; }
+        if (p === "ano") return [ `${a}-01-01`, `${a}-12-31` ];
+        if (p === "12m" || p === "24m") { const n = p === "12m" ? 12 : 24, d = new Date(a, m - n, 1); return [ `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`, fimMes(a, m) ]; }
+        if (/^\d{4}-\d{2}$/.test(p)) { const [ aa, mm ] = p.split("-").map(Number); return [ `${p}-01`, fimMes(aa, mm) ]; }
         return [ "2000-01-01", "2100-12-31" ];
+    }
+    const perDe = id => per[id] || periodo;
+    const rotuloPer = p => ({ semana: "esta semana", mes: "este mês", trimestre: "este trimestre", ano: "este ano", "12m": "últimos 12 meses", "24m": "últimos 24 meses", tudo: "todo o período" })[p]
+        || (/^\d{4}-\d{2}$/.test(p) ? new Date(p + "-15T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "");
+    async function indicadores(p) {
+        const [ ini, fim ] = intervaloDe(p), k = ini + "|" + fim;
+        if (!indCache.has(k)) {
+            indCache.set(k, ctx.sb.rpc("fin_indicadores_imobiliaria", { p_carteira: ctx.carteiraId(), p_ini: ini, p_fim: fim })
+                .then(r => { if (r.error) { indCache.delete(k); throw r.error; } return r.data || {}; }));
+        }
+        return indCache.get(k);
     }
     async function carregar() {
         const grade = $("pgGrade");
         grade.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
-        const [ ini, fim ] = intervalo();
+        indCache = new Map();
         const hoje = new Date();
         const tri = Math.floor(hoje.getMonth() / 3) + 1;
-        const [ ind, met ] = await Promise.all([
-            ctx.sb.rpc("fin_indicadores_imobiliaria", { p_carteira: ctx.carteiraId(), p_ini: ini, p_fim: fim }),
-            ctx.sb.rpc("metas_painel", { p_carteira: ctx.carteiraId(), p_ano: hoje.getFullYear(), p_trimestre: tri })
-        ]);
-        if (ind.error) { grade.innerHTML = `<p class="pg-carregando">${h(ctx.traduzErro(ind.error.message))}</p>`; return; }
+        let ind;
+        try { ind = await indicadores(periodo); } catch (e) { grade.innerHTML = `<p class="pg-carregando">${h(ctx.traduzErro(e.message))}</p>`; return; }
+        const met = await ctx.sb.rpc("metas_painel", { p_carteira: ctx.carteiraId(), p_ano: hoje.getFullYear(), p_trimestre: tri });
         if (window.SKLFinGestao && window.SKLFinGestao.carregar) await window.SKLFinGestao.carregar();
-        ultimo = { ini, fim, ind: ind.data || {}, metas: met.data || null, tri };
+        ultimo = { ind, metas: met.data || null, tri };
         desenhar(ultimo);
     }
-    // negócios ganhos (do CRM) com finalidade e comissão total (a da divisão ou a estimada, igual ao banco)
+    // negócios ganhos (do CRM) com finalidade, comissão total (a da divisão ou a estimada, igual ao banco) e imóvel
     function negocios() {
         const I = window.SKLCRM && window.SKLCRM.interno;
         if (!I) return [];
@@ -162,7 +185,7 @@
         return [ ...I.negs.values() ].filter(n => n.situacao === "ganha" && n.fechado_em).map(n => {
             const f = I.funil(n.funil_id), fin = f && f.finalidade;
             const vgc = n.comissao_total != null ? Number(n.comissao_total) : fin === "venda" ? Number(n.valor || 0) * hon / 100 : Number(n.valor || 0);
-            return { id: n.id, fin, dia: isoLocal(n.fechado_em), valor: Number(n.valor || 0), vgc };
+            return { id: n.id, fin, dia: isoLocal(n.fechado_em), valor: Number(n.valor || 0), vgc, neg: n };
         }).filter(n => n.fin === "venda" || n.fin === "locacao");
     }
     function mesesDoPeriodo(ini, fim, lista) {
@@ -173,62 +196,151 @@
         }
         const [ af, mf ] = (fim > hojeIso() ? hojeIso() : fim).split("-").map(Number);
         const out = [];
-        while ((a < af || (a === af && m <= mf)) && out.length < 60) { out.push(`${a}-${String(m).padStart(2, "0")}`); m++; if (m > 12) { m = 1; a++; } }
+        while ((a < af || (a === af && m <= mf)) && out.length < 60) { out.push(`${a}-${pad(m)}`); m++; if (m > 12) { m = 1; a++; } }
         return out.length ? out : [ hojeIso().slice(0, 7) ];
+    }
+    // eixo do tempo: dias na semana e no mês, meses nos períodos maiores
+    function eixo(p, ini, fim, lista) {
+        if (p === "semana" || p === "mes" || /^\d{4}-\d{2}$/.test(p)) {
+            const dias = [];
+            for (let t = new Date(ini + "T12:00:00"); isoLocal(t) <= fim && dias.length < 31; t = new Date(t.getTime() + 86400000)) dias.push(isoLocal(t));
+            const sem = [ "dom", "seg", "ter", "qua", "qui", "sex", "sáb" ];
+            return { chaves: dias, rotulo: k => p === "semana" ? sem[new Date(k + "T12:00:00").getDay()] : String(Number(k.slice(8))), de: dia => dia };
+        }
+        const meses = mesesDoPeriodo(ini, fim, lista);
+        return { chaves: meses, rotulo: mm => { const [ a, m ] = mm.split("-").map(Number); return MESES[m - 1] + (meses.length > 12 || a !== new Date().getFullYear() ? "/" + String(a).slice(2) : ""); }, de: dia => dia.slice(0, 7) };
     }
 
     // ------------------------------------------------------------------ desenho
-    function cartao(id, classe, titulo, extra) {
-        return `<section class="pg-cartao ${classe || ""}" id="${id}"><header><h2>${h(titulo)}</h2>${extra || ""}</header><div class="pg-corpo"></div></section>`;
+    function chips(id, opcoes, atual) {
+        return `<div class="pg-per" role="group" aria-label="Período deste quadro">${opcoes.map(([ v, r ]) =>
+            `<button type="button" data-per-card="${id}" data-per="${v}" aria-pressed="${v === atual}">${h(r)}</button>`).join("")}</div>`;
     }
-    function botaoTabela(id) { return `<button type="button" class="pg-tab" data-tabela="${id}" aria-pressed="false">≡ tabela</button>`; }
+    function cartao(id, classe, titulo, extra, comPeriodo) {
+        return `<section class="pg-cartao ${classe || ""}" id="${id}"><header><h2>${h(titulo)}</h2>${extra || ""}</header>${comPeriodo ? chips(id, PERIODOS, perDe(id)) : ""}<div class="pg-corpo"></div></section>`;
+    }
+    function botaoTabela(id) { return `<button type="button" class="pg-tab" data-tabela="${id}" aria-pressed="${modoTabela[id] ? "true" : "false"}">${modoTabela[id] ? "◔ gráfico" : "≡ tabela"}</button>`; }
+    const corpo = id => $(id) && $(id).querySelector(".pg-corpo");
+    let desenhos = {}, tabelas = {};
+    function mostrarTabela(id) {
+        const c = corpo(id), t = tabelas[id];
+        if (!c || !t) return;
+        c.innerHTML = `<div class="pg-tabela"><table><thead><tr>${t[0].map(x => `<th>${h(x)}</th>`).join("")}</tr></thead><tbody>${t.slice(1).map(l => `<tr>${l.map(x => `<td>${h(x)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
+    function desenharCartao(id) {
+        if (!desenhos[id]) return;
+        desenhos[id]();
+        if (modoTabela[id]) mostrarTabela(id);
+    }
     function desenhar(d) {
-        const r = d.ind;
-        const todos = negocios().filter(n => n.dia >= d.ini && n.dia <= d.fim);
-        const lista = filtro === "todos" ? todos : todos.filter(n => n.fin === filtro);
-        const meses = mesesDoPeriodo(d.ini, d.fim, todos);
-        const rotuloMes = mm => { const [ a, m ] = mm.split("-").map(Number); return MESES[m - 1] + (meses.length > 12 || a !== new Date().getFullYear() ? "/" + String(a).slice(2) : ""); };
-        const porMes = (arr, f) => meses.map(mm => arr.filter(n => n.dia.startsWith(mm)).reduce((s, n) => s + f(n), 0));
-        const vgv = lista.reduce((s, n) => s + n.valor, 0), vgc = lista.reduce((s, n) => s + n.vgc, 0);
-        const dadosFin = window.SKLFinGestao && window.SKLFinGestao.dados ? window.SKLFinGestao.dados() : { recebiveis: [], lancamentos: [], plano: [] };
         const grade = $("pgGrade");
+        const segP = per.pgSeg || "12m";
         grade.innerHTML = [
-            cartao("pgVgv", "pg-c-kpi", filtro === "todos" ? "VGV no período" : filtro === "venda" ? "VGV de vendas" : "VGV de locações"),
-            cartao("pgQtd", "pg-c-kpi", "Negócios fechados"),
-            cartao("pgVgcMes", "pg-c-largo", "Comissões (VGC) por mês", botaoTabela("pgVgcMes")),
+            cartao("pgVgv", "pg-c-kpi", filtro === "todos" ? "VGV" : filtro === "venda" ? "VGV de vendas" : "VGV de locações", "", true),
+            cartao("pgQtd", "pg-c-kpi", "Negócios fechados", "", true),
+            cartao("pgVgcMes", "pg-c-largo", "Comissões (VGC) no tempo", botaoTabela("pgVgcMes"), true),
             cartao("pgCal", "pg-c-cal", "Vencimentos do mês"),
-            cartao("pgAneis", "pg-c-aneis", "Indicadores"),
+            cartao("pgAneis", "pg-c-aneis", "Indicadores", "", true),
+            cartao("pgPend", "pg-c-largo", "Pendências e recebimentos", `<div class="pg-abas" role="tablist">
+                <button type="button" data-pend="receber" aria-pressed="${abaPend === "receber"}">A receber</button>
+                <button type="button" data-pend="pagar" aria-pressed="${abaPend === "pagar"}">A pagar</button></div>`),
             cartao("pgMeta", "pg-c-meta", `Metas — ${d.tri}º trimestre`),
-            cartao("pgProx", "pg-c-largo", "Próximos recebimentos"),
-            cartao("pgVxl", "pg-c-largo", "Negócios por mês: venda × locação", botaoTabela("pgVxl")),
             cartao("pgCorr", "pg-c-largo", `VGC por corretor — ${d.tri}º trimestre`, botaoTabela("pgCorr")),
-            cartao("pgDesp", "pg-c-largo", "Despesas pagas por plano de contas")
+            cartao("pgVxl", "pg-c-largo", "Negócios no tempo: venda × locação", botaoTabela("pgVxl"), true),
+            cartao("pgFunil", "pg-c-largo", "Funil de conversão", `<button type="button" class="pg-tab" data-pg-ir="settings" title="Metas de conversão por etapa">⚙ metas</button>`, true),
+            cartao("pgDesp", "pg-c-largo", "Despesas pagas por plano de contas", `<div class="pg-abas" role="group">
+                <button type="button" data-desp="barras" aria-pressed="${modoDesp === "barras"}">▬ barras</button>
+                <button type="button" data-desp="pizza" aria-pressed="${modoDesp === "pizza"}">◔ pizza</button></div>`, true),
+            `<section class="pg-cartao pg-c-seg" id="pgSeg"><header><h2>Segmento que mais fecha</h2><small class="pg-sub">tipo de imóvel e faixa de preço</small></header>
+              ${chips("pgSeg", PERIODOS_SEG, segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "mesames" : segP)}
+              <input id="pgSegMes" type="month" class="pg-mes" ${segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "" : "hidden"} value="${h(mesSeg || hojeIso().slice(0, 7))}" aria-label="Mês" />
+              <div class="pg-corpo"></div></section>`
         ].join("");
-        const corpo = id => $(id).querySelector(".pg-corpo");
+        const fazer = {
+            pgVgv: () => kpiVgv(), pgQtd: () => kpiQtd(), pgVgcMes: () => vgcTempo(), pgCal: () => calendario(corpo("pgCal"), dadosFin()),
+            pgAneis: () => aneis(), pgMeta: () => metas(d), pgPend: () => pendencias(corpo("pgPend")), pgVxl: () => vxl(),
+            pgCorr: () => corretores(d), pgFunil: () => funilConversao(), pgDesp: () => despesasCartao(), pgSeg: () => segmento()
+        };
+        desenhos = fazer; tabelas = {};
+        Object.keys(fazer).forEach(desenharCartao);
+        redesenhar = () => [ "pgVgv", "pgVgcMes", "pgVxl", "pgCorr" ].forEach(desenharCartao);
 
-        // 1. VGV com linha de tendência mensal
-        const serieVgv = porMes(lista, n => n.valor);
-        corpo("pgVgv").innerHTML = `<strong class="pg-heroi">${h(curto(vgv))}</strong><small>${h(dinheiro(vgv))}</small><div class="pg-faisca"></div>`;
-        faisca(corpo("pgVgv").querySelector(".pg-faisca"), meses.map(rotuloMes), serieVgv, COR.s3);
-        // 2. contagem venda | locação
+        grade.querySelectorAll("[data-per-card]").forEach(b => b.addEventListener("click", () => {
+            const id = b.dataset.perCard, v = b.dataset.per;
+            if (id === "pgSeg" && v === "mesames") { mesSeg = mesSeg || hojeIso().slice(0, 7); per.pgSeg = mesSeg; $("pgSegMes").hidden = false; }
+            else { per[id] = v; if (id === "pgSeg") $("pgSegMes").hidden = true; }
+            $(id).querySelectorAll("[data-per-card]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+            desenharCartao(id);
+        }));
+        $("pgSegMes").addEventListener("change", () => { mesSeg = $("pgSegMes").value; if (mesSeg) { per.pgSeg = mesSeg; desenharCartao("pgSeg"); } });
+        grade.querySelectorAll("[data-tabela]").forEach(b => b.addEventListener("click", () => {
+            const id = b.dataset.tabela;
+            modoTabela[id] = !modoTabela[id];
+            b.setAttribute("aria-pressed", modoTabela[id] ? "true" : "false");
+            b.textContent = modoTabela[id] ? "◔ gráfico" : "≡ tabela";
+            desenharCartao(id);
+        }));
+        grade.querySelectorAll("[data-pend]").forEach(b => b.addEventListener("click", () => {
+            abaPend = b.dataset.pend;
+            grade.querySelectorAll("[data-pend]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+            desenharCartao("pgPend");
+        }));
+        grade.querySelectorAll("[data-desp]").forEach(b => b.addEventListener("click", () => {
+            modoDesp = b.dataset.desp;
+            grade.querySelectorAll("[data-desp]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+            desenharCartao("pgDesp");
+        }));
+        grade.querySelectorAll("[data-pg-ir]").forEach(b => b.addEventListener("click", () => { fechar(); if (ctx.showPage) ctx.showPage(b.dataset.pgIr); }));
+    }
+    const dadosFin = () => window.SKLFinGestao && window.SKLFinGestao.dados ? window.SKLFinGestao.dados() : { recebiveis: [], lancamentos: [], plano: [] };
+    function doCartao(id) {
+        const p = perDe(id), [ ini, fim ] = intervaloDe(p);
+        const todos = negocios().filter(n => n.dia >= ini && n.dia <= fim);
+        return { p, ini, fim, todos, lista: filtro === "todos" ? todos : todos.filter(n => n.fin === filtro) };
+    }
+    function porTempo(ex, arr, f) { return ex.chaves.map(k => arr.filter(n => ex.de(n.dia) === k).reduce((s, n) => s + f(n), 0)); }
+
+    // 1. VGV com linha de tendência
+    function kpiVgv() {
+        const { p, ini, fim, todos, lista } = doCartao("pgVgv");
+        const ex = eixo(p, ini, fim, todos), serie = porTempo(ex, lista, n => n.valor), vgv = lista.reduce((s, n) => s + n.valor, 0);
+        corpo("pgVgv").innerHTML = `<strong class="pg-heroi">${h(curto(vgv))}</strong><small>${h(dinheiro(vgv))} · ${h(rotuloPer(p))}</small><div class="pg-faisca"></div>`;
+        faisca(corpo("pgVgv").querySelector(".pg-faisca"), ex.chaves.map(ex.rotulo), serie, COR.s3);
+    }
+    // 2. contagem venda | locação
+    async function kpiQtd() {
+        const { p, todos, lista } = doCartao("pgQtd");
         const nv = todos.filter(n => n.fin === "venda").length, nl = todos.filter(n => n.fin === "locacao").length;
+        const vgc = lista.reduce((s, n) => s + n.vgc, 0);
         corpo("pgQtd").innerHTML = `<div class="pg-duplo"><div><strong>${nv}</strong><span>vendas</span><i style="background:${COR.s1}"></i></div>
             <div><strong>${nl}</strong><span>locações</span><i style="background:${COR.s2}"></i></div></div>
-            <p class="pg-nota">${h(r.com_parceiros || 0)} com parceiro de fora · VGC ${h(curto(vgc))}</p>`;
-        // 3. VGC por mês
-        const serieVgc = porMes(lista, n => n.vgc);
-        const desenhaVgc = () => linhas(corpo("pgVgcMes"), meses.map(rotuloMes), [ { nome: "VGC", cor: COR.s1, valores: serieVgc } ], curto);
-        // 4. calendário
-        calendario(corpo("pgCal"), dadosFin);
-        // 5. anéis
+            <p class="pg-nota">VGC ${h(curto(vgc))} · ${h(rotuloPer(p))}<span class="pg-parc"></span></p>`;
+        try { const r = await indicadores(p); const sp = corpo("pgQtd").querySelector(".pg-parc"); if (sp) sp.textContent = ` · ${r.com_parceiros || 0} com parceiro de fora`; } catch (e) { /* só o detalhe */ }
+    }
+    // 3. VGC no tempo
+    function vgcTempo() {
+        const { p, ini, fim, todos, lista } = doCartao("pgVgcMes");
+        const ex = eixo(p, ini, fim, todos), serie = porTempo(ex, lista, n => n.vgc);
+        tabelas.pgVgcMes = [ [ ex.chaves[0] && ex.chaves[0].length > 7 ? "Dia" : "Mês", "VGC" ], ...ex.chaves.map((k, i) => [ ex.rotulo(k), dinheiro(serie[i]) ]) ];
+        linhas(corpo("pgVgcMes"), ex.chaves.map(ex.rotulo), [ { nome: "VGC", cor: COR.s1, valores: serie } ], curto);
+    }
+    // 5. anéis (margem e a receber) — do banco, no período do quadro
+    async function aneis() {
+        const p = perDe("pgAneis"), c = corpo("pgAneis");
+        c.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
+        let r;
+        try { r = await indicadores(p); } catch (e) { c.innerHTML = `<p class="pg-vazio">${h(ctx.traduzErro(e.message))}</p>`; return; }
+        if (perDe("pgAneis") !== p) return;
         const margem = Number(r.vgc) > 0 ? Number(r.vlc) / Number(r.vgc) * 100 : 0;
         const totRec = Number(r.receber_aberto || 0) + Number(r.recebido_sem_data || 0) + Number(r.recebido_periodo || 0);
         const pRec = totRec > 0 ? (Number(r.recebido_sem_data || 0) + Number(r.recebido_periodo || 0)) / totRec * 100 : 0;
-        corpo("pgAneis").innerHTML = `<div class="pg-aneis">
+        c.innerHTML = `<div class="pg-aneis">
             ${anel(margem, COR.s2, curto(r.vlc), "Fica para a imobiliária", `${pct(margem)} do VGC (VLC)`)}
             ${anel(pRec, COR.s3, curto(Number(r.receber_aberto || 0)), "Comissões a receber", `${pct(pRec)} já recebido`)}
-          </div>`;
-        // 6. metas
+          </div><p class="pg-nota">${h(rotuloPer(p))}</p>`;
+    }
+    // 6. metas do trimestre
+    function metas(d) {
         const ps = (d.metas && d.metas.pessoas) || [];
         const comMeta = ps.filter(p => p.meta_prop != null);
         const bateram = comMeta.filter(p => Number(p.vgc) > Number(p.meta_prop)).length;
@@ -237,35 +349,114 @@
               <p><strong>${bateram} de ${comMeta.length}</strong> corretores já bateram a meta${d.metas.meta != null ? ` de ${h(curto(d.metas.meta))}` : ""}.</p>
               <button type="button" class="pg-botao" data-pg-ir="comissoes">Ver metas</button></div>`
             : `<p class="pg-vazio">Sem meta definida para este trimestre.</p><button type="button" class="pg-botao" data-pg-ir="comissoes">Definir metas</button>`;
-        // 7. venda × locação (contagem por mês, mesma escala)
-        const desenhaVxl = () => linhas(corpo("pgVxl"), meses.map(rotuloMes), [
-            { nome: "Vendas", cor: COR.s1, valores: porMes(todos.filter(n => n.fin === "venda"), () => 1) },
-            { nome: "Locações", cor: COR.s2, valores: porMes(todos.filter(n => n.fin === "locacao"), () => 1) }
-        ], v => String(Math.round(v)), true);
-        // 8. VGC por corretor (trimestre atual) com a meta como referência
+        corpo("pgMeta").querySelectorAll("[data-pg-ir]").forEach(b => b.addEventListener("click", () => { fechar(); if (ctx.showPage) ctx.showPage(b.dataset.pgIr); }));
+    }
+    // 7. venda × locação (contagem, mesma escala)
+    function vxl() {
+        const { p, ini, fim, todos } = doCartao("pgVxl");
+        const ex = eixo(p, ini, fim, todos);
+        const v = porTempo(ex, todos.filter(n => n.fin === "venda"), () => 1), l = porTempo(ex, todos.filter(n => n.fin === "locacao"), () => 1);
+        tabelas.pgVxl = [ [ "Período", "Vendas", "Locações" ], ...ex.chaves.map((k, i) => [ ex.rotulo(k), v[i], l[i] ]) ];
+        linhas(corpo("pgVxl"), ex.chaves.map(ex.rotulo), [ { nome: "Vendas", cor: COR.s1, valores: v }, { nome: "Locações", cor: COR.s2, valores: l } ], x => String(Math.round(x)), true);
+    }
+    // 8. VGC por corretor (trimestre atual) com a meta como referência
+    function corretores(d) {
+        const ps = (d.metas && d.metas.pessoas) || [];
         const top = ps.filter(p => Number(p.vgc) > 0).sort((a, b) => Number(b.vgc) - Number(a.vgc)).slice(0, 10);
-        const desenhaCorr = () => barras(corpo("pgCorr"), top.map(p => p.nome.split(" ").slice(0, 2).join(" ")), top.map(p => Number(p.vgc)), COR.s3, d.metas && d.metas.meta != null ? Number(d.metas.meta) : null, curto, top.map(p => p.nome));
-        // 9. próximos recebimentos
-        proximos(corpo("pgProx"), dadosFin.recebiveis);
-        // 10. despesas por plano de contas (parte do todo)
-        despesas(corpo("pgDesp"), (r.por_plano || []).filter(p => p.natureza === "despesa"));
-
-        redesenhar = () => { desenhaVgc(); desenhaVxl(); desenhaCorr(); faisca(corpo("pgVgv").querySelector(".pg-faisca"), meses.map(rotuloMes), serieVgv, COR.s3); };
-        redesenhar();
-        // tabelas (alternativa acessível aos gráficos)
-        const tabelas = {
-            pgVgcMes: [ [ "Mês", "VGC" ], ...meses.map((mm, i) => [ rotuloMes(mm), dinheiro(serieVgc[i]) ]) ],
-            pgVxl: [ [ "Mês", "Vendas", "Locações" ], ...meses.map(mm => [ rotuloMes(mm), todos.filter(n => n.fin === "venda" && n.dia.startsWith(mm)).length, todos.filter(n => n.fin === "locacao" && n.dia.startsWith(mm)).length ]) ],
-            pgCorr: [ [ "Corretor", "VGC no trimestre", "Meta" ], ...top.map(p => [ p.nome, dinheiro(p.vgc), p.meta_prop != null ? dinheiro(p.meta_prop) : "—" ]) ]
+        tabelas.pgCorr = [ [ "Corretor", "VGC no trimestre", "Meta" ], ...top.map(p => [ p.nome, dinheiro(p.vgc), p.meta_prop != null ? dinheiro(p.meta_prop) : "—" ]) ];
+        barras(corpo("pgCorr"), top.map(p => p.nome.split(" ").slice(0, 2).join(" ")), top.map(p => Number(p.vgc)), COR.s3, d.metas && d.metas.meta != null ? Number(d.metas.meta) : null, curto, top.map(p => p.nome));
+    }
+    // 9. pendências: vencidas e próximos 30 dias, com baixa e data programada ali mesmo
+    function pendencias(box) {
+        const f = dadosFin(), hoje = hojeIso(), ate = isoLocal(Date.now() + 30 * 86400000);
+        const gere = ctx.podeGerir && ctx.podeGerir();
+        const FG = window.SKLFinGestao;
+        const quando = x => x.programado_para || x.vencimento;
+        const rec = abaPend === "receber";
+        const itens = rec
+            ? (f.recebiveis || []).filter(r => !r.recebido_em && !r.recebido_sem_data && r.vencimento && quando(r) <= ate)
+            : (f.lancamentos || []).filter(l => l.natureza === "despesa" && !l.pago_em && !l.pago_sem_data && l.vencimento && quando(l) <= ate);
+        itens.sort((a, b) => quando(a).localeCompare(quando(b)));
+        const vencidas = itens.filter(x => quando(x) < hoje);
+        const nome = x => rec ? (FG && FG.nomeNegocio ? FG.nomeNegocio(x.negociacao_id) : "Negócio") + ` · ${x.parcela}ª parcela` : x.descricao;
+        const total = arr => arr.reduce((s, x) => s + Number(x.valor || 0), 0);
+        box.innerHTML = (vencidas.length ? `<p class="pg-alerta">⚠ ${vencidas.length} ${rec ? "parcela(s) vencida(s) sem baixa" : "conta(s) vencida(s) sem pagamento"}: ${h(dinheiro(total(vencidas)))}</p>` : "")
+            + (itens.length ? `<ul class="pg-pend">${itens.slice(0, 12).map(x => `<li class="${quando(x) < hoje ? "vencida" : ""}">
+                <span class="pg-lt-data">${h(dataBr(quando(x)))}</span>
+                <span class="pg-lt-txt"><b>${h(x.valor == null ? "sem valor" : dinheiro(x.valor))}</b><small>${h(nome(x))}${x.programado_para ? ` · programado (vence ${h(dataBr(x.vencimento))})` : ""}</small></span>
+                ${gere ? `<span class="pg-pend-acoes"><button type="button" class="pg-mini ok" data-baixa="${h(x.id)}" title="${rec ? "Recebido" : "Pago"}">✓ ${rec ? "Recebido" : "Pago"}</button>
+                  <button type="button" class="pg-mini" data-prog="${h(x.id)}" title="Programar data">📅</button></span>` : ""}
+              </li>`).join("")}</ul>${itens.length > 12 ? `<p class="pg-nota">+ ${itens.length - 12} no Financeiro.</p>` : ""}`
+              : `<p class="pg-vazio">Nada ${rec ? "a receber" : "a pagar"} nos próximos 30 dias.</p>`);
+        const tipo = rec ? "recebivel" : "lancamento";
+        const achar = id => itens.find(x => x.id === id);
+        const depois = async () => { indCache = new Map(); if (FG && FG.carregar) await FG.carregar(); [ "pgPend", "pgCal", "pgAneis" ].forEach(desenharCartao); };
+        box.querySelectorAll("[data-baixa]").forEach(b => b.addEventListener("click", () => FG.abrirBaixa(tipo, achar(b.dataset.baixa), depois)));
+        box.querySelectorAll("[data-prog]").forEach(b => b.addEventListener("click", () => FG.abrirProgramar(tipo, achar(b.dataset.prog), depois)));
+    }
+    // 10. funil de conversão (meta de cada etapa editável em Configurações)
+    async function funilConversao() {
+        const p = perDe("pgFunil"), [ ini, fim ] = intervaloDe(p), box = corpo("pgFunil");
+        box.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
+        const { data, error } = await ctx.sb.rpc("crm_funil_conversao", { p_carteira: ctx.carteiraId(), p_de: ini === "2000-01-01" ? null : ini, p_ate: fim });
+        if (perDe("pgFunil") !== p) return;
+        if (error) { box.innerHTML = `<p class="pg-vazio">${h(ctx.traduzErro(error.message))}</p>`; return; }
+        const funis = (data || []).filter(f => filtro === "todos" || f.finalidade === filtro);
+        const comDados = funis.filter(f => f.etapas.length && f.etapas[0].chegaram);
+        if (!comDados.length) { box.innerHTML = `<p class="pg-vazio">Nenhum contato novo no CRM ${h(rotuloPer(p))}. O histórico importado não entra no funil (não tem as etapas).</p>`; return; }
+        box.innerHTML = comDados.map(f => {
+            const base = f.etapas[0].chegaram;
+            return `<div class="pg-funil"><h3><i style="background:${h(f.cor || "#fff")}"></i>${h(f.funil)} <small>${base} contato(s) · ${h(rotuloPer(p))}</small></h3>
+              ${f.etapas.map((e, i) => {
+                  const ant = i ? f.etapas[i - 1].chegaram : null;
+                  const real = i && ant ? Math.round(e.chegaram * 1000 / ant) / 10 : null;
+                  const meta = i && e.meta != null ? Number(e.meta) : null;
+                  const cls = meta == null || real == null ? "" : real >= meta ? "ok" : "abaixo";
+                  return `<div class="pg-funil-linha"><span class="pg-funil-nome">${h(e.nome)}</span>
+                    <span class="pg-funil-barra"><i style="width:${base ? Math.max(3, e.chegaram / base * 100) : 0}%"></i></span>
+                    <b>${e.chegaram}</b>
+                    <small class="${cls}">${real != null ? real.toLocaleString("pt-BR") + "%" : ""}${meta != null ? ` <span>meta ${meta.toLocaleString("pt-BR")}%</span>` : ""}</small></div>`;
+              }).join("")}</div>`;
+        }).join("");
+    }
+    // 11. despesas por plano de contas: barras (parte do todo) ou pizza
+    async function despesasCartao() {
+        const p = perDe("pgDesp"), box = corpo("pgDesp");
+        let r;
+        try { r = await indicadores(p); } catch (e) { box.innerHTML = `<p class="pg-vazio">${h(ctx.traduzErro(e.message))}</p>`; return; }
+        if (perDe("pgDesp") !== p) return;
+        despesas(box, (r.por_plano || []).filter(x => x.natureza === "despesa"), rotuloPer(p));
+    }
+    // 12. segmento: tipo de imóvel e faixa de preço que mais fecham
+    function segmento() {
+        const p = per.pgSeg || "12m", [ ini, fim ] = intervaloDe(p === "mesames" ? (mesSeg || hojeIso().slice(0, 7)) : p);
+        const I = window.SKLCRM && window.SKLCRM.interno;
+        const imoveis = I && I.ctx() && I.ctx().imoveis ? I.ctx().imoveis() : [];
+        const porId = new Map(imoveis.map(i => [ i.id, i ]));
+        const lista = negocios().filter(n => n.dia >= ini && n.dia <= fim && (filtro === "todos" || n.fin === filtro));
+        const box = corpo("pgSeg");
+        if (!lista.length) { box.innerHTML = `<p class="pg-vazio">Nenhum negócio fechado ${h(rotuloPer(p === "mesames" ? mesSeg : p))}.</p>`; return; }
+        const grupo = chave => {
+            const m = new Map();
+            lista.forEach(n => { const k = chave(n); const r = m.get(k) || { qtd: 0, vgv: 0 }; r.qtd++; r.vgv += n.valor; m.set(k, r); });
+            return [ ...m.entries() ].sort((a, b) => b[1].qtd - a[1].qtd || b[1].vgv - a[1].vgv);
         };
-        grade.querySelectorAll("[data-tabela]").forEach(b => b.addEventListener("click", () => {
-            const id = b.dataset.tabela, c = corpo(id), on = b.getAttribute("aria-pressed") !== "true";
-            b.setAttribute("aria-pressed", on ? "true" : "false");
-            b.textContent = on ? "◔ gráfico" : "≡ tabela";
-            if (on) c.innerHTML = `<div class="pg-tabela"><table><thead><tr>${tabelas[id][0].map(x => `<th>${h(x)}</th>`).join("")}</tr></thead><tbody>${tabelas[id].slice(1).map(l => `<tr>${l.map(x => `<td>${h(x)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-            else ({ pgVgcMes: desenhaVgc, pgVxl: desenhaVxl, pgCorr: desenhaCorr })[id]();
-        }));
-        grade.querySelectorAll("[data-pg-ir]").forEach(b => b.addEventListener("click", () => { fechar(); if (ctx.showPage) ctx.showPage(b.dataset.pgIr); }));
+        const tipo = n => { const im = porId.get(n.neg.construcao_id); return im ? (im.tipo_imovel || "Tipo não informado") + (im.rural ? " (rural)" : "") : "Sem imóvel ligado"; };
+        const faixa = n => {
+            const pd = I && I.padraoDe ? I.padraoDe(n.neg) : null;
+            const nomes = { economico: "Econômico", medio: "Médio padrão", alto: "Alto padrão" };
+            return (n.fin === "venda" ? "Venda · " : "Locação · ") + (pd ? nomes[pd] : "sem valor");
+        };
+        const bloco = (titulo, linhasG) => {
+            const max = Math.max(1, ...linhasG.map(([ , r ]) => r.qtd));
+            return `<div class="pg-seg-bloco"><h3>${h(titulo)}</h3>${linhasG.slice(0, 8).map(([ k, r ], i) => `<div class="pg-funil-linha">
+                <span class="pg-funil-nome">${i === 0 ? "🏆 " : ""}${h(k)}</span><span class="pg-funil-barra"><i style="width:${Math.max(3, r.qtd / max * 100)}%"></i></span>
+                <b>${r.qtd}</b><small>${h(curto(r.vgv))}</small></div>`).join("")}</div>`;
+        };
+        const tipos = grupo(tipo), faixas = grupo(faixa);
+        const semImovel = lista.filter(n => !porId.has(n.neg.construcao_id)).length;
+        box.innerHTML = `<div class="pg-seg">${bloco("Tipo de imóvel", tipos)}${bloco("Faixa de preço", faixas)}</div>
+          <p class="pg-nota">${lista.length} negócio(s) · ${h(rotuloPer(p === "mesames" ? mesSeg : p))}. Faixas de preço: Configurações → Faixas de padrão.${semImovel ? ` ${semImovel} negócio(s) sem imóvel ligado (o histórico do Power BI não traz o tipo do imóvel).` : ""}</p>`;
     }
 
     // ------------------------------------------------------------------ dica (tooltip)
@@ -422,25 +613,28 @@
             ligarDica(sp, () => `<b>${h(dataBr(iso))}</b>${r.length ? `<br><i class="pg-dot" style="background:${COR.s1}"></i>A receber: <b>${h(dinheiro(r.reduce((s, x) => s + Number(x.valor || 0), 0)))}</b> (${r.length})` : ""}${p.length ? `<br><i class="pg-dot" style="background:${COR.s2}"></i>A pagar: <b>${h(dinheiro(p.reduce((s, x) => s + Number(x.valor || 0), 0)))}</b> (${p.length})` : ""}`);
         });
     }
-    function proximos(box, recebiveis) {
-        const hoje = hojeIso();
-        const lista = (recebiveis || []).filter(r => !r.recebido_em && !r.recebido_sem_data && r.vencimento >= hoje).sort((a, b) => a.vencimento.localeCompare(b.vencimento)).slice(0, 5);
-        const vencidas = (recebiveis || []).filter(r => !r.recebido_em && !r.recebido_sem_data && r.vencimento < hoje);
-        const I = window.SKLCRM && window.SKLCRM.interno;
-        const nome = id => { const n = I && I.negs.get(id); return n ? (n.titulo || "Negócio").trim() : "Negócio"; };
-        box.innerHTML = (vencidas.length ? `<p class="pg-alerta">⚠ ${vencidas.length} parcela(s) vencida(s) sem baixa: ${h(dinheiro(vencidas.reduce((s, r) => s + Number(r.valor || 0), 0)))}</p>` : "")
-            + (lista.length ? `<ol class="pg-linha-tempo">${lista.map(r => `<li><span class="pg-lt-data">${h(dataBr(r.vencimento))}</span><i></i>
-                <span class="pg-lt-txt"><b>${h(r.valor == null ? "sem valor" : dinheiro(r.valor))}</b><small>${h(nome(r.negociacao_id))} · ${r.parcela}ª parcela</small></span></li>`).join("")}</ol>`
-              : `<p class="pg-vazio">Nenhuma parcela a vencer.</p>`);
-    }
-    function despesas(box, planos) {
-        if (!planos.length) { box.innerHTML = `<p class="pg-vazio">Nenhuma despesa paga no período.</p>`; return; }
+    function despesas(box, planos, rotulo) {
+        if (!planos.length) { box.innerHTML = `<p class="pg-vazio">Nenhuma despesa paga ${h(rotulo || "no período")}.</p>`; return; }
         const total = planos.reduce((s, p) => s + Number(p.total), 0);
-        const top = planos.slice(0, 4), resto = planos.slice(4).reduce((s, p) => s + Number(p.total), 0);
-        const partes = [ ...top.map((p, i) => ({ nome: p.nome, v: Number(p.total), cor: [ COR.s1, COR.s2, COR.s3, clarear(COR.s2, 0.45) ][i] })), ...(resto > 0 ? [ { nome: "Outros", v: resto, cor: "#9aa6ab" } ] : []) ];
-        box.innerHTML = `<div class="pg-pilha">${partes.map(p => `<span style="width:${(p.v / total * 100).toFixed(2)}%;background:${p.cor}" data-parte="${h(p.nome)}"></span>`).join("")}</div>
-          <ul class="pg-partes">${partes.map(p => `<li><i style="background:${p.cor}"></i><span>${h(p.nome)}</span><b>${h(dinheiro(p.v))}</b><small>${h(pct(p.v / total * 100))}</small></li>`).join("")}</ul>
-          <p class="pg-nota">Total pago no período: <b>${h(dinheiro(total))}</b></p>`;
+        const cores = [ COR.s1, COR.s2, COR.s3, clarear(COR.s2, 0.45), clarear(COR.s1, 0.62), "#7c9a5c", "#b07aa1" ];
+        const nTop = modoDesp === "pizza" ? 6 : 4;
+        const top = planos.slice(0, nTop), resto = planos.slice(nTop).reduce((s, p) => s + Number(p.total), 0);
+        const partes = [ ...top.map((p, i) => ({ nome: p.nome, v: Number(p.total), cor: cores[i] })), ...(resto > 0 ? [ { nome: "Outros", v: resto, cor: "#9aa6ab" } ] : []) ];
+        const legenda = `<ul class="pg-partes">${partes.map(p => `<li><i style="background:${p.cor}"></i><span>${h(p.nome)}</span><b>${h(dinheiro(p.v))}</b><small>${h(pct(p.v / total * 100))}</small></li>`).join("")}</ul>`;
+        const rodape = `<p class="pg-nota">Total pago (${h(rotulo || "período")}): <b>${h(dinheiro(total))}</b></p>`;
+        if (modoDesp === "pizza") {
+            const R = 70, cx = 80, cy = 80;
+            let ang = -Math.PI / 2;
+            const fatias = partes.map(p => {
+                const a0 = ang, a1 = ang + p.v / total * 2 * Math.PI; ang = a1;
+                if (partes.length === 1) return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${p.cor}" data-parte="${h(p.nome)}"/>`;
+                const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0), x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+                return `<path d="M${cx},${cy}L${x0.toFixed(2)},${y0.toFixed(2)}A${R},${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}Z" fill="${p.cor}" stroke="#fff" stroke-width="2" data-parte="${h(p.nome)}"/>`;
+            }).join("");
+            box.innerHTML = `<div class="pg-pizza"><svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Despesas por plano de contas">${fatias}</svg>${legenda}</div>${rodape}`;
+        } else {
+            box.innerHTML = `<div class="pg-pilha">${partes.map(p => `<span style="width:${(p.v / total * 100).toFixed(2)}%;background:${p.cor}" data-parte="${h(p.nome)}"></span>`).join("")}</div>${legenda}${rodape}`;
+        }
         box.querySelectorAll("[data-parte]").forEach(sp => { const p = partes.find(x => x.nome === sp.dataset.parte); ligarDica(sp, () => `<b>${h(p.nome)}</b><br>${h(dinheiro(p.v))} · ${h(pct(p.v / total * 100))}`); });
     }
 

@@ -115,10 +115,46 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
 .pg-c-aneis{grid-column:span 3}
 .pg-c-meta{grid-column:span 3}
 #pgVgcMes{grid-column:span 6}
-#pgProx{grid-column:span 3}
+#pgPend{grid-column:span 6}
 #pgVxl{grid-column:span 6}
-#pgCorr{grid-column:span 6}
-#pgDesp{grid-column:span 12}
+#pgCorr{grid-column:span 9}
+#pgFunil{grid-column:span 6}
+#pgDesp{grid-column:span 6}
+#pgSeg{grid-column:span 6}
+.pg-sub{font-size:11.5px;color:#6b8790}
+/* período de cada quadro */
+.pg-per{display:flex;flex-wrap:wrap;gap:4px;margin:-2px 0 10px}
+.pg-per button,.pg-abas button{border:1px solid #cfe2e6;background:#fff;border-radius:999px;font:inherit;font-size:11px;padding:2px 9px;cursor:pointer;color:#365560;line-height:1.6}
+.pg-per button[aria-pressed="true"],.pg-abas button[aria-pressed="true"]{background:var(--pg-s1);border-color:var(--pg-s1);color:#fff;font-weight:700}
+.pg-abas{display:flex;gap:4px;flex-wrap:wrap}
+.pg-mes{border:1px solid #cfe2e6;border-radius:10px;padding:4px 8px;font:inherit;font-size:12.5px;margin:-4px 0 10px;width:max-content}
+.pg-mes[hidden]{display:none}
+/* pendências */
+.pg-pend{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:330px;overflow:auto}
+.pg-pend li{display:grid;grid-template-columns:86px 1fr auto;gap:8px;align-items:center}
+.pg-pend li.vencida .pg-lt-data{background:#fde8e6;color:#9a3b34}
+.pg-pend-acoes{display:flex;gap:4px}
+.pg-mini{border:1px solid #cfe2e6;background:#fff;border-radius:8px;font:inherit;font-size:11.5px;padding:4px 8px;cursor:pointer;color:#365560;white-space:nowrap}
+.pg-mini.ok{background:var(--pg-s1);border-color:var(--pg-s1);color:#fff;font-weight:700}
+/* funil de conversão e segmento */
+.pg-funil{margin-bottom:12px}
+.pg-funil h3,.pg-seg-bloco h3{margin:0 0 6px;font-size:13px;color:#21343b;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pg-funil h3 i{width:12px;height:12px;border-radius:3px;border:1px solid #c9d6da}
+.pg-funil h3 small{font-weight:400;color:#6b8790}
+.pg-funil-linha{display:grid;grid-template-columns:minmax(90px,150px) 1fr 34px minmax(70px,auto);gap:8px;align-items:center;font-size:12.5px;margin:3px 0}
+.pg-funil-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#365560}
+.pg-funil-barra{height:12px;background:#eef4f5;border-radius:99px;overflow:hidden}
+.pg-funil-barra i{display:block;height:100%;background:var(--pg-s3);border-radius:99px}
+.pg-funil-linha b{text-align:right;color:#163a45}
+.pg-funil-linha small{color:#6b8790;font-size:11.5px}
+.pg-funil-linha small.ok{color:#247346;font-weight:700}
+.pg-funil-linha small.abaixo{color:#b23b31;font-weight:700}
+.pg-funil-linha small span{font-weight:400;color:#6b8790}
+.pg-seg{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* pizza */
+.pg-pizza{display:grid;grid-template-columns:160px 1fr;gap:16px;align-items:center}
+.pg-pizza .pg-partes{grid-template-columns:1fr}
+.pg-pizza path,.pg-pizza circle{cursor:pointer}
 .pg-heroi{display:block;font-size:30px;color:#163a45;line-height:1.1}
 .pg-corpo>small{color:#6b8790;font-size:12px}
 .pg-faisca{margin-top:6px}
@@ -174,8 +210,9 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
 .pg-dica{position:fixed;z-index:5001;background:var(--navy-deep);color:#fff;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;pointer-events:none;max-width:260px;box-shadow:0 8px 20px rgba(0,0,0,.2)}
 .pg-dica[hidden]{display:none}
 @media(max-width:1180px){
-  .pg-c-kpi,.pg-c-cal,.pg-c-aneis,.pg-c-meta,#pgProx{grid-column:span 6}
-  #pgVgcMes,#pgVxl,#pgCorr,#pgDesp{grid-column:span 12}
+  .pg-c-kpi,.pg-c-cal,.pg-c-aneis,.pg-c-meta{grid-column:span 6}
+  #pgVgcMes,#pgVxl,#pgDesp,#pgPend,#pgFunil,#pgSeg{grid-column:span 12}
+  #pgCorr{grid-column:span 6}
 }
 @media(max-width:700px){
   .pg-raiz{padding:0}
@@ -185,5 +222,9 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
   .pg-ico{width:auto;padding:6px 10px}
   .pg-conteudo{padding:14px 12px 20px}
   .pg-grade{gap:12px}
-  .pg-c-kpi,.pg-c-cal,.pg-c-aneis,.pg-c-meta,#pgVgcMes,#pgVxl,#pgCorr,#pgProx,#pgDesp{grid-column:span 12}
+  .pg-c-kpi,.pg-c-cal,.pg-c-aneis,.pg-c-meta,#pgVgcMes,#pgVxl,#pgCorr,#pgPend,#pgDesp,#pgFunil,#pgSeg{grid-column:span 12}
+  .pg-seg,.pg-pizza{grid-template-columns:1fr}
+  .pg-pizza svg{margin:0 auto}
+  .pg-pend li{grid-template-columns:78px 1fr;}
+  .pg-pend-acoes{grid-column:2}
 }

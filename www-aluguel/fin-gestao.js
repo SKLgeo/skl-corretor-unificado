@@ -90,6 +90,18 @@
             <button id="fgBaixaSalvar" type="button" class="primary-button">Confirmar</button>
             <div id="fgBaixaMsg" class="form-message" hidden></div>
           </form></dialog>
+          <dialog id="fgProgDialog" class="crm-dialog"><form method="dialog" class="dialog-card">
+            <button class="dialog-close" type="button" data-fechar>×</button>
+            <span class="eyebrow">PROGRAMAR</span><h2 id="fgProgTitulo">Programar data</h2>
+            <p id="fgProgInfo" class="muted-text"></p>
+            <label><span id="fgProgRotulo">Programado para</span><input id="fgProgData" type="date" /></label>
+            <p class="muted-text">O vencimento original continua o mesmo; a data programada aparece no painel e nas listas.</p>
+            <div class="div-acoes">
+              <button id="fgProgLimpar" type="button" class="text-button">Tirar a data programada</button>
+              <button id="fgProgSalvar" type="button" class="primary-button">Salvar</button>
+            </div>
+            <div id="fgProgMsg" class="form-message" hidden></div>
+          </form></dialog>
           <dialog id="fgLancDialog" class="crm-dialog"><form method="dialog" class="dialog-card">
             <button class="dialog-close" type="button" data-fechar>×</button>
             <span class="eyebrow">FINANCEIRO DA IMOBILIÁRIA</span><h2 id="fgLancTitulo">Novo lançamento</h2>
@@ -138,8 +150,10 @@
             <button id="fgParcSalvar" type="button" class="primary-button">Salvar parcelas</button>
             <div id="fgParcMsg" class="form-message" hidden></div>
           </form></dialog>`);
-        document.querySelectorAll("#fgBaixaDialog,#fgLancDialog,#fgCadDialog,#fgParcDialog").forEach(d => d.querySelectorAll("[data-fechar]").forEach(b => b.addEventListener("click", () => d.close())));
+        document.querySelectorAll("#fgBaixaDialog,#fgProgDialog,#fgLancDialog,#fgCadDialog,#fgParcDialog").forEach(d => d.querySelectorAll("[data-fechar]").forEach(b => b.addEventListener("click", () => d.close())));
         $("fgBaixaSalvar").addEventListener("click", confirmarBaixa);
+        $("fgProgSalvar").addEventListener("click", () => salvarProgramado($("fgProgData").value || null));
+        $("fgProgLimpar").addEventListener("click", () => salvarProgramado(null));
         $("fgLancSalvar").addEventListener("click", salvarLancamento);
         $("fgLancExcluir").addEventListener("click", excluirLancamento);
         $("fgParcGerar").addEventListener("click", gerarParcelas);
@@ -184,15 +198,16 @@
                 <td data-r="Negócio"><button type="button" class="text-button" data-abrir-neg="${h(r.negociacao_id)}">${h(nomeNegocio(r.negociacao_id))}</button></td>
                 <td data-r="Parcela">${h(r.parcela)}ª${r.observacao ? `<small class="fin-sub">${h(r.observacao)}</small>` : ""}</td>
                 <td data-r="Valor"><strong>${h(dinheiro(r.valor))}</strong></td>
-                <td data-r="Situação">${situacaoRec(r)}</td>
+                <td data-r="Situação">${situacaoRec(r)}${programado(r)}</td>
                 <td data-r="Conta">${h(nomeConta(r.conta_id) || "—")}</td>
                 <td class="fin-acoes">${podeGerir() ? (recebido(r) ? `<button type="button" class="text-button" data-rec-estornar="${h(r.id)}">Estornar</button>`
-                    : `<button type="button" class="primary-button fin-mini" data-rec-baixa="${h(r.id)}">Recebido</button>`) : ""}</td>
+                    : `<button type="button" class="primary-button fin-mini" data-rec-baixa="${h(r.id)}">Recebido</button><button type="button" class="text-button" data-rec-prog="${h(r.id)}">Programar</button>`) : ""}</td>
               </tr>`).join("")}</tbody></table>` : `<div class="empty-state">Nenhuma parcela nesta seleção.</div>`}</div>`;
         $("fgRecFiltro").value = filtroRec;
         $("fgRecFiltro").addEventListener("change", () => { filtroRec = $("fgRecFiltro").value; renderReceber(box); });
         box.querySelectorAll("[data-abrir-neg]").forEach(b => b.addEventListener("click", () => window.SKLCRM && window.SKLCRM.abrirNegociacao(b.dataset.abrirNeg)));
         box.querySelectorAll("[data-rec-baixa]").forEach(b => b.addEventListener("click", () => abrirBaixa("recebivel", recebiveis.find(r => r.id === b.dataset.recBaixa))));
+        box.querySelectorAll("[data-rec-prog]").forEach(b => b.addEventListener("click", () => abrirProgramar("recebivel", recebiveis.find(r => r.id === b.dataset.recProg))));
         box.querySelectorAll("[data-rec-estornar]").forEach(b => b.addEventListener("click", async () => {
             if (!window.confirm("Desfazer o recebimento desta parcela?")) return;
             const { error } = await ctx.sb.rpc("crm_baixar_recebivel", { p_id: b.dataset.recEstornar, p_recebido_em: null, p_conta: null });
@@ -205,9 +220,9 @@
     function opcoesContas(atual, vazio) {
         return `<option value="">${h(vazio || "Sem conta")}</option>` + contas.filter(c => c.ativa || c.id === atual).map(c => `<option value="${h(c.id)}"${c.id === atual ? " selected" : ""}>${h(c.nome)}</option>`).join("");
     }
-    function abrirBaixa(tipo, item) {
+    function abrirBaixa(tipo, item, aoConcluir) {
         if (!item) return;
-        baixaAlvo = { tipo, item };
+        baixaAlvo = { tipo, item, aoConcluir };
         const rec = tipo === "recebivel";
         $("fgBaixaEyebrow").textContent = rec ? "COMISSÃO A RECEBER" : (item.natureza === "receita" ? "RECEITA" : "DESPESA");
         $("fgBaixaTitulo").textContent = rec ? "Registrar recebimento" : (item.natureza === "receita" ? "Registrar recebimento" : "Registrar pagamento");
@@ -231,7 +246,36 @@
         const aba = baixaAlvo.tipo === "recebivel" ? "receber" : "despesas";
         if (!$("finGestao").hidden) await render(aba); else await carregar();
         if (boxParcelas && negParcelas) desenharNaNegociacao(negParcelas, boxParcelas);
+        if (baixaAlvo.aoConcluir) baixaAlvo.aoConcluir();
     }
+
+    // ------------------------------------------------------------------ data programada (painel e listas)
+    let progAlvo = null;
+    function abrirProgramar(tipo, item, aoConcluir) {
+        if (!item) return;
+        progAlvo = { tipo, item, aoConcluir };
+        const rec = tipo === "recebivel";
+        $("fgProgTitulo").textContent = rec || item.natureza === "receita" ? "Programar recebimento" : "Programar pagamento";
+        $("fgProgInfo").textContent = rec ? `${nomeNegocio(item.negociacao_id)} · ${item.parcela}ª parcela · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`
+            : `${item.descricao} · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`;
+        $("fgProgRotulo").textContent = rec || item.natureza === "receita" ? "Receber em" : "Pagar em";
+        $("fgProgData").value = item.programado_para || item.vencimento || hojeIso();
+        $("fgProgLimpar").hidden = !item.programado_para;
+        $("fgProgMsg").hidden = true;
+        $("fgProgDialog").showModal();
+    }
+    async function salvarProgramado(data) {
+        if (!progAlvo) return;
+        const { error } = await ctx.sb.rpc("fin_programar", { p_tipo: progAlvo.tipo, p_id: progAlvo.item.id, p_data: data });
+        if (error) { falha("fgProgMsg", error); return; }
+        $("fgProgDialog").close();
+        ctx.toast(data ? "Data programada: " + dataBr(data) + "." : "Data programada retirada.");
+        await carregar();
+        if (!$("finGestao").hidden) await render(progAlvo.tipo === "recebivel" ? "receber" : "despesas");
+        if (progAlvo.aoConcluir) progAlvo.aoConcluir();
+    }
+    const programado = x => x.programado_para && !(x.recebido_em || x.recebido_sem_data || x.pago_em || x.pago_sem_data)
+        ? `<small class="fin-sub fg-programado">📅 programado ${h(dataBr(x.programado_para))}</small>` : "";
 
     // ------------------------------------------------------------------ despesas e receitas
     function situacaoLanc(l) {
@@ -268,10 +312,10 @@
                 <td data-r="Descrição"><strong>${h(l.descricao)}</strong>${l.natureza === "receita" ? `<small class="fin-sub">receita</small>` : ""}${l.observacao ? `<small class="fin-sub">${h(l.observacao)}</small>` : ""}</td>
                 <td data-r="Plano de contas">${h(nomePlano(l.plano_conta_id) || l.plano_origem || "—")}</td>
                 <td data-r="Valor"><strong>${h(dinheiro(l.valor))}</strong></td>
-                <td data-r="Situação">${situacaoLanc(l)}${l.pago_em ? `<small class="fin-sub">em ${h(dataBr(l.pago_em))}</small>` : l.pago_sem_data ? `<small class="fin-sub">data não informada</small>` : ""}</td>
+                <td data-r="Situação">${situacaoLanc(l)}${programado(l)}${l.pago_em ? `<small class="fin-sub">em ${h(dataBr(l.pago_em))}</small>` : l.pago_sem_data ? `<small class="fin-sub">data não informada</small>` : ""}</td>
                 <td data-r="Conta">${h(nomeConta(l.conta_id) || "—")}</td>
                 <td class="fin-acoes">${podeGerir() ? (liquidado(l) ? `<button type="button" class="text-button" data-lanc-estornar="${h(l.id)}">Estornar</button>`
-                    : `<button type="button" class="primary-button fin-mini" data-lanc-baixa="${h(l.id)}">${l.natureza === "receita" ? "Recebido" : "Pago"}</button>`)
+                    : `<button type="button" class="primary-button fin-mini" data-lanc-baixa="${h(l.id)}">${l.natureza === "receita" ? "Recebido" : "Pago"}</button><button type="button" class="text-button" data-lanc-prog="${h(l.id)}">Programar</button>`)
                     + `<button type="button" class="text-button" data-lanc-editar="${h(l.id)}">Editar</button>` : ""}</td>
               </tr>`).join("")}</tbody></table>` : `<div class="empty-state">Nenhum lançamento nesta seleção.</div>`}</div>`;
         $("fgDespNat").value = f.natureza; $("fgDespSit").value = f.situacao; $("fgDespMes").value = f.mes;
@@ -284,6 +328,7 @@
             $("fgContasBtn").addEventListener("click", () => abrirCadastro("contas"));
         }
         box.querySelectorAll("[data-lanc-baixa]").forEach(b => b.addEventListener("click", () => abrirBaixa("lancamento", lancamentos.find(l => l.id === b.dataset.lancBaixa))));
+        box.querySelectorAll("[data-lanc-prog]").forEach(b => b.addEventListener("click", () => abrirProgramar("lancamento", lancamentos.find(l => l.id === b.dataset.lancProg))));
         box.querySelectorAll("[data-lanc-editar]").forEach(b => b.addEventListener("click", () => abrirLancamento(lancamentos.find(l => l.id === b.dataset.lancEditar))));
         box.querySelectorAll("[data-lanc-estornar]").forEach(b => b.addEventListener("click", async () => {
             if (!window.confirm("Desfazer a baixa deste lançamento?")) return;
@@ -525,5 +570,5 @@
 
     function sair() { contas = []; plano = []; lancamentos = []; recebiveis = []; const b = $("finGestao"); if (b) b.innerHTML = ""; }
 
-    window.SKLFinGestao = { iniciar, sair, carregar, temAba, render, desenharNaNegociacao, dados: () => ({ contas, plano, lancamentos, recebiveis }) };
+    window.SKLFinGestao = { iniciar, sair, carregar, temAba, render, desenharNaNegociacao, abrirBaixa, abrirProgramar, nomeNegocio, dados: () => ({ contas, plano, lancamentos, recebiveis }) };
 })();

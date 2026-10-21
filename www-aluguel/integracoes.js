@@ -7,7 +7,8 @@
     "use strict";
     const $ = id => document.getElementById(id);
     const BASE_FUNCOES = "https://xigwlofqkmiibzbongkn.supabase.co/functions/v1/";
-    const PAGINA_IMOVEL = "https://sklgeo.github.io/skl-corretor-unificado/imovel.html";
+    // página pública do imóvel: a do link do cliente (com prévia de foto no WhatsApp); sem marca, a do SKL Unificado
+    const PAGINA_IMOVEL = (window.SKL_MARCA && window.SKL_MARCA.pagina_imovel) || "https://sklgeo.github.io/skl-corretor-unificado/imovel.html";
     let ctx = null, info = null;
     const h = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const erro = e => ctx.traduzErro((e && e.message) || String(e || ""));

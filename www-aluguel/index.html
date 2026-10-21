@@ -46,6 +46,17 @@
       <button id="backFromRecoverButton" class="text-button" type="button">Voltar ao login</button>
       <div id="recoverMessage" class="form-message" hidden></div>
     </form>
+    <form id="conviteForm" class="login-card" hidden>
+      <span class="eyebrow">CONVITE</span>
+      <h1>Criar meu acesso</h1>
+      <p>Você recebeu um convite para entrar na equipe. Preencha seus dados e escolha uma senha (mínimo 6 caracteres).</p>
+      <label><span>Seu nome</span><input id="conviteNomeInput" autocomplete="name" required minlength="3" /></label>
+      <label><span>E-mail</span><input id="conviteEmailInput" type="email" autocomplete="username" required /></label>
+      <label><span>Senha</span><input id="convitePasswordInput" type="password" autocomplete="new-password" required minlength="6" /></label>
+      <button id="conviteSubmitButton" class="primary-button" type="submit">Criar acesso e entrar</button>
+      <button id="conviteVoltarButton" class="text-button" type="button">Já tenho acesso</button>
+      <div id="conviteMessage" class="form-message" hidden></div>
+    </form>
     <form id="recoverNewPasswordForm" class="login-card" hidden>
       <span class="eyebrow">NOVA SENHA</span>
       <h1>Defina sua nova senha</h1>
@@ -182,7 +193,7 @@
           </div>
           <div class="busca-linha">
             <div class="bairro-filtro">
-              <input id="bairroFiltroInput" list="bairrosLista" placeholder="Bairro (até 3)" autocomplete="off" />
+              <input id="bairroFiltroInput" placeholder="Digite o bairro (até 3)" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" />
               <div id="bairroChips" class="bairro-chips"></div>
             </div>
             <div id="faixaValorBox" class="faixa-valor" hidden>
@@ -420,7 +431,7 @@
           <div id="settingsCadastroPanel" class="panel form-panel" hidden>
             <span class="eyebrow">CADASTRO PELOS CORRETORES</span>
             <h2>Nota mínima para envio</h2>
-            <p>Quando ativada, o corretor só consegue enviar um imóvel para aprovação se o cadastro atingir a quantidade de estrelas escolhida. Cada estrela vale 20% do cadastro completo.</p>
+            <p>Quando ativada, o corretor só consegue enviar um imóvel para aprovação se o cadastro atingir a quantidade de estrelas escolhida. Cada estrela vale 20% da nota.</p>
             <label><span>Exigir no mínimo</span>
               <select id="notaMinimaSelect">
                 <option value="">Desativado (sem exigência)</option>
@@ -432,19 +443,34 @@
               </select>
             </label>
             <button id="salvarNotaMinimaButton" type="button" class="primary-button">Salvar</button>
+            <h3 class="pesos-titulo">Peso de cada item da nota</h3>
+            <p class="muted-text">O que é mais importante no cadastro conta mais nas estrelas (ex.: endereço completo). Peso 0 = o item não conta.</p>
+            <div id="pesosQualidadeLista" class="pesos-lista"></div>
+            <p id="pesosQualidadeTotal" class="muted-text"></p>
+            <div class="crm-config-acoes"><button id="padraoPesosQualidade" type="button" class="text-button">Voltar ao padrão</button><button id="salvarPesosQualidade" type="button" class="primary-button">Salvar pesos</button></div>
           </div>
           <div id="crmConfigPanel" class="panel form-panel crm-config" data-so-config>
             <span class="eyebrow">CRM — FUNIS</span>
-            <h2>Etapas das negociações</h2>
-            <p>Renomeie, reordene ou crie etapas. "Fechado" e "Perdido" ficam sempre no fim. Para remover uma etapa, ela precisa estar vazia.</p>
+            <h2>Funis e etapas das negociações</h2>
+            <p>Venda, Locação e Captação aparecem juntas na aba "Todos" das Negociações, cada uma com a cor do cartão escolhida aqui.
+              Renomeie, reordene ou crie etapas. "Fechado" e "Perdido" ficam sempre no fim. Para remover uma etapa, ela precisa estar vazia.
+              A <b>meta de conversão</b> é a % que se espera passar da etapa anterior para esta; aparece no Painel e nos Indicadores.</p>
             <select id="crmConfigFunil"></select>
+            <div class="crm-config-funil">
+              <label><span>Nome do funil</span><input id="crmFunilNome" maxlength="40" autocomplete="off" /></label>
+              <label><span>Cor do cartão</span><input id="crmFunilCor" type="color" /></label>
+              <label class="crm-config-check"><input id="crmFunilAtivo" type="checkbox" /> Funil ligado</label>
+              <button id="crmSalvarFunil" type="button" class="secondary-button">Salvar funil</button>
+            </div>
+            <div class="crm-config-cab"><span></span><span>Etapa</span><span>Meta de conversão</span></div>
             <div id="crmConfigEtapas" class="crm-config-lista"></div>
             <div class="crm-config-acoes"><button id="crmAddEtapa" type="button" class="secondary-button">+ Etapa</button><button id="crmSalvarEtapas" type="button" class="primary-button">Salvar etapas</button></div>
           </div>
           <div id="crmMotivosPanel" class="panel form-panel crm-config" data-so-config>
             <span class="eyebrow">CRM — PERDAS</span>
             <h2>Motivos de perda</h2>
-            <p>Lista que o corretor escolhe ao marcar uma negociação como perdida. Motivo já usado é desativado, não apagado.</p>
+            <p>Lista que o corretor escolhe ao marcar uma negociação como perdida. Motivo já usado é desativado, não apagado.
+              Marque "pede texto" no motivo em que a pessoa escreve o motivo (ex.: "Outro").</p>
             <div id="crmConfigMotivos" class="crm-config-lista"></div>
             <div class="crm-config-acoes"><button id="crmAddMotivo" type="button" class="secondary-button">+ Motivo</button><button id="crmSalvarMotivos" type="button" class="primary-button">Salvar motivos</button></div>
           </div>
@@ -616,7 +642,7 @@
             <label class="c-6 largo"><span id="logradouroRotulo">Rua / avenida</span><input id="logradouroInput" /></label>
             <label class="c-3"><span id="numeroRotulo">Número</span><input id="numeroInput" /></label>
             <label class="c-3"><span>Complemento</span><input id="complementoInput" placeholder="Apto, sala, bloco" /></label>
-            <label class="c-3"><span id="bairroRotulo">Bairro</span><input id="bairroInput" list="bairrosLista" autocomplete="off" /></label>
+            <label class="c-3"><span id="bairroRotulo">Bairro</span><input id="bairroInput" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" /></label>
             <label class="c-4"><span>Cidade</span><input id="cidadeInput" /></label>
             <label class="c-2"><span>UF</span><input id="ufInput" maxlength="2" /></label>
           </div>
@@ -1018,6 +1044,8 @@
       <span class="eyebrow">NOVO ACESSO</span>
       <h2>Gerar convite</h2>
       <label><span>Nome da pessoa</span><input id="inviteAluguelNameInput" required /></label>
+      <label><span>Celular / WhatsApp</span><input id="inviteAluguelTelInput" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
+      <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Com o celular, o convite pode ser enviado pelo WhatsApp (abre o WhatsApp do computador ou do celular).</p>
       <label><span>CPF do usuário (opcional)</span><input id="inviteAluguelCpfInput" placeholder="000.000.000-00" /></label>
       <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
       <div class="form-row">
@@ -1044,6 +1072,7 @@
       <h2>Criar usuário já com senha</h2>
       <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Cria o login pronto na hora. Se o e-mail já tiver um acesso, a senha digitada é ignorada e só vinculamos o acesso a esta carteira.</p>
       <label><span>Nome da pessoa</span><input id="directAluguelNameInput" required /></label>
+      <label><span>Celular / WhatsApp</span><input id="directAluguelTelInput" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
       <label><span>CPF do usuário (opcional)</span><input id="directAluguelCpfInput" placeholder="000.000.000-00" /></label>
       <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
       <label><span>E-mail</span><input id="directAluguelEmailInput" type="email" required /></label>

@@ -123,15 +123,19 @@
                 return { e, qtd };
             });
             const base = linhas.length ? linhas[0].qtd : 0;
-            ultimoCsv.push([ `Funil de ${f.nome}`, "Chegaram", "% do início" ], ...linhas.map(l => [ l.e.nome, String(l.qtd), pct(l.qtd, base) + "%" ]), []);
+            ultimoCsv.push([ `Funil de ${f.nome}`, "Chegaram", "% do início", "% da etapa anterior", "Meta" ], ...linhas.map((l, i) => [ l.e.nome, String(l.qtd), pct(l.qtd, base) + "%",
+                i && linhas[i - 1].qtd ? pct(l.qtd, linhas[i - 1].qtd) + "%" : "", l.e.meta_conversao != null && i ? l.e.meta_conversao + "%" : "" ]), []);
             return `<article class="panel painel-bloco"><h3>Funil de ${h(f.nome)}</h3><p class="muted-text">${doFunil.length} contato(s) novo(s) · ${h(rotuloPeriodo(periodo))}</p>
               <div class="painel-funil">${linhas.map((l, i) => {
                   const ant = i ? linhas[i - 1].qtd : null;
+                  const meta = i && l.e.meta_conversao != null ? Number(l.e.meta_conversao) : null;
+                  const real = i && ant ? Math.round(l.qtd * 1000 / ant) / 10 : null;
+                  const selo = meta == null ? "" : ` <span class="painel-meta ${real == null ? "" : real >= meta ? "ok" : "abaixo"}" title="Meta de conversão definida em Configurações → Etapas das negociações">meta ${meta.toLocaleString("pt-BR")}%</span>`;
                   return `<div class="painel-funil-linha">
                     <span class="painel-funil-nome">${h(l.e.nome)}</span>
                     <span class="painel-barra"><i style="width:${base && l.qtd ? Math.max(4, pct(l.qtd, base)) : 0}%;background:${h(l.e.cor || "#64748b")}"></i></span>
                     <strong>${l.qtd}</strong>
-                    <small>${i && ant ? pct(l.qtd, ant) + "% da etapa anterior" : ""}</small>
+                    <small>${real != null ? real.toLocaleString("pt-BR") + "% da etapa anterior" : ""}${selo}</small>
                   </div>`;
               }).join("")}</div></article>`;
         }).join("") || `<p class="muted-text">Sem funis.</p>`;
@@ -148,7 +152,7 @@
         const perdasPorMotivo = new Map();
         perdidas.forEach(n => {
             const m = x.motivos().find(mm => mm.id === n.motivo_perda_id);
-            const nome = m ? m.nome : "Sem motivo";
+            const nome = m ? (m.permite_texto ? "Outro" : m.nome) : "Sem motivo";
             const r = perdasPorMotivo.get(nome) || { qtd: 0, valor: 0 };
             r.qtd++; r.valor += Number(n.valor) || 0;
             perdasPorMotivo.set(nome, r);
