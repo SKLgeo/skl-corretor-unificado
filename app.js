@@ -177,13 +177,15 @@
 
     // Mesmo filtro do Central Unificado: qualquer papel ativo — a própria
     // UI de Aluguéis já vira só-leitura pro papel corretor sozinha.
+    const CARTEIRA_DEMONSTRACAO = "6f02a7db-d925-49b3-abc0-8a8785e09017"; // SKL Imobiliária - Demonstração
     async function temAcessoAluguel() {
         const { data: userData } = await sb.auth.getUser();
         if (!userData?.user) return false;
         const { data, error } = await sb.from("carteira_aluguel_usuarios")
             .select("ativo, expira_em, carteiras_aluguel(ativo)")
             .eq("usuario_id", userData.user.id)
-            .eq("ativo", true);
+            .eq("ativo", true)
+            .eq("carteira_id", CARTEIRA_DEMONSTRACAO); // o Unificado nunca abre carteira de cliente
         if (error) throw new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.");
         const agora = Date.now();
         return (data || []).some(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora));

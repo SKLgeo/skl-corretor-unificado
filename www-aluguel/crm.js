@@ -22,6 +22,11 @@
     let funisTodos = [];           // inclusive os desligados (só Configurações)
     const TODOS = "__todos";       // aba do Kanban com venda, locação e captação juntas
     const COR_FUNIL = { venda: "#ffffff", locacao: "#e0f2fe", captacao: "#ffedd5" };
+    // Negociações em forma de funil (etapas uma embaixo da outra, como no papel da imobiliária) ou em colunas (quadro)
+    const CHAVE_VISAO = "sklu_alug_crm_visao";
+    let visao = (() => { try { return localStorage.getItem(CHAVE_VISAO) === "quadro" ? "quadro" : "funil"; } catch (e) { return "funil"; } })();
+    const faixasAbertas = new Map();   // chave da etapa → aberta/fechada (só nesta sessão)
+    let conversao = null, conversaoChave = "";
     const clientes = new Map();
     const negs = new Map();
     let funilAtual = null;
@@ -207,6 +212,7 @@
         if (cfg && cfg.data && cfg.data.faixas_padrao) faixas = cfg.data.faixas_padrao;
         if (!funilAtual || (funilAtual !== TODOS && !funil(funilAtual))) funilAtual = funis.length > 1 ? TODOS : (funis[0] ? funis[0].id : null);
         if (window.SKLCRMPainel) window.SKLCRMPainel.invalidar();
+        conversaoChave = "";
         renderTudo();
     }
     function agendarRecarga() {
@@ -261,6 +267,11 @@
     // ------------------------------------------------------------------ eventos
     function ligarEventos() {
         $("crmBuscaNeg").addEventListener("input", renderQuadro);
+        document.querySelectorAll("#crmVisao [data-vis]").forEach(b => b.addEventListener("click", () => {
+            visao = b.dataset.vis;
+            try { localStorage.setItem(CHAVE_VISAO, visao); } catch (e) { /* só lembra no aparelho */ }
+            renderQuadro();
+        }));
         $("crmCorretorFiltro").addEventListener("change", renderQuadro);
         $("crmNovaNegButton").addEventListener("click", () => abrirNegociacao(null));
         $("crmBuscaCli").addEventListener("input", renderClientes);
@@ -395,21 +406,97 @@
         const doFunil = [ ...negs.values() ].filter(n => (todos ? !!funil(n.funil_id) : n.funil_id === funilAtual) && negociacaoPassaFiltro(n));
         renderResumo(doFunil);
         quadro.classList.toggle("crm-quadro-todos", todos);
+        quadro.classList.toggle("crm-quadro-funil", visao === "funil");
+        document.querySelectorAll("#crmVisao [data-vis]").forEach(b => b.classList.toggle("ativo", b.dataset.vis === visao));
+        if (visao === "funil") {
+            desenharFunil(quadro, colunas, doFunil, limite, todos);
+            ligarArraste(quadro, colunas, todos);
+            carregarConversao(todos);
+            return;
+        }
         quadro.innerHTML = colunas.map(et => {
-            let itens = doFunil.filter(n => et.ids.includes(n.etapa_id));
-            if (et.tipo !== "aberta") itens = itens.filter(n => new Date(n.fechado_em || n.updated_at).getTime() >= limite);
-            itens.sort((a, b) => {
-                const sa = situacaoAcao(a), sb2 = situacaoAcao(b);
-                const peso = { atrasada: 0, hoje: 1, futura: 2, sem: 3 };
-                if (peso[sa] !== peso[sb2]) return peso[sa] - peso[sb2];
-                return String(b.updated_at).localeCompare(String(a.updated_at));
-            });
+            const itens = itensDaEtapa(et, doFunil, limite);
             const total = itens.reduce((s, n) => s + (Number(n.valor) || 0), 0);
             return `<section class="crm-coluna crm-coluna-${et.tipo}" data-etapa="${h(et.chave)}" style="--cor:${h(et.cor || "#64748b")}">
               <header><strong>${h(et.nome)}</strong><span>${itens.length}${total ? " · " + dinheiroCurto(total) : ""}</span></header>
               <div class="crm-coluna-corpo">${itens.map(cartao).join("") || `<p class="crm-vazio">—</p>`}</div>
             </section>`;
         }).join("");
+        ligarArraste(quadro, colunas, todos);
+    }
+    // negociações de uma etapa (Fechado e Perdido: só os últimos 30 dias), ações atrasadas primeiro
+    function itensDaEtapa(et, doFunil, limite) {
+        let itens = doFunil.filter(n => et.ids.includes(n.etapa_id));
+        if (et.tipo !== "aberta") itens = itens.filter(n => new Date(n.fechado_em || n.updated_at).getTime() >= limite);
+        const peso = { atrasada: 0, hoje: 1, futura: 2, sem: 3 };
+        return itens.sort((a, b) => {
+            const sa = situacaoAcao(a), sb2 = situacaoAcao(b);
+            if (peso[sa] !== peso[sb2]) return peso[sa] - peso[sb2];
+            return String(b.updated_at).localeCompare(String(a.updated_at));
+        });
+    }
+    // ------------------------------------------------------------------ visão em funil
+    // Cada etapa é uma faixa que vai estreitando (como o funil desenhado no papel). Entre as faixas, a conversão
+    // real de uma etapa para a outra e a meta de Configurações. Tocar na faixa abre ou fecha a lista de negociações.
+    function desenharFunil(quadro, colunas, doFunil, limite, todos) {
+        const etapasFunil = colunas.filter(c => c.tipo !== "perdido");
+        const perdido = colunas.find(c => c.tipo === "perdido");
+        const conv = conversaoDasColunas(etapasFunil, todos);
+        const n = etapasFunil.length;
+        const faixa = (et, larg, i) => {
+            const itens = itensDaEtapa(et, doFunil, limite);
+            const total = itens.reduce((s, x) => s + (Number(x.valor) || 0), 0);
+            const aberta = !!faixasAbertas.get(et.chave);   // começa tudo fechado: o funil aparece inteiro
+            let seta = "";
+            if (i > 0 && conv[i] && conv[i - 1] && conv[i - 1].chegaram) {
+                const real = Math.round(conv[i].chegaram * 1000 / conv[i - 1].chegaram) / 10;
+                const meta = conv[i].meta;
+                const cls = meta == null ? "" : real >= meta ? "ok" : "abaixo";
+                seta = `<div class="crm-funil-conv ${cls}" title="Das negociações que chegaram em ${h(etapasFunil[i - 1].nome)}, quantas passaram para ${h(et.nome)} (negócios criados no sistema)">
+                  ↓ <b>${real.toLocaleString("pt-BR")}%</b>${meta != null ? ` <small>meta ${Number(meta).toLocaleString("pt-BR")}%</small>` : ""}</div>`;
+            }
+            return `${seta}<section class="crm-faixa-bloco crm-faixa-${et.tipo}${aberta ? " aberta" : ""}" data-etapa="${h(et.chave)}">
+                <button type="button" class="crm-faixa" data-faixa="${h(et.chave)}" aria-expanded="${aberta}" style="--cor:${h(et.cor || "#64748b")};--larg:${larg}%">
+                  <span class="crm-faixa-nome">${h(et.nome)}</span>
+                  <span class="crm-faixa-num"><strong>${itens.length}</strong>${total ? `<small>${h(dinheiroCurto(total))}</small>` : ""}</span>
+                  <span class="crm-faixa-seta" aria-hidden="true">▾</span>
+                </button>
+                ${aberta ? `<div class="crm-faixa-itens">${itens.map(cartao).join("") || `<p class="crm-vazio">Nenhuma negociação nesta etapa.</p>`}</div>` : ""}
+              </section>`;
+        };
+        quadro.innerHTML = `<div class="crm-funil-vis">${etapasFunil.map((et, i) => faixa(et, Math.round(100 - i * (42 / Math.max(n - 1, 1))), i)).join("")}
+            ${perdido ? `<div class="crm-funil-perdido">${faixa(perdido, 100, -1)}</div>` : ""}</div>`;
+        quadro.querySelectorAll("[data-faixa]").forEach(b => b.addEventListener("click", () => {
+            const bloco = b.closest(".crm-faixa-bloco");
+            faixasAbertas.set(b.dataset.faixa, !bloco.classList.contains("aberta"));
+            renderQuadro();
+        }));
+    }
+    // quantas negociações chegaram em cada etapa (funil_conversao do banco, sem os negócios importados), somando os funis da aba
+    function conversaoDasColunas(cols, todos) {
+        if (!conversao) return [];
+        const visiveis = conversao.filter(f => todos ? !!funil(f.funil_id) : f.funil_id === funilAtual);
+        const porEtapa = new Map();
+        visiveis.forEach(f => (f.etapas || []).forEach(e => porEtapa.set(e.id, e)));
+        return cols.map(c => {
+            const ets = c.ids.map(id => porEtapa.get(id)).filter(Boolean);
+            const metas = ets.map(e => e.meta).filter(m => m != null);
+            return { chegaram: ets.reduce((s, e) => s + Number(e.chegaram || 0), 0), meta: metas.length ? Number(metas[0]) : null };
+        });
+    }
+    async function carregarConversao() {
+        if (!ctx || !ctx.carteiraId()) return;
+        const corretor = foco() || (central() ? $("crmCorretorFiltro").value : "");
+        const chave = ctx.carteiraId() + "|" + corretor;
+        if (chave === conversaoChave) return;
+        conversaoChave = chave;
+        const { data, error } = await ctx.sb.rpc("crm_funil_conversao", { p_carteira: ctx.carteiraId(), p_de: null, p_ate: null, p_corretor: corretor || null });
+        if (error) { console.warn("Conversão do funil:", error); return; }
+        conversao = data || [];
+        if (visao === "funil" && conversaoChave === chave) renderQuadro();
+    }
+    // arrastar o cartão para outra etapa (coluna no quadro, faixa no funil)
+    function ligarArraste(quadro, colunas, todos) {
         quadro.querySelectorAll("[data-neg]").forEach(card => {
             card.addEventListener("click", () => abrirNegociacao(card.dataset.neg));
             card.addEventListener("dragstart", ev => {
@@ -419,7 +506,7 @@
             });
             card.addEventListener("dragend", () => card.classList.remove("arrastando"));
         });
-        quadro.querySelectorAll(".crm-coluna").forEach(col => {
+        quadro.querySelectorAll(".crm-coluna, .crm-faixa-bloco").forEach(col => {
             col.addEventListener("dragover", ev => { ev.preventDefault(); col.classList.add("alvo"); });
             col.addEventListener("dragleave", () => col.classList.remove("alvo"));
             col.addEventListener("drop", ev => {
