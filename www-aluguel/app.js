@@ -917,6 +917,7 @@
         if (window.SKLCRM) await seguro("CRM", () => window.SKLCRM.iniciar(contextoCrm()));
         if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
+        if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
         const ctxExtras = contextoExtras();
         if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
@@ -930,6 +931,7 @@
         if (window.SKLDivisao) window.SKLDivisao.sair();
         if (window.SKLMetas) window.SKLMetas.sair();
         if (window.SKLPainel) window.SKLPainel.sair();
+        if (window.SKLFiscal) window.SKLFiscal.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         sb.auth.signOut();
         carteiraId = null;

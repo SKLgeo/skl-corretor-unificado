@@ -1,0 +1,71 @@
+/* Fiscal → DIMOB (fiscal.js). Usa as classes do Financeiro (fin-aba, fin-cards, fin-tabela) e só acrescenta o que falta. */
+.fiscal-toolbar{flex-wrap:wrap;align-items:flex-end}
+.fiscal-campo{display:grid;gap:3px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.fiscal-campo select{min-width:120px}
+.fiscal-toolbar #fiscalDeclarante{max-width:320px}
+.fiscal-toolbar #fiscalGerar:disabled{opacity:.55;cursor:not-allowed}
+.fiscal-aviso{background:#f5fbff;border:1px solid #cfe8f5;border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:13.5px;color:var(--navy-deep)}
+.fiscal-aviso-erro{background:#f7e8e6;border-color:#e8c4bf;color:#9a3b34}
+.fiscal-linha-status{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.fiscal-selo{display:inline-flex;align-items:center;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800;background:#eef3f5;color:var(--navy-deep);white-space:nowrap}
+.fiscal-selo.ok{background:#e4f4ea;color:#1f6b3a}
+.fiscal-selo.alerta{background:#fff4d9;color:#8a5a00}
+.fiscal-selo.erro{background:#f7e8e6;color:#9a3b34}
+.fiscal-h3{margin:0 0 8px;font-size:15px;color:var(--navy-deep)}
+.fiscal-rolagem{overflow-x:auto}
+.fiscal-meses{min-width:900px!important;font-size:12.5px}
+.fiscal-meses th,.fiscal-meses td{text-align:right;white-space:nowrap;padding:6px 8px}
+.fiscal-meses tbody th{text-align:left}
+.fiscal-vazio{padding:12px}
+.fiscal-fora ul,.fiscal-lista{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px}
+.fiscal-loc{padding:12px 14px;margin-bottom:10px}
+.fiscal-loc summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.fiscal-loc summary .fin-sub{flex-basis:100%}
+.fiscal-pessoas{font-size:13px;margin:10px 0 6px}
+.fiscal-origens{margin-top:8px;font-size:13px}
+.fiscal-origens ul{margin:4px 0 0;padding-left:18px;display:grid;gap:6px}
+.fiscal-origens small{display:block;color:var(--muted)}
+.fiscal-pend{padding:12px 14px;margin-bottom:10px}
+.fiscal-pend header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:6px}
+.fiscal-pend ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.fiscal-nivel-erro{color:#9a3b34}
+.fiscal-nivel-alerta{color:#8a5a00}
+.fiscal-nivel-info{color:#2c6a8a}
+.fiscal-hash{font-size:11.5px}
+.fiscal-larga{grid-column:span 2}
+.fiscal-check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.fiscal-hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.fiscal-det{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fbfdfe}
+.fiscal-det summary{cursor:pointer;font-weight:800;color:var(--navy-deep)}
+.fiscal-det[open] summary{margin-bottom:10px}
+.fiscal-partes{border-top:1px solid var(--line);padding-top:10px}
+.fiscal-parte{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) 70px auto;gap:8px;align-items:center;margin-bottom:6px}
+.fiscal-parte input{min-width:0}
+.form-message.fiscal-msg-ok{background:#e4f4ea;color:#1f6b3a}
+@media (max-width:700px){
+  .fiscal-larga{grid-column:auto}
+  .fiscal-parte{grid-template-columns:1fr 1fr;}
+  .fiscal-parte input[data-k=nome]{grid-column:1/-1}
+  .fiscal-toolbar #fiscalDeclarante{max-width:100%}
+  .fiscal-toolbar>*{flex:1 1 auto}
+}
+/* relatório de conferência (impressão) */
+.fiscal-relatorio[hidden]{display:none!important}
+.fiscal-rel{font-size:11px;color:#111}
+.fiscal-rel h1{font-size:17px;margin:0 0 4px}
+.fiscal-rel h2{font-size:13px;margin:14px 0 6px;border-bottom:1px solid #999;padding-bottom:2px}
+.fiscal-rel table{width:100%;border-collapse:collapse;min-width:0!important;margin-bottom:6px}
+.fiscal-rel th,.fiscal-rel td{border:1px solid #ccc;padding:3px 5px;text-align:left;vertical-align:top}
+.fiscal-rel .fiscal-meses{min-width:0!important;font-size:9.5px}
+.fiscal-rel .fiscal-meses td{text-align:right}
+.fiscal-rel-aviso{font-weight:700;border:1px solid #c33;padding:4px 6px}
+.fiscal-rel-loc{break-inside:avoid}
+@media print{
+  body.imprimindo-fiscal>*:not(#fiscalRelatorio){display:none!important}
+  body.imprimindo-fiscal #fiscalRelatorio{display:block!important}
+  body.imprimindo-fiscal{background:#fff!important}
+}
+/* dentro do Financeiro: as abas internas do Fiscal ficam menores, para não competir com as abas do Financeiro */
+.fiscal-subabas{border-top:1px solid var(--line);padding-top:10px}
+.fiscal-subabas .fin-aba{padding:6px 12px;font-size:12.5px;background:transparent}
+.fiscal-subabas .fin-aba.ativa{background:var(--navy-deep);border-color:var(--navy-deep);color:#fff}

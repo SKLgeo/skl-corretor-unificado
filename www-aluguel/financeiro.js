@@ -175,13 +175,15 @@
         // Régua, Encargos e Chamados ficam em financeiro-extra.js
         // Comissões a receber, Despesas e Resultado ficam em fin-gestao.js
         const gestao = !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
-        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba)) || gestao;
+        const fiscal = !!(window.SKLFiscal && window.SKLFiscal.temAba(aba)); // Fiscal · DIMOB fica em fiscal.js
+        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba)) || gestao || fiscal;
         $("finResumo").hidden = aba !== "resumo";
         $("finLista").hidden = aba === "resumo" || extra;
         $("finMes").hidden = aba === "contratos" || extra;
         $("finNovoContrato").hidden = !podeGerir() || extra;
         if (window.SKLFinExtra) window.SKLFinExtra.render(aba);
         if (window.SKLFinGestao) window.SKLFinGestao.render(aba);
+        if (window.SKLFiscal) window.SKLFiscal.render(aba);
         if (gestao) $("finContagem").textContent = "";
         if (extra) return;
         if (aba === "resumo") return renderResumo();
