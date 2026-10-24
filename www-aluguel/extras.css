@@ -94,3 +94,8 @@
 .div-parc-painel[open] .div-parc-seta{transform:rotate(180deg)}
 .div-parc-painel:not([open]){padding-bottom:inherit}
 .div-parc-acoes{display:flex;justify-content:flex-end;margin:10px 0 4px}
+
+/* Imóvel aberto pela Central: travado até "Destravar edição" */
+.trava-edicao:not([hidden]){display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-size:13px}
+.trava-edicao span{flex:1 1 220px}
+.trava-edicao button{white-space:nowrap}

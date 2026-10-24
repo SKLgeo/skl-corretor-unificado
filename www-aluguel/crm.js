@@ -1862,7 +1862,7 @@
 
     // ------------------------------------------------------------------ proprietário no cadastro do imóvel
     // modo: "central" | "corretor" | "leitura" (mesmos modos do diálogo do imóvel no app.js)
-    function proprietarioPreencher(imovel, modo) {
+    function proprietarioPreencher(imovel, modo, opcoes = {}) {
         renderInteressados(imovel);
         prop = { modo, imovel, clienteVisivel: null };
         const bloco = $("proprietarioBloco");
@@ -1871,6 +1871,8 @@
         prop.clienteVisivel = visivel || null;
         // corretor vendo imóvel aprovado: só quem captou vê o proprietário (o banco só entrega o cadastro a ele), sem editar
         const captadorLendo = modo === "leitura" && !!ctx && !!visivel && imovel.cadastrado_por === (ctx.usuario() || {}).id;
+        // Central com o imóvel travado também vê o resumo do proprietário (edita depois de destravar)
+        const centralLendo = modo === "leitura" && !!opcoes.central && !!visivel;
         let resumoLeitura = $("fichaProprietario");
         if (!resumoLeitura && $("fichaLeitura")) {
             resumoLeitura = document.createElement("div");
@@ -1879,12 +1881,12 @@
             $("fichaLeitura").appendChild(resumoLeitura);
         }
         if (resumoLeitura) {
-            resumoLeitura.hidden = !captadorLendo;
-            resumoLeitura.innerHTML = captadorLendo ? `<span class="crm-rotulo">Proprietário <small>— você captou este imóvel</small></span>
+            resumoLeitura.hidden = !(captadorLendo || centralLendo);
+            resumoLeitura.innerHTML = captadorLendo || centralLendo ? `<span class="crm-rotulo">Proprietário${centralLendo ? "" : " <small>— você captou este imóvel</small>"}</span>
               <strong>${h(visivel.nome)}</strong>${visivel.cpf ? " · CPF " + h(visivel.cpf) : ""}
               <div class="crm-contato-rapido">${linksContato(visivel)}</div>
               ${imovel.exclusividade ? `<p class="muted-text">Exclusividade${imovel.exclusividade_ate ? " até " + h(dataCurta(imovel.exclusividade_ate + "T12:00:00")) : ""}.</p>` : ""}
-              <small class="muted-text">Para mudar os dados do proprietário, fale com a Central.</small>` : "";
+              <small class="muted-text">${centralLendo ? "Para mudar, toque em Destravar edição." : "Para mudar os dados do proprietário, fale com a Central."}</small>` : "";
         }
         bloco.hidden = modo === "leitura" || !ctx;
         if (bloco.hidden) return;

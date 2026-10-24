@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.13.0";
+    const APP_VERSION = "0.13.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -98,6 +98,7 @@
     let notaMinimaCadastro = null;
     let pesosQualidade = null;   // peso de cada item da nota (Configurações); sem peso = 10
     let modoDialogo = "leitura";
+    let centralTravada = false;  // Central abriu um imóvel pronto: ficha travada até tocar em "Destravar edição"
 
     let editandoId = null;
     let fotosExistentes = [];
@@ -248,6 +249,10 @@
         $("deleteConstrucaoButton").addEventListener("click", openDeleteDialog);
         $("confirmDeleteConstrucaoButton").addEventListener("click", confirmDeleteConstrucao);
         $("registrarInteresseButton").addEventListener("click", () => abrirInteresseDialog(construcoes.get(editandoId)));
+        [ "destravarEdicaoButton", "destravarEdicaoTopo" ].forEach(id => $(id).addEventListener("click", () => {
+            const c = construcoes.get(editandoId);
+            if (c) openConstrucaoDialog(c, { destravar: true });
+        }));
         $("submitInteresseButton").addEventListener("click", enviarInteresse);
         $("construcaoFotosInput").addEventListener("change", onFotosInputChange);
         $("construcaoCameraInput").addEventListener("change", onFotosInputChange);
@@ -1551,8 +1556,10 @@
     // ===== Diálogo do imóvel =====
     // Três modos: "central" (central/admin edita qualquer imóvel), "corretor" (corretor cria ou edita o próprio
     // cadastro enquanto não foi aprovado) e "leitura" (corretor vendo um imóvel aprovado: ficha + interesse).
+    // A Central abre um imóvel já cadastrado em "leitura" (travado, para não alterar nada sem querer) e só edita
+    // depois de tocar em "Destravar edição". Imóvel novo e cadastro aguardando aprovação já abrem para editar.
 
-    function openConstrucaoDialog(construcao) {
+    function openConstrucaoDialog(construcao, opcoes = {}) {
         editandoId = construcao ? construcao.id : null;
         fotosExistentes = construcao ? [ ...(construcao.fotos || []) ] : [];
         fotosNovas = [];
@@ -1561,7 +1568,8 @@
         const gerencia = podeGerenciar();
         const meuEditavel = !!construcao && construcao.cadastrado_por === currentUser.id
             && [ "rascunho", "pendente", "recusado" ].includes(construcao.aprovacao);
-        modoDialogo = gerencia ? "central" : (!construcao || meuEditavel ? "corretor" : "leitura");
+        centralTravada = gerencia && !!construcao && construcao.aprovacao !== "pendente" && !opcoes.destravar;
+        modoDialogo = gerencia ? (centralTravada ? "leitura" : "central") : (!construcao || meuEditavel ? "corretor" : "leitura");
         const leitura = modoDialogo === "leitura";
 
         $("construcaoDialogMessage").hidden = true;
@@ -1653,12 +1661,16 @@
         $("saveConstrucaoButton").className = gerencia && !pendente ? "primary-button" : "secondary-button";
         $("enviarCadastroButton").hidden = modoDialogo !== "corretor";
         $("enviarCadastroButton").textContent = construcao?.aprovacao === "pendente" ? "Salvar e manter na fila" : "Enviar para aprovação";
-        $("registrarInteresseButton").hidden = !leitura;
+        $("registrarInteresseButton").hidden = !leitura || centralTravada;
+        $("destravarEdicaoButton").hidden = !centralTravada;
+        $("travaEdicaoBarra").hidden = !centralTravada;
 
-        if (window.SKLCRM) window.SKLCRM.proprietarioPreencher(construcao, modoDialogo);
+        if (window.SKLCRM) window.SKLCRM.proprietarioPreencher(construcao, modoDialogo, { central: centralTravada });
         if (window.SKLExtras) window.SKLExtras.aoAbrirImovel(construcao);
         renderGaleria();
-        $("construcaoDialog").showModal();
+        // destravar reabre o mesmo diálogo já aberto, agora com os campos de edição
+        if ($("construcaoDialog").open) $("construcaoDialog").scrollTop = 0;
+        else $("construcaoDialog").showModal();
         setTimeout(() => {
             ensurePickerMap();
             pickerMap.invalidateSize();
