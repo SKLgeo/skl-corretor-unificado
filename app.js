@@ -7,7 +7,7 @@
     const APP_VERSION = "0.16.3-web";
     // Vendas (loteamento/prédio) desligado neste app por enquanto: só a Gestão imobiliária (aluguel + venda de imóveis).
     // Para religar, trocar para true (o código de Vendas continua no pacote).
-    const VENDAS_LIGADO = false;
+    const VENDAS_LIGADO = true;
     document.querySelectorAll(".appVersionText").forEach(el => el.textContent = `v${APP_VERSION}`);
 
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -165,12 +165,12 @@
         const { data: userData } = await sb.auth.getUser();
         if (!userData?.user) return null;
         const { data, error } = await sb.from("empreendimento_usuarios")
-            .select("papel, expira_em, empreendimentos(ativo)")
+            .select("papel, expira_em, empreendimentos(ativo, slug)")
             .eq("usuario_id", userData.user.id)
             .in("papel", ["administrador", "central_vendas", "corretor"]);
         if (error) throw new Error("Não foi possível verificar seus acessos agora (o servidor está ocupado). Aguarde um instante e tente entrar de novo.");
         const agora = Date.now();
-        const validos = (data || []).filter(v => v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora));
+        const validos = (data || []).filter(v => v.empreendimentos?.ativo && SLUGS_DEMONSTRACAO.includes(v.empreendimentos.slug) && (!v.expira_em || new Date(v.expira_em).getTime() >= agora));
         if (validos.some(v => v.papel !== "corretor")) return "vendas";
         return validos.length ? "vendas-corretor" : null;
     }
@@ -178,6 +178,7 @@
     // Mesmo filtro do Central Unificado: qualquer papel ativo — a própria
     // UI de Aluguéis já vira só-leitura pro papel corretor sozinha.
     const CARTEIRA_DEMONSTRACAO = "6f02a7db-d925-49b3-abc0-8a8785e09017"; // SKL Imobiliária - Demonstração
+    const SLUGS_DEMONSTRACAO = [ "skl-base", "aurora-prime-demo" ]; // Vendas (loteamento e prédio) de demonstração
     async function temAcessoAluguel() {
         const { data: userData } = await sb.auth.getUser();
         if (!userData?.user) return false;

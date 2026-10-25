@@ -5,6 +5,9 @@
     const SUPABASE_ANON_KEY = "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
     const ORIGEM = "app_corretor";
     const SLUGS_OCULTOS_NA_BASE = [ "skl-demo" ];
+    // App de demonstração da SKL (Base/Unificado) no banco da SKL: abre SÓ os empreendimentos de demonstração, nunca o de um
+    // cliente (Acquaville, Carmel...), nem com a conta mestre. Em projeto de cliente (kit, outro Supabase) não filtra.
+    const SLUGS_DEMONSTRACAO = SUPABASE_URL.includes("xigwlofqkmiibzbongkn") ? [ "skl-base", "aurora-prime-demo" ] : null;
     const APP_VERSION = "3.7.2-base";
     if ($("brokerAppVersion")) $("brokerAppVersion").textContent = APP_VERSION;
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -209,7 +212,7 @@
         if (error) throw error;
         const agora = Date.now();
         // Corretor e quem é da Central (administrador/central_vendas) entram aqui; a Central usa o "Modo corretor".
-        return (data || []).filter(v => [ "corretor", "central_vendas", "administrador" ].includes(v.papel) && v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora)).filter(v => !SLUGS_OCULTOS_NA_BASE.includes(v.empreendimentos.slug)).map(v => ({
+        return (data || []).filter(v => [ "corretor", "central_vendas", "administrador" ].includes(v.papel) && v.empreendimentos?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora)).filter(v => !SLUGS_OCULTOS_NA_BASE.includes(v.empreendimentos.slug) && (!SLUGS_DEMONSTRACAO || SLUGS_DEMONSTRACAO.includes(v.empreendimentos.slug))).map(v => ({
             id: v.empreendimentos.id,
             nome: v.empreendimentos.nome,
             slug: v.empreendimentos.slug,
