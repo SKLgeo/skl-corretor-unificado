@@ -204,11 +204,16 @@
                 <input id="valorMinRange" type="range" aria-label="Valor mínimo" />
                 <input id="valorMaxRange" type="range" aria-label="Valor máximo" />
               </div>
+              <div class="faixa-valor-campos">
+                <label>De <input id="valorMinInput" inputmode="decimal" autocomplete="off" aria-label="Valor mínimo (digite)" /></label>
+                <label>até <input id="valorMaxInput" inputmode="decimal" autocomplete="off" aria-label="Valor máximo (digite)" /></label>
+              </div>
             </div>
             <p id="faixaValorDica" class="muted-text faixa-dica">Escolha Aluguel ou Venda para filtrar por faixa de valor.</p>
           </div>
           <div class="busca-linha busca-acoes">
             <span id="buscaResultado" class="muted-text">—</span>
+            <button id="recentesButton" type="button" class="secondary-button recentes-button" aria-pressed="false" title="Mostra primeiro os imóveis cadastrados por último">🆕 Adicionados recentemente</button>
             <button id="limparFiltrosButton" type="button" class="text-button">Limpar filtros</button>
             <button id="toggleConstrucaoViewButton" class="secondary-button">Alternar mapa/lista</button>
             <button id="newConstrucaoButton" class="primary-button">Novo imóvel</button>

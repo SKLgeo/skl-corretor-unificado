@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.13.1";
+    const APP_VERSION = "0.13.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -95,6 +95,7 @@
     let benfeitoriasAtuais = [];
     let bairrosFiltro = [];
     let faixaValor = null;
+    let recentesPrimeiro = false;   // botão "Adicionados recentemente": os mais novos no topo da lista
     let notaMinimaCadastro = null;
     let pesosQualidade = null;   // peso de cada item da nota (Configurações); sem peso = 10
     let modoDialogo = "leitura";
@@ -193,7 +194,15 @@
         });
         $("valorMinRange").addEventListener("input", () => aoMoverFaixa("min"));
         $("valorMaxRange").addEventListener("input", () => aoMoverFaixa("max"));
+        // valor digitado ("de ... até ..."): mais fácil que arrastar a bolinha em celular pequeno
+        [ [ "valorMinInput", "min" ], [ "valorMaxInput", "max" ] ].forEach(([ id, qual ]) => {
+            let espera = null;
+            $(id).addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(() => aplicarValorDigitado(qual, false), 500); });
+            $(id).addEventListener("change", () => { clearTimeout(espera); aplicarValorDigitado(qual, true); });
+            $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $(id).blur(); } });
+        });
         $("limparFiltrosButton").addEventListener("click", limparFiltros);
+        $("recentesButton").addEventListener("click", () => definirRecentesPrimeiro(!recentesPrimeiro));
         $("toggleConstrucaoViewButton").addEventListener("click", toggleConstrucaoView);
         $("newConstrucaoButton").addEventListener("click", () => openConstrucaoDialog(null));
         $("novoCadastroButton").addEventListener("click", () => openConstrucaoDialog(null));
@@ -1279,6 +1288,37 @@
         $("valorMaxRange").value = faixaValor.max;
         box.hidden = false;
         desenharFaixa();
+        escreverCamposValor();
+    }
+
+    // Campo vazio = sem limite (o exemplo mostra o menor/maior valor cadastrado); não mexe no campo em que a pessoa está digitando.
+    function escreverCamposValor(forcar) {
+        if (!faixaValor) return;
+        [ [ "valorMinInput", faixaValor.min, faixaValor.limMin ], [ "valorMaxInput", faixaValor.max, faixaValor.limMax ] ].forEach(([ id, valor, limite ]) => {
+            const campo = $(id);
+            // sem o "R$" para caber em celular pequeno (o valor com R$ aparece logo acima, junto da barra)
+            const numero = v => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+            campo.placeholder = numero(limite);
+            if (forcar || document.activeElement !== campo) campo.value = valor === limite ? "" : numero(valor);
+        });
+    }
+
+    // final = saiu do campo (ou Enter): aí acerta "de" maior que "até" e formata; enquanto digita só filtra.
+    function aplicarValorDigitado(qual, final) {
+        if (!faixaValor) return;
+        const lido = parseValor($(qual === "min" ? "valorMinInput" : "valorMaxInput").value);
+        const limite = qual === "min" ? faixaValor.limMin : faixaValor.limMax;
+        const valor = lido == null ? limite : Math.min(Math.max(lido, faixaValor.limMin), faixaValor.limMax);
+        faixaValor[qual] = valor;
+        if (final) {
+            if (qual === "min" && faixaValor.max < valor) faixaValor.max = valor;
+            if (qual === "max" && faixaValor.min > valor) faixaValor.min = valor;
+        }
+        $("valorMinRange").value = faixaValor.min;
+        $("valorMaxRange").value = faixaValor.max;
+        desenharFaixa();
+        renderConstrucoes();
+        if (final) escreverCamposValor(true);
     }
 
     function desenharFaixa() {
@@ -1303,6 +1343,7 @@
         faixaValor.min = min;
         faixaValor.max = max;
         desenharFaixa();
+        escreverCamposValor();
         renderConstrucoes();
     }
 
@@ -1310,9 +1351,19 @@
         return !!faixaValor && (faixaValor.min > faixaValor.limMin || faixaValor.max < faixaValor.limMax);
     }
 
+    function definirRecentesPrimeiro(ligado) {
+        recentesPrimeiro = ligado;
+        $("recentesButton").classList.toggle("ativo", ligado);
+        $("recentesButton").setAttribute("aria-pressed", String(ligado));
+        renderConstrucoes();
+    }
+
     function limparFiltros() {
         bairrosFiltro = [];
         faixaValor = null;
+        recentesPrimeiro = false;
+        $("recentesButton").classList.remove("ativo");
+        $("recentesButton").setAttribute("aria-pressed", "false");
         $("construcaoSearchInput").value = "";
         $("bairroFiltroInput").value = "";
         definirFinalidadeFiltro("todos");
@@ -1339,6 +1390,11 @@
             }
             return true;
         });
+        // "Adicionados recentemente" ligado: data de cadastro, do mais novo ao mais antigo (empate: código maior primeiro)
+        if (recentesPrimeiro) {
+            return filtrados.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))
+                || String(b.codigo || "").localeCompare(String(a.codigo || ""), "pt-BR", { numeric: true }));
+        }
         // primeiro os imóveis do perfil de atuação de quem está usando (ele continua vendo todos)
         return window.SKLPerfis ? window.SKLPerfis.ordenar(filtrados, meusPerfis()) : filtrados;
     }

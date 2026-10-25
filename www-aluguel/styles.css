@@ -182,6 +182,7 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .busca-linha>select{max-width:230px;width:auto}
 .busca-acoes{justify-content:flex-end}
 .busca-acoes #buscaResultado{margin-right:auto;font-weight:700}
+.recentes-button.ativo{background:var(--navy);border-color:var(--navy);color:#fff}
 .segmentado{display:inline-flex;background:#e6edef;border-radius:12px;padding:4px;gap:4px;flex:none}
 .segmentado button{border:0;background:transparent;border-radius:9px;padding:9px 16px;font-weight:800;color:var(--navy-deep)}
 .segmentado button.ativo{background:var(--navy);color:#fff;box-shadow:0 2px 8px rgba(6,27,46,.2)}
@@ -190,10 +191,13 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .bairro-chips{display:flex;gap:6px;flex-wrap:wrap}
 .bairro-chip{display:inline-flex;align-items:center;gap:6px;background:#e3f3fb;color:var(--navy-deep);border-radius:99px;padding:6px 6px 6px 12px;font-size:12px;font-weight:700}
 .bairro-chip button{border:0;background:rgba(6,27,46,.12);color:var(--navy-deep);width:22px;height:22px;border-radius:50%;line-height:1;font-size:14px;padding:0}
-.faixa-valor{flex:1;min-width:260px;max-width:460px}
+.faixa-valor{flex:1;min-width:min(310px,100%);max-width:460px}
 .faixa-valor-topo{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:4px}
 .faixa-valor-topo strong{color:var(--navy-deep)}
 .faixa-valor-trilho{position:relative;height:28px}
+.faixa-valor-campos{display:flex;gap:10px;margin-top:6px}
+.faixa-valor-campos label{flex:1;min-width:0;display:flex;align-items:center;gap:6px;margin:0;font-size:12px;font-weight:700;color:var(--muted)}
+.faixa-valor-campos input{flex:1 1 0;min-width:0;width:0;padding:8px;font-size:16px}
 .faixa-valor-trilho::before{content:"";position:absolute;left:0;right:0;top:12px;height:4px;border-radius:4px;background:#dce3e5}
 .faixa-valor-preenchido{position:absolute;top:12px;height:4px;border-radius:4px;background:var(--navy)}
 .faixa-valor-trilho input[type=range]{position:absolute;left:0;top:0;width:100%;height:28px;margin:0;padding:0;border:0;background:transparent;pointer-events:none;-webkit-appearance:none;appearance:none;box-shadow:none;outline:none}
