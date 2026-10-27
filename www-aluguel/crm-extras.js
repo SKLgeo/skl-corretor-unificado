@@ -46,6 +46,8 @@
   <button class="dialog-close" type="button" data-fechar>×</button>
   <span class="eyebrow">ENVIAR AO CLIENTE</span><h2 id="extEnvTitulo">Imóvel</h2>
   <label><span>Telefone do cliente (WhatsApp)</span><input id="extEnvTel" inputmode="tel" placeholder="(66) 99999-0000" autocomplete="off" /></label>
+  <label class="check-inline ext-env-local"><input id="extEnvLocal" type="checkbox" /> Incluir localização do imóvel</label>
+  <p id="extEnvLocalDica" class="muted-text ext-env-local-dica"></p>
   <label><span>Mensagem</span><textarea id="extEnvTexto" rows="9"></textarea></label>
   <p id="extEnvAviso" class="muted-text"></p>
   <div class="dialog-actions"><button id="extEnvFicha" type="button" class="secondary-button">Ficha em PDF</button><button id="extEnvCopiar" type="button" class="secondary-button">Copiar texto</button><button id="extEnvWhats" type="button" class="primary-button">Abrir WhatsApp</button></div>
@@ -64,6 +66,7 @@
         document.querySelectorAll("#extPropostaDialog [data-fechar], #extEnviarDialog [data-fechar], #extChaveDialog [data-fechar]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
         $("extPropSalvar").addEventListener("click", salvarProposta);
         $("extEnvWhats").addEventListener("click", abrirWhats);
+        $("extEnvLocal").addEventListener("change", alternarLocalizacao);
         $("extEnvCopiar").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("extEnvTexto").value); ctx.toast("Texto copiado."); } catch { ctx.toast("Selecione o texto e copie."); } });
         $("extEnvFicha").addEventListener("click", () => fichaPdf(imovelAberto));
         $("extChaveQuem").addEventListener("change", () => { $("extChaveNomeLabel").hidden = $("extChaveQuem").value !== "__fora"; });
@@ -333,10 +336,16 @@
     }
 
     // ------------------------------------------------------------------ enviar ao cliente
-    function textoImovel(c, link) {
+    // comLocal: o corretor marcou "Incluir localização" — vai o endereço e o link do mapa (sem isso, só bairro e cidade)
+    function textoImovel(c, link, comLocal) {
         const linhas = [ `🏠 *${c.nome}*${c.codigo ? ` (cód. ${c.codigo})` : ""}` ];
         const local = [ c.bairro, c.cidade ].filter(Boolean).join(" · ");
         if (local) linhas.push(`📍 ${local}`);
+        if (comLocal) {
+            const rua = [ c.logradouro, c.numero ].filter(Boolean).join(", ");
+            if (rua) linhas.push(`🏷️ ${rua}${c.complemento ? " - " + c.complemento : ""}`);
+            if (c.latitude != null && c.longitude != null) linhas.push(`🗺️ Localização: https://www.google.com/maps/search/?api=1&query=${c.latitude},${c.longitude}`);
+        }
         const precos = [];
         if (c.para_aluguel && c.valor_aluguel) precos.push(`Aluguel ${dinheiro(c.valor_aluguel)}`);
         if (c.para_venda && c.valor_venda) precos.push(`Venda ${dinheiro(c.valor_venda)}`);
@@ -370,9 +379,33 @@
             const tel = String((eu && eu.telefone) || "").replace(/\D/g, "");
             if (tel.length >= 10) link += "&w=" + tel;
         }
-        $("extEnvTexto").value = textoImovel(c, link);
+        envioAtual = { c, link, chave: null };
+        const temLocal = (c.latitude != null && c.longitude != null) || !!(c.logradouro || "").trim();
+        $("extEnvLocal").checked = false;
+        $("extEnvLocal").disabled = !temLocal;
+        $("extEnvLocalDica").textContent = temLocal
+            ? "Desmarcado, o cliente recebe só as fotos e as informações, com o bairro e a cidade (sem endereço nem mapa)."
+            : "Este imóvel não tem endereço nem localização no cadastro.";
+        $("extEnvTexto").value = textoImovel(c, link, false);
         $("extEnvAviso").textContent = link ? "O link abre uma página com as fotos e a descrição, sem dados do proprietário."
             : (c.publicar_site ? "Sem link: a vitrine de imóveis está desligada (Configurações → Site e portais). Use a ficha em PDF." : "Sem link: este imóvel não está marcado \"Publicar no site\". Use a ficha em PDF.");
+    }
+    let envioAtual = null;
+    // marcar/desmarcar refaz a mensagem; com localização, o link leva uma chave que libera endereço e mapa na página do imóvel
+    async function alternarLocalizacao() {
+        const e = envioAtual;
+        if (!e) return;
+        const com = $("extEnvLocal").checked;
+        let link = e.link;
+        if (com && link) {
+            if (!e.chave) {
+                const { data, error } = await ctx.sb.rpc("imovel_link_envio", { p_construcao: e.c.id, p_localizacao: true });
+                if (error) { ctx.toast(ctx.traduzErro(error.message)); $("extEnvLocal").checked = false; return; }
+                e.chave = data;
+            }
+            link += "&e=" + encodeURIComponent(e.chave);
+        }
+        $("extEnvTexto").value = textoImovel(e.c, link, com);
     }
     function abrirWhats() {
         const d = $("extEnvTel").value.replace(/\D/g, "");

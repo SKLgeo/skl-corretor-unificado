@@ -1,10 +1,11 @@
 // Página pública de UM imóvel (link do "Enviar ao cliente"): lê o feed da imobiliária (imobiliaria-feed) pelo token + código.
-// Não mostra proprietário, corretor nem endereço exato (só bairro/cidade); o número do WhatsApp vem do link (?w=) de quem enviou.
+// Não mostra proprietário nem corretor; o número do WhatsApp vem do link (?w=) de quem enviou. Endereço exato e mapa só quando
+// o corretor marcou "Incluir localização" (o link traz ?e=<chave> e o feed só devolve a localização com ela).
 (function () {
     "use strict";
     const $ = id => document.getElementById(id);
     const q = new URLSearchParams(location.search);
-    const token = q.get("f") || "", codigo = q.get("c") || "", whats = (q.get("w") || "").replace(/\D/g, "");
+    const token = q.get("f") || "", codigo = q.get("c") || "", whats = (q.get("w") || "").replace(/\D/g, ""), envio = q.get("e") || "";
     const FEED = "https://xigwlofqkmiibzbongkn.supabase.co/functions/v1/imobiliaria-feed";
     const dinheiro = v => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     let fotos = [], atual = 0;
@@ -41,7 +42,7 @@
         if (!token || !codigo) return falha("Link incompleto.");
         let d;
         try {
-            const r = await fetch(`${FEED}?t=${encodeURIComponent(token)}&codigo=${encodeURIComponent(codigo)}`);
+            const r = await fetch(`${FEED}?t=${encodeURIComponent(token)}&codigo=${encodeURIComponent(codigo)}${envio ? "&e=" + encodeURIComponent(envio) : ""}`);
             d = await r.json();
         } catch { return falha("Não foi possível carregar agora. Tente de novo em instantes."); }
         const i = d && d.ok && d.imoveis && d.imoveis[0];
@@ -56,7 +57,8 @@
         $("codigo").textContent = `${i.tipo || "Imóvel"} · cód. ${i.codigo}`;
         $("titulo").textContent = i.titulo;
         const e = i.endereco || {};
-        $("local").textContent = [ e.bairro, [ e.cidade, e.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
+        const rua = i.localizacao ? [ e.logradouro, e.numero ].filter(Boolean).join(", ") : "";
+        $("local").textContent = [ rua, e.bairro, [ e.cidade, e.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
         const precos = [];
         if (i.valor_aluguel) precos.push([ "Aluguel", dinheiro(i.valor_aluguel) + "/mês" ]);
         if (i.valor_venda) precos.push([ "Venda", dinheiro(i.valor_venda) ]);

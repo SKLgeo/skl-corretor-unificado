@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.13.2";
+    const APP_VERSION = "0.13.3";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1677,6 +1677,7 @@
         $("construcaoDescricaoInput").value = construcao?.descricao || "";
         $("destaqueInput").checked = !!construcao?.destaque;
         $("publicarSiteInput").checked = !!construcao?.publicar_site;
+        $("siteLocalizacaoInput").checked = !!construcao?.site_localizacao;
         $("construcaoLatInput").value = construcao?.latitude ?? "";
         $("construcaoLngInput").value = construcao?.longitude ?? "";
         $("construcaoLinkMapaInput").value = "";
@@ -2401,6 +2402,14 @@
             if (window.SKLCRM) {
                 const comProprietario = await window.SKLCRM.proprietarioSalvar(imovel);
                 if (comProprietario) { imovel = comProprietario; construcoes.set(imovel.id, imovel); }
+            }
+            // "Mostrar localização no site" (sem ela o site e os portais mostram só bairro e cidade)
+            const mostrarLocal = $("siteLocalizacaoInput").checked;
+            if (podeGerenciar() && !!imovel.site_localizacao !== mostrarLocal) {
+                const { error } = await sb.rpc("definir_localizacao_site", { p_construcao: imovel.id, p_mostrar: mostrarLocal });
+                if (error) throw error;
+                imovel = { ...imovel, site_localizacao: mostrarLocal };
+                construcoes.set(imovel.id, imovel);
             }
             if (enviar && imovel.aprovacao !== "pendente") {
                 const { data, error } = await sb.rpc("enviar_cadastro_imovel", { p_id: imovel.id });
