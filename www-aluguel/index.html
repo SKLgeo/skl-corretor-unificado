@@ -1197,18 +1197,50 @@
   <dialog id="finContratoDialog" class="crm-dialog crm-dialog-larga">
     <form method="dialog" class="dialog-card" id="finContratoForm">
       <button class="dialog-close" type="button" value="cancel">×</button>
-      <span class="eyebrow">ADMINISTRAÇÃO DE ALUGUEL</span>
-      <h2 id="finContratoTitulo">Novo contrato de locação</h2>
+      <span class="eyebrow">CONTRATOS</span>
+      <h2 id="finContratoTitulo">Novo contrato</h2>
       <input id="finCtNegociacao" type="hidden" />
       <div id="finCtCobrancas"></div>
+      <div id="finCtTipoBox" class="finalidade-row">
+        <span class="campo-rotulo">Tipo de contrato</span>
+        <div id="finCtTipo" class="segmentado" role="group" aria-label="Tipo de contrato">
+          <button type="button" data-ct-tipo="locacao" class="ativo">Locação</button>
+          <button type="button" data-ct-tipo="venda">Compra e venda</button>
+        </div>
+      </div>
+      <div class="finalidade-row">
+        <span class="campo-rotulo">Imóvel</span>
+        <label class="check-inline"><input type="radio" name="finCtOrigem" value="cadastrado" checked /> Cadastrado no sistema</label>
+        <label class="check-inline"><input type="radio" name="finCtOrigem" value="avulso" /> Não cadastrado (imóvel novo)</label>
+      </div>
       <div class="form-row">
-        <label><span>Imóvel</span><select id="finCtImovel"></select></label>
+        <label id="finCtImovelLabel"><span>Imóvel</span><select id="finCtImovel"></select></label>
         <label><span>Corretor que fechou</span><select id="finCtCorretor"></select></label>
       </div>
-      <div class="form-row">
-        <label><span>Inquilino</span><select id="finCtInquilino"></select></label>
-        <label><span>Proprietário</span><select id="finCtProprietario"></select></label>
+      <div id="finCtAvulso" class="fin-grade fin-avulso" hidden>
+        <label class="fin-largo"><span>Descrição do imóvel</span><input id="finCtAvDesc" placeholder="ex.: Casa 3 quartos no Jardim Atlântico" autocomplete="off" /></label>
+        <label><span>Tipo</span><input id="finCtAvTipo" placeholder="Casa, apartamento, terreno…" autocomplete="off" /></label>
+        <label class="fin-largo"><span>Endereço</span><input id="finCtAvEnd" placeholder="Rua, número, bairro" autocomplete="off" /></label>
+        <label><span>Cidade/UF</span><input id="finCtAvCidade" placeholder="ex.: Rondonópolis/MT" autocomplete="off" /></label>
+        <label><span>Matrícula</span><input id="finCtAvMatricula" autocomplete="off" /></label>
+        <label><span>Área</span><input id="finCtAvArea" placeholder="ex.: 360 m²" autocomplete="off" /></label>
       </div>
+      <div class="form-row">
+        <label><span id="finCtInquilinoRot">Inquilino</span><select id="finCtInquilino"></select></label>
+        <label><span id="finCtProprietarioRot">Proprietário</span><select id="finCtProprietario"></select></label>
+      </div>
+      <div id="finCtVendaCampos" hidden>
+        <div class="fin-grade">
+          <label><span>Valor da venda (R$)</span><input id="finCvValor" inputmode="decimal" autocomplete="off" /></label>
+          <label><span>Data do contrato</span><input id="finCvData" type="date" /></label>
+          <label><span>Sinal / entrada (R$)</span><input id="finCvSinal" inputmode="decimal" autocomplete="off" /></label>
+          <label><span>Comissão (%)</span><input id="finCvComPct" inputmode="decimal" autocomplete="off" /></label>
+          <label><span>Comissão (R$)</span><input id="finCvComValor" inputmode="decimal" autocomplete="off" /></label>
+          <label><span>Prazo para a escritura</span><input id="finCvEscritura" type="date" /></label>
+        </div>
+        <label><span>Forma de pagamento</span><input id="finCvForma" placeholder="ex.: sinal + financiamento bancário, à vista, permuta" autocomplete="off" /></label>
+      </div>
+      <div id="finCtLocacaoCampos">
       <div class="fin-grade">
         <label><span>Aluguel (R$)</span><input id="finCtValor" inputmode="decimal" autocomplete="off" /></label>
         <label><span>Vence todo dia</span><input id="finCtDia" type="number" min="1" max="28" /></label>
@@ -1230,6 +1262,7 @@
       <div id="finCtItens" class="fin-itens"></div>
       <button id="finCtAddItem" type="button" class="secondary-button fin-mini">+ Item (condomínio, IPTU…)</button>
       <label><span>Dados para o repasse ao proprietário (PIX, banco)</span><input id="finCtRepDados" autocomplete="off" /></label>
+      </div>
       <label><span>Observações</span><textarea id="finCtObs" rows="2"></textarea></label>
       <p id="finCtMsg" class="form-message" hidden></p>
       <div class="dialog-actions"><button id="finCtSalvar" type="button" class="primary-button">Criar contrato</button></div>
@@ -1251,6 +1284,20 @@
           <label class="check-inline"><input id="finEncLiberar" type="checkbox" checked /> Imóvel volta a ficar disponível</label>
           <button id="finEncAplicar" type="button" class="danger-button">Encerrar contrato</button>
         </details>
+      </div>
+      <div id="finCvAcoes" class="fin-ct-acoes" hidden>
+        <details><summary>Concluir a venda</summary>
+          <div class="fin-grade"><label><span>Concluída em (escritura / entrega)</span><input id="finCvConcluirData" type="date" /></label></div>
+          <p class="muted-text">Se o imóvel for cadastrado no sistema, ele passa a aparecer como vendido.</p>
+          <button id="finCvConcluir" type="button" class="primary-button">Marcar como concluída</button>
+        </details>
+        <details><summary>Cancelar o contrato</summary>
+          <div class="fin-grade"><label class="fin-largo"><span>Motivo</span><input id="finCvMotivo" placeholder="ex.: distrato, financiamento negado" autocomplete="off" /></label></div>
+          <button id="finCvCancelar" type="button" class="danger-button">Cancelar contrato</button>
+        </details>
+      </div>
+      <div id="finCvReabrirBox" class="fin-ct-acoes" hidden>
+        <button id="finCvReabrir" type="button" class="secondary-button">Voltar para "em andamento"</button>
       </div>
       <div id="finCtHistoricoBox" class="fin-historico" hidden><span class="crm-rotulo">Histórico do contrato</span><ul id="finCtHistorico"></ul></div>
     </form>

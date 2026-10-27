@@ -53,7 +53,11 @@
     const cliente = id => (id && F().cliente(id)) || null;
     const nomeCli = id => (cliente(id) || {}).nome || "—";
     const imovel = id => ctx.imoveis().find(c => c.id === id) || null;
+    // contrato com imóvel não cadastrado guarda a descrição no próprio contrato (imovel_avulso)
+    const imovelCt = c => (c && c.construcao_id ? imovel(c.construcao_id) : null)
+        || (c && c.imovel_avulso ? { nome: c.imovel_avulso.descricao, endereco: [ c.imovel_avulso.endereco, c.imovel_avulso.cidade ].filter(Boolean).join(", ") } : null);
     const nomeImovel = id => { const c = imovel(id); return c ? ((c.codigo ? c.codigo + " · " : "") + c.nome) : "—"; };
+    const nomeImovelCt = c => { const i = imovelCt(c); return i ? ((i.codigo ? i.codigo + " · " : "") + (i.nome || "")) : "—"; };
     const nomeUsuario = id => ((ctx.equipe() || []).find(u => u.id === id) || {}).display_name || "—";
 
     // ------------------------------------------------------------------ início, dados e tempo real
@@ -144,7 +148,7 @@
         const modelo = regua["msg_" + l.etapa] || MSG_PADRAO[l.etapa];
         const troca = {
             nome: (inq.nome || "").split(" ")[0] || "tudo bem", valor: dinheiro(l.valor.total), vencimento: dataBr(l.b.vencimento),
-            mes: mesAno(l.b.competencia), imovel: nomeImovel(l.c.construcao_id), dias: l.valor.dias,
+            mes: mesAno(l.b.competencia), imovel: nomeImovelCt(l.c), dias: l.valor.dias,
             pagamento: regua.pagamento ? regua.pagamento.trim().replace(/([^.!?])$/, "$1.") : "", imobiliaria: ctx.carteiraNome()
         };
         return modelo.replace(/\{(\w+)\}/g, (m, k) => (k in troca ? String(troca[k]) : m)).replace(/\s{2,}/g, " ").trim();
@@ -152,7 +156,7 @@
     function renderRegua(box) {
         const f = $("finFiltro").value || "avisar";
         const todas = linhasRegua();
-        const lista = todas.filter(l => (f === "todas" || l.avisar) && bate(`${l.c.numero} ${nomeCli(l.c.inquilino_id)} ${nomeImovel(l.c.construcao_id)}`));
+        const lista = todas.filter(l => (f === "todas" || l.avisar) && bate(`${l.c.numero} ${nomeCli(l.c.inquilino_id)} ${nomeImovelCt(l.c)}`));
         $("finContagem").textContent = `${lista.length} aviso(s) · ${dinheiro(lista.reduce((s, l) => s + l.valor.total, 0))}`;
         const grupo = etapa => {
             const itens = lista.filter(l => l.etapa === etapa);
@@ -175,7 +179,7 @@
         const ult = l.ultimo ? `Avisado por ${l.ultimo.canal === "email" ? "e-mail" : l.ultimo.canal === "telefone" ? "telefone" : "WhatsApp"} em ${new Date(l.ultimo.created_at).toLocaleDateString("pt-BR")}` : "Ainda não avisado";
         return `<article class="fx-cartao${l.avisar ? " fx-pendente" : ""}">
             <header><strong>${h(inq.nome || "—")}</strong><span class="status-pill ${l.etapa === "atraso" ? "fin-atrasada" : l.etapa === "vencimento" ? "fin-hoje" : "fin-aberta"}">${l.etapa === "atraso" ? `${l.valor.dias} dia(s) em atraso` : l.etapa === "vencimento" ? "Vence hoje" : `Vence ${dataBr(l.b.vencimento)}`}</span></header>
-            <small>${h(nomeImovel(l.c.construcao_id))} · ${l.b.tipo === "rescisao" ? "rescisão" : h(l.b.parcela) + "ª parcela"} (${h(mesAno(l.b.competencia))})</small>
+            <small>${h(nomeImovelCt(l.c))} · ${l.b.tipo === "rescisao" ? "rescisão" : h(l.b.parcela) + "ª parcela"} (${h(mesAno(l.b.competencia))})</small>
             <div class="fx-valor">${h(dinheiro(l.valor.total))}${l.valor.dias ? `<small>com multa e juros</small>` : ""}</div>
             <small class="fx-ultimo">${h(ult)}</small>
             <div class="fin-acoes">
@@ -275,7 +279,7 @@
     }
     function opcoesContratos(sel, soAtivos) {
         const lista = (F().contratos() || []).filter(c => !soAtivos || c.status === "ativo" || c.id === sel);
-        return `<option value="">Sem contrato (só o imóvel)</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))} · ${h(nomeImovel(c.construcao_id))}</option>`).join("");
+        return `<option value="">Sem contrato (só o imóvel)</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))} · ${h(nomeImovelCt(c))}</option>`).join("");
     }
     function opcoesImoveis(sel) {
         const lista = ctx.imoveis().slice().sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
@@ -626,12 +630,12 @@
     function termoRescisao(c, r, previa) {
         if (!r) return;
         const inq = cliente(c.inquilino_id) || {}, prop = cliente(c.proprietario_id) || {};
-        const im = imovel(c.construcao_id) || {};
+        const im = imovelCt(c) || {};
         const nome = ctx.carteiraNome();
         const html = `<div class="fin-doc"><header><div><strong>${h(nome)}</strong><span>Termo de rescisão de contrato de locação${previa ? " (prévia)" : ""}</span></div><small>Emitido em ${h(new Date().toLocaleDateString("pt-BR"))}</small></header>
           <p>Pelo presente termo, <strong>${h(prop.nome || "o LOCADOR")}</strong>${prop.cpf ? `, CPF/CNPJ ${h(prop.cpf)}` : ""} (locador), representado por ${h(nome)}, e
           <strong>${h(inq.nome || "o LOCATÁRIO")}</strong>${inq.cpf ? `, CPF/CNPJ ${h(inq.cpf)}` : ""} (locatário), rescindem o contrato de locação nº ${h(c.numero)}
-          do imóvel <strong>${h(nomeImovel(c.construcao_id))}</strong>${im.endereco ? `, ${h(im.endereco)}` : ""}, iniciado em ${h(dataBr(r.inicio))} com término previsto em ${h(dataBr(r.fim))},
+          do imóvel <strong>${h(nomeImovelCt(c))}</strong>${im.endereco ? `, ${h(im.endereco)}` : ""}, iniciado em ${h(dataBr(r.inicio))} com término previsto em ${h(dataBr(r.fim))},
           com entrega das chaves em <strong>${h(dataBr(r.data_saida))}</strong>${r.motivo ? ` (motivo: ${h(r.motivo)})` : ""}.</p>
           <p>Aluguel vigente: ${h(dinheiro(r.valor_aluguel))} por mês. Apuração dos valores:</p>
           ${tabelaRescisao(r)}

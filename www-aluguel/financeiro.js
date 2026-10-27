@@ -1,4 +1,4 @@
-// Financeiro da administração de aluguéis (Bloco 4): contratos de locação, cobranças mensais com multa e juros,
+// Financeiro da administração de aluguéis (Bloco 4): contratos de locação e de compra e venda, cobranças mensais com multa e juros,
 // repasse ao proprietário (com taxa de administração e intermediação do 1º aluguel), reajuste, encerramento,
 // recibo do inquilino e demonstrativo do proprietário. Toda escrita passa pelas RPCs fin_* do banco; o cálculo do
 // repasse e da multa é feito lá (aqui só aparece uma prévia com a mesma conta).
@@ -10,14 +10,16 @@
     const FORMAS = [ "PIX", "Boleto", "Transferência", "Dinheiro", "Cartão", "Depósito" ];
     const FILTROS = {
         cobrancas: { abertas: "Em aberto (todas)", atrasadas: "Em atraso", mes: "Vencem no mês", pagas: "Pagas no mês", canceladas: "Canceladas", todas: "Todas do mês" },
-        contratos: { ativos: "Ativos", reajuste: "Reajuste em até 30 dias", vencendo: "Terminando em até 60 dias", encerrados: "Encerrados", todos: "Todos" },
+        contratos: { ativos: "Ativos e em andamento", locacao: "Locação (ativos)", venda: "Compra e venda (em andamento)", reajuste: "Reajuste em até 30 dias",
+            vencendo: "Terminando em até 60 dias", encerrados: "Encerrados, concluídos e cancelados", todos: "Todos" },
         repasses: { pendentes: "A repassar", pagos: "Repassados no mês", todos: "Todos do mês" }
     };
 
     let ctx = null, ligado = false, aba = "resumo";
-    let contratos = [], cobrancas = [], repasses = [], clientes = new Map(), eventos = [];
+    let contratos = [], vendas = [], cobrancas = [], repasses = [], clientes = new Map(), eventos = [];
     let resumo = null, carregando = null, canal = null, recarregarTimer = null;
     let contratoAberto = null, itens = [], cobrancaAberta = null;
+    let ctTipo = "locacao", vendaAberta = null; // tipo do contrato aberto na janela: locação ou compra e venda
 
     const h = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const podeGerir = () => !!ctx && ctx.podeGerir();
@@ -48,6 +50,16 @@
     const imovel = id => ctx.imoveis().find(c => c.id === id) || null;
     const nomeImovel = id => { const c = imovel(id); return c ? ((c.codigo ? c.codigo + " · " : "") + c.nome) : "—"; };
     const contrato = id => contratos.find(c => c.id === id) || null;
+    const venda = id => vendas.find(c => c.id === id) || null;
+    // imóvel do contrato: cadastrado no sistema ou "não cadastrado" (imovel_avulso, descrito no próprio contrato)
+    const nomeImovelCt = c => c && c.construcao_id ? nomeImovel(c.construcao_id)
+        : (c && c.imovel_avulso && c.imovel_avulso.descricao ? c.imovel_avulso.descricao : "—");
+    function enderecoCt(c) {
+        const i = c && c.construcao_id ? imovel(c.construcao_id) : null;
+        if (i) return i.endereco || "";
+        const a = (c && c.imovel_avulso) || {};
+        return [ a.endereco, a.cidade ].filter(Boolean).join(", ");
+    }
 
     // ------------------------------------------------------------------ início e dados
     function iniciar(contexto) {
@@ -56,7 +68,7 @@
         const ve = ctx.veTudo();
         $("navFinanceiro").hidden = !ve;
         document.querySelectorAll("[data-fin-gerir]").forEach(el => { el.hidden = !podeGerir(); });
-        contratos = []; cobrancas = []; repasses = []; clientes = new Map(); resumo = null;
+        contratos = []; vendas = []; cobrancas = []; repasses = []; clientes = new Map(); resumo = null;
         if (!$("finMes").value) $("finMes").value = hojeIso().slice(0, 7);
         if (window.SKLFinExtra) window.SKLFinExtra.iniciar(ctx);
         if (window.SKLFinGestao) window.SKLFinGestao.iniciar(ctx);
@@ -66,7 +78,7 @@
     }
     function sair() {
         if (canal && ctx) { ctx.sb.removeChannel(canal); }
-        canal = null; contratos = []; cobrancas = []; repasses = []; clientes = new Map();
+        canal = null; contratos = []; vendas = []; cobrancas = []; repasses = []; clientes = new Map();
         if (window.SKLFinExtra) window.SKLFinExtra.sair();
         if (window.SKLFinGestao) window.SKLFinGestao.sair();
     }
@@ -89,16 +101,18 @@
             const cart = ctx.carteiraId();
             const desde = somaDias(hojeIso(), -400);
             if (!silencioso) await ctx.sb.rpc("fin_atualizar", { p_carteira: cart });
-            const [ c1, c2, c3, c4, c5 ] = await Promise.all([
+            const [ c1, c2, c3, c4, c5, c6 ] = await Promise.all([
                 ctx.sb.from("aluguel_contratos").select("*").eq("carteira_id", cart).order("numero", { ascending: false }),
                 ctx.sb.from("aluguel_cobrancas").select("*").eq("carteira_id", cart).or(`status.eq.aberta,vencimento.gte.${desde}`).order("vencimento"),
                 ctx.sb.from("aluguel_repasses").select("*").eq("carteira_id", cart).or(`status.eq.pendente,competencia.gte.${desde}`).order("competencia", { ascending: false }),
                 ctx.sb.from("crm_clientes").select("id,nome,telefone,email,cpf").eq("carteira_id", cart),
-                ctx.sb.rpc("fin_resumo", { p_carteira: cart, p_mes: mesSel() + "-01" })
+                ctx.sb.rpc("fin_resumo", { p_carteira: cart, p_mes: mesSel() + "-01" }),
+                ctx.sb.from("imobiliaria_contratos_venda").select("*").eq("carteira_id", cart).order("numero", { ascending: false })
             ]);
             const falha = [ c1, c2, c3, c4 ].find(r => r.error);
             if (falha) { if (!silencioso) ctx.toast(erro(falha.error)); return; }
             contratos = c1.data || []; cobrancas = c2.data || []; repasses = c3.data || [];
+            vendas = (c6.error ? [] : c6.data || []).map(v => ({ ...v, _tipo: "venda" }));
             clientes = new Map((c4.data || []).map(c => [ c.id, c ]));
             resumo = c5.error ? null : c5.data;
             atualizarSelo();
@@ -128,8 +142,15 @@
             const c = imovel($("finCtImovel").value);
             if (!c) return;
             if (c.proprietario_cliente_id && !$("finCtProprietario").value) $("finCtProprietario").value = c.proprietario_cliente_id;
-            if (c.valor_aluguel && !$("finCtValor").value) $("finCtValor").value = pct(c.valor_aluguel);
+            if (ctTipo === "venda") { if (c.valor_venda && !$("finCvValor").value) { $("finCvValor").value = pct(c.valor_venda); calcularComissaoVenda(); } }
+            else if (c.valor_aluguel && !$("finCtValor").value) $("finCtValor").value = pct(c.valor_aluguel);
         });
+        document.querySelectorAll("[data-ct-tipo]").forEach(b => b.addEventListener("click", () => definirTipo(b.dataset.ctTipo)));
+        document.querySelectorAll("input[name=finCtOrigem]").forEach(r => r.addEventListener("change", mostrarOrigem));
+        [ "finCvValor", "finCvComPct" ].forEach(id => $(id).addEventListener("input", calcularComissaoVenda));
+        $("finCvConcluir").addEventListener("click", () => situacaoVenda("concluido"));
+        $("finCvCancelar").addEventListener("click", () => situacaoVenda("cancelado"));
+        $("finCvReabrir").addEventListener("click", () => situacaoVenda("em_andamento"));
         $("finCtGarantia").addEventListener("change", mostrarGarantia);
         $("finCtAddItem").addEventListener("click", () => { itens.push({ descricao: "", valor: "", repassar: false }); desenharItens(); });
         $("finCtSalvar").addEventListener("click", salvarContrato);
@@ -215,10 +236,10 @@
             ${aviso("Em atraso", atr.length, atr.slice(0, 8).map(b => linhaAtraso(b)).join(""), "Nenhum aluguel em atraso.", "cobrancas:atrasadas")}
             ${aviso("Reajustes nos próximos 30 dias", reaj.length, reaj.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>${h(INDICES[c.indice_reajuste])} · ${h(dataBr(c.proximo_reajuste))}</small></li>`).join(""), "Nenhum reajuste chegando.", "contratos:reajuste")}
             ${aviso("Contratos terminando em 60 dias", venc.length, venc.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>termina em ${h(dataBr(c.fim))}</small></li>`).join(""), "Nenhum contrato terminando.", "contratos:vencendo")}
-            ${semContrato.length && podeGerir() ? aviso("Locações fechadas sem contrato", semContrato.length, semContrato.slice(0, 8).map(n => `<li><button type="button" class="text-button" data-fin-neg="${h(n.id)}">${h(n.titulo || nomeCli(n.cliente_id))}</button><small>${h(dinheiro(n.valor))} · criar contrato</small></li>`).join(""), "") : ""}
+            ${semContrato.length && podeGerir() ? aviso("Negócios fechados sem contrato", semContrato.length, semContrato.slice(0, 8).map(n => `<li><button type="button" class="text-button" data-fin-neg="${h(n.id)}">${h(n.titulo || nomeCli(n.cliente_id))}</button><small>${h(dinheiro(n.valor))} · criar contrato</small></li>`).join(""), "") : ""}
             ${window.SKLFinExtra ? window.SKLFinExtra.avisosResumo(aviso) : ""}
           </div>
-          ${contratos.length ? "" : `<div class="empty-state">Nenhum contrato ainda. ${podeGerir() ? `Toque em "+ Novo contrato" ou, numa negociação de locação fechada, em "Criar contrato".` : ""}</div>`}`;
+          ${contratos.length ? "" : `<div class="empty-state">Nenhum contrato ainda. ${podeGerir() ? `Toque em "+ Novo contrato" ou, numa negociação fechada, em "Criar contrato".` : ""}</div>`}`;
         ligarLinks($("finResumo"));
         if (window.SKLFinExtra) window.SKLFinExtra.ligar($("finResumo"));
     }
@@ -238,8 +259,8 @@
         const crm = window.SKLCRM && window.SKLCRM.interno;
         if (!crm) return [];
         const negs = crm.negs instanceof Map ? [ ...crm.negs.values() ] : [];
-        const comContrato = new Set(contratos.map(c => c.negociacao_id).filter(Boolean));
-        return negs.filter(n => n.situacao === "ganha" && !comContrato.has(n.id) && (crm.funil(n.funil_id) || {}).finalidade === "locacao");
+        const comContrato = new Set([ ...contratos, ...vendas.filter(v => v.status !== "cancelado") ].map(c => c.negociacao_id).filter(Boolean));
+        return negs.filter(n => n.situacao === "ganha" && !comContrato.has(n.id) && [ "locacao", "venda" ].includes((crm.funil(n.funil_id) || {}).finalidade));
     }
     function ligarLinks(box) {
         box.querySelectorAll("[data-fin-ct]").forEach(b => b.addEventListener("click", () => abrirContrato(contrato(b.dataset.finCt))));
@@ -266,7 +287,7 @@
         const d = digitos(cli && cli.telefone);
         if (d.length < 10) return "";
         const atraso = b.vencimento < hojeIso();
-        const texto = `Olá, ${((cli.nome || "").split(" ")[0]) || "tudo bem"}! ${atraso ? "Consta em aberto" : "Lembrete:"} o aluguel de ${mesAno(b.competencia)} (${nomeImovel(c.construcao_id)}), `
+        const texto = `Olá, ${((cli.nome || "").split(" ")[0]) || "tudo bem"}! ${atraso ? "Consta em aberto" : "Lembrete:"} o aluguel de ${mesAno(b.competencia)} (${nomeImovelCt(c)}), `
             + `${atraso ? "vencido em" : "com vencimento em"} ${dataBr(b.vencimento)}, no valor de ${dinheiro(b.valor_total)}. Qualquer dúvida, estamos à disposição. ${ctx.carteiraNome()}`;
         return `<a class="crm-btn-contato whats" href="https://wa.me/55${d}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">WhatsApp</a>`;
     }
@@ -280,7 +301,7 @@
             if (f === "canceladas" && b.status !== "cancelada") return false;
             if (f === "todas" && !noMes(b.vencimento, ym)) return false;
             const c = contrato(b.contrato_id) || {};
-            return bate(`${c.numero} ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovel(c.construcao_id)}`);
+            return bate(`${c.numero} ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovelCt(c)}`);
         }).sort((a, b) => f === "pagas" ? String(b.pago_em).localeCompare(String(a.pago_em)) : a.vencimento.localeCompare(b.vencimento));
         const total = lista.reduce((s, b) => s + Number(b.status === "paga" ? b.valor_pago : b.valor_total || 0), 0);
         $("finContagem").textContent = `${lista.length} cobrança(s) · ${dinheiro(total)}`;
@@ -288,7 +309,7 @@
           ${lista.map(b => { const c = contrato(b.contrato_id) || {}; return `<tr>
             <td data-r="Vencimento">${h(dataBr(b.vencimento))}</td>
             <td data-r="Inquilino"><strong>${h(nomeCli(c.inquilino_id))}</strong><small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
-            <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}</td>
+            <td data-r="Imóvel">${h(nomeImovelCt(c))}</td>
             <td data-r="Parcela">${b.tipo === "rescisao" ? "Rescisão" : h(b.parcela) + "ª"} · ${h(mesAno(b.competencia))}</td>
             <td data-r="Valor">${h(dinheiro(b.status === "paga" ? b.valor_pago : b.valor_total))}${(b.itens || []).length ? `<small class="fin-sub">aluguel ${h(dinheiro(b.valor_aluguel))} + ${h(b.itens.map(i => i.descricao).join(", "))}</small>` : ""}${Number(b.multa) + Number(b.juros) > 0 ? `<small class="fin-sub">multa+juros ${h(dinheiro(Number(b.multa) + Number(b.juros)))}</small>` : ""}</td>
             <td data-r="Situação">${situacaoCobranca(b)}</td>
@@ -337,7 +358,7 @@
         const c = contrato(b.contrato_id) || {};
         cobrancaAberta = b;
         $("finPgTitulo").textContent = `Receber ${b.parcela}ª parcela · ${mesAno(b.competencia)}`;
-        $("finPgInfo").innerHTML = `<strong>${h(nomeCli(c.inquilino_id))}</strong> · ${h(nomeImovel(c.construcao_id))}<br>
+        $("finPgInfo").innerHTML = `<strong>${h(nomeCli(c.inquilino_id))}</strong> · ${h(nomeImovelCt(c))}<br>
           Vencimento ${h(dataBr(b.vencimento))} · aluguel ${h(dinheiro(b.valor_aluguel))}${(b.itens || []).map(i => ` + ${h(i.descricao)} ${h(dinheiro(i.valor))}`).join("")}`;
         $("finPgData").value = hojeIso();
         $("finPgDesconto").value = "";
@@ -395,45 +416,82 @@
         if (c.proximo_reajuste && c.proximo_reajuste <= somaDias(hoje, 30)) return `<span class="status-pill fin-hoje">Reajuste ${h(dataBr(c.proximo_reajuste))}</span>`;
         return `<span class="status-pill fin-paga">Ativo</span>`;
     }
+    function situacaoVenda_(v) {
+        if (v.status === "concluido") return `<span class="status-pill fin-paga">Concluída ${h(dataBr(v.concluido_em))}</span>`;
+        if (v.status === "cancelado") return `<span class="status-pill fin-cancelada">Cancelado</span>`;
+        if (v.prazo_escritura && v.prazo_escritura < hojeIso()) return `<span class="status-pill fin-atrasada">Escritura atrasada</span>`;
+        return `<span class="status-pill fin-hoje">Em andamento</span>`;
+    }
     function renderContratos() {
         const f = $("finFiltro").value || "ativos", hoje = hojeIso();
-        const lista = contratos.filter(c => {
-            if (f === "ativos" && c.status !== "ativo") return false;
+        const loc = contratos.filter(c => {
+            if (f === "venda") return false;
+            if ((f === "ativos" || f === "locacao") && c.status !== "ativo") return false;
             if (f === "encerrados" && c.status !== "encerrado") return false;
             if (f === "reajuste" && !(c.status === "ativo" && c.proximo_reajuste && c.proximo_reajuste <= somaDias(hoje, 30))) return false;
             if (f === "vencendo" && !(c.status === "ativo" && c.fim <= somaDias(hoje, 60))) return false;
-            return bate(`${c.numero} ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovel(c.construcao_id)}`);
+            return bate(`${c.numero} locação ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovelCt(c)}`);
         });
-        $("finContagem").textContent = `${lista.length} contrato(s) · ${dinheiro(lista.filter(c => c.status === "ativo").reduce((s, c) => s + Number(c.valor_aluguel), 0))}/mês`;
-        $("finLista").innerHTML = lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Nº</th><th>Imóvel</th><th>Inquilino</th><th>Proprietário</th><th>Aluguel</th><th>Vigência</th><th>Reajuste</th><th>Situação</th></tr></thead><tbody>
-          ${lista.map(c => `<tr class="crm-linha" data-fin-ct="${h(c.id)}">
-            <td data-r="Nº"><strong>${h(c.numero)}</strong></td>
-            <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}</td>
-            <td data-r="Inquilino">${h(nomeCli(c.inquilino_id))}</td>
-            <td data-r="Proprietário">${h(nomeCli(c.proprietario_id))}</td>
-            <td data-r="Aluguel">${h(dinheiro(c.valor_aluguel))}<small class="fin-sub">vence dia ${h(c.dia_vencimento)} · adm ${h(pct(c.taxa_adm_pct))}%</small></td>
-            <td data-r="Vigência">${h(dataBr(c.inicio))} a ${h(dataBr(c.fim))}</td>
+        const ven = vendas.filter(v => {
+            if ([ "locacao", "reajuste", "vencendo" ].includes(f)) return false;
+            if ((f === "ativos" || f === "venda") && v.status !== "em_andamento") return false;
+            if (f === "encerrados" && v.status === "em_andamento") return false;
+            return bate(`${v.numero} compra venda ${nomeCli(v.comprador_id)} ${nomeCli(v.vendedor_id)} ${nomeImovelCt(v)}`);
+        });
+        const lista = [ ...loc, ...ven ].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+        const mensal = loc.filter(c => c.status === "ativo").reduce((s, c) => s + Number(c.valor_aluguel), 0);
+        const vendido = ven.filter(v => v.status !== "cancelado").reduce((s, v) => s + Number(v.valor_venda), 0);
+        $("finContagem").textContent = `${lista.length} contrato(s)` + (loc.length ? ` · aluguéis ${dinheiro(mensal)}/mês` : "") + (ven.length ? ` · vendas ${dinheiro(vendido)}` : "");
+        const linha = c => c._tipo === "venda" ? `<tr class="crm-linha" data-fin-cv="${h(c.id)}">
+            <td data-r="Nº"><strong>${h(c.numero)}</strong><small class="fin-sub">Compra e venda</small></td>
+            <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
+            <td data-r="Inquilino / comprador">${h(nomeCli(c.comprador_id))}<small class="fin-sub">comprador</small></td>
+            <td data-r="Proprietário / vendedor">${h(nomeCli(c.vendedor_id))}<small class="fin-sub">vendedor</small></td>
+            <td data-r="Valor">${h(dinheiro(c.valor_venda))}${c.comissao_valor != null ? `<small class="fin-sub">comissão ${h(dinheiro(c.comissao_valor))}</small>` : ""}</td>
+            <td data-r="Período">${h(dataBr(c.data_contrato))}${c.prazo_escritura ? `<small class="fin-sub">escritura até ${h(dataBr(c.prazo_escritura))}</small>` : ""}</td>
+            <td data-r="Reajuste">—</td>
+            <td data-r="Situação">${situacaoVenda_(c)}</td></tr>`
+          : `<tr class="crm-linha" data-fin-ct="${h(c.id)}">
+            <td data-r="Nº"><strong>${h(c.numero)}</strong><small class="fin-sub">Locação</small></td>
+            <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id || !c.imovel_avulso ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
+            <td data-r="Inquilino / comprador">${h(nomeCli(c.inquilino_id))}<small class="fin-sub">inquilino</small></td>
+            <td data-r="Proprietário / vendedor">${h(nomeCli(c.proprietario_id))}<small class="fin-sub">proprietário</small></td>
+            <td data-r="Valor">${h(dinheiro(c.valor_aluguel))}<small class="fin-sub">por mês · vence dia ${h(c.dia_vencimento)} · adm ${h(pct(c.taxa_adm_pct))}%</small></td>
+            <td data-r="Período">${h(dataBr(c.inicio))} a ${h(dataBr(c.fim))}</td>
             <td data-r="Reajuste">${h(INDICES[c.indice_reajuste])}${c.proximo_reajuste ? `<small class="fin-sub">${h(dataBr(c.proximo_reajuste))}</small>` : ""}</td>
-            <td data-r="Situação">${situacaoContrato(c)}</td></tr>`).join("")}
+            <td data-r="Situação">${situacaoContrato(c)}</td></tr>`;
+        $("finLista").innerHTML = lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Nº</th><th>Imóvel</th><th>Inquilino / comprador</th><th>Proprietário / vendedor</th><th>Valor</th><th>Período</th><th>Reajuste</th><th>Situação</th></tr></thead><tbody>
+          ${lista.map(linha).join("")}
           </tbody></table>` : `<div class="empty-state">Nenhum contrato nesta seleção.</div>`;
         $("finLista").querySelectorAll("[data-fin-ct]").forEach(tr => tr.addEventListener("click", () => abrirContrato(contrato(tr.dataset.finCt))));
+        $("finLista").querySelectorAll("[data-fin-cv]").forEach(tr => tr.addEventListener("click", () => abrirContrato(venda(tr.dataset.finCv))));
     }
     function opcoesClientes(sel) {
         const lista = [ ...clientes.values() ].sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
         return `<option value="">Escolha…</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>${h(c.nome)}${c.cpf ? ` · ${h(c.cpf)}` : ""}</option>`).join("");
     }
+    // Uma janela só para os dois tipos: locação (cobranças, repasses, reajuste) e compra e venda (registro da venda).
+    // O tipo só é escolhido em contrato novo; o imóvel pode ser um cadastrado no sistema ou um "não cadastrado".
     function abrirContrato(c, padrao) {
         const base = c || padrao || {};
-        contratoAberto = c ? c.id : null;
-        const pode = podeGerir() && (!c || c.status === "ativo");
-        $("finContratoTitulo").textContent = c ? `Contrato nº ${c.numero}` : "Novo contrato de locação";
-        const imoveis = ctx.imoveis().filter(i => i.para_aluguel !== false || i.id === base.construcao_id)
-            .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
-        $("finCtImovel").innerHTML = `<option value="">Escolha o imóvel…</option>` + imoveis.map(i => `<option value="${h(i.id)}"${i.id === base.construcao_id ? " selected" : ""}>${h((i.codigo ? i.codigo + " · " : "") + i.nome)}</option>`).join("");
-        $("finCtInquilino").innerHTML = opcoesClientes(base.inquilino_id);
-        $("finCtProprietario").innerHTML = opcoesClientes(base.proprietario_id);
+        const tipo = base._tipo === "venda" ? "venda" : "locacao";
+        contratoAberto = c && tipo === "locacao" ? c.id : null;
+        vendaAberta = c && tipo === "venda" ? c.id : null;
+        const pode = podeGerir() && (!c || (tipo === "venda" ? c.status === "em_andamento" : c.status === "ativo"));
+        $("finContratoTitulo").textContent = c ? `Contrato de ${tipo === "venda" ? "compra e venda" : "locação"} nº ${c.numero}` : "Novo contrato";
+        $("finCtTipoBox").hidden = !!c || !!base.negociacao_id;
+        const avulso = !base.construcao_id && !!base.imovel_avulso;
+        document.querySelectorAll("input[name=finCtOrigem]").forEach(r => { r.checked = r.value === (avulso ? "avulso" : "cadastrado"); });
+        const a = base.imovel_avulso || {};
+        $("finCtAvDesc").value = a.descricao || ""; $("finCtAvTipo").value = a.tipo || ""; $("finCtAvEnd").value = a.endereco || "";
+        $("finCtAvCidade").value = a.cidade || ""; $("finCtAvMatricula").value = a.matricula || ""; $("finCtAvArea").value = a.area || "";
+        $("finCtImovel").value = "";
+        $("finCtImovel").dataset.sel = base.construcao_id || "";
+        $("finCtInquilino").innerHTML = opcoesClientes(tipo === "venda" ? base.comprador_id : base.inquilino_id);
+        $("finCtProprietario").innerHTML = opcoesClientes(tipo === "venda" ? base.vendedor_id : base.proprietario_id);
         const equipe = ctx.equipe().filter(u => u.active !== false);
         $("finCtCorretor").innerHTML = `<option value="">Sem corretor</option>` + equipe.map(u => `<option value="${h(u.id)}"${u.id === base.corretor_id ? " selected" : ""}>${h(u.display_name)}</option>`).join("");
+        // locação
         $("finCtValor").value = base.valor_aluguel != null ? pct(base.valor_aluguel) : "";
         $("finCtDia").value = base.dia_vencimento || 10;
         $("finCtInicio").value = base.inicio || hojeIso();
@@ -448,16 +506,26 @@
         $("finCtCaucao").value = base.caucao_valor != null ? pct(base.caucao_valor) : "";
         $("finCtRepPrazo").value = base.repasse_prazo_dias ?? 5;
         $("finCtRepDados").value = base.repasse_dados || "";
-        $("finCtObs").value = base.observacoes || "";
         itens = JSON.parse(JSON.stringify(base.itens_mensais || []));
+        // compra e venda
+        $("finCvValor").value = base.valor_venda != null ? pct(base.valor_venda) : "";
+        $("finCvData").value = base.data_contrato || hojeIso();
+        $("finCvSinal").value = base.sinal_valor != null ? pct(base.sinal_valor) : "";
+        $("finCvComPct").value = base.comissao_pct != null ? pct(base.comissao_pct) : "";
+        $("finCvComValor").value = base.comissao_valor != null ? pct(base.comissao_valor) : "";
+        $("finCvEscritura").value = base.prazo_escritura || "";
+        $("finCvForma").value = base.forma_pagamento || "";
+        $("finCtObs").value = base.observacoes || "";
+        definirTipo(tipo);
+        mostrarOrigem();
         mostrarGarantia();
         desenharItens();
         $("finContratoForm").querySelectorAll("input,select,textarea").forEach(el => { el.disabled = !pode; });
-        $("finCtAddItem").hidden = !pode;
+        $("finCtAddItem").hidden = !pode || tipo !== "locacao";
         $("finCtSalvar").hidden = !pode;
         $("finCtSalvar").textContent = c ? "Salvar alterações" : "Criar contrato";
         $("finCtNegociacao").value = base.negociacao_id || "";
-        const ativo = c && c.status === "ativo" && podeGerir();
+        const ativo = tipo === "locacao" && c && c.status === "ativo" && podeGerir();
         $("finCtAcoes").hidden = !ativo;
         if (ativo) {
             $("finReajPct").value = ""; $("finReajValor").value = "";
@@ -466,14 +534,54 @@
             $("finEncData").value = hojeIso(); $("finEncMotivo").value = ""; $("finEncLiberar").checked = true;
             [ "finReajPct", "finReajValor", "finReajDesde", "finEncData", "finEncMotivo", "finEncLiberar" ].forEach(id => { $(id).disabled = false; });
         }
-        $("finCtCobrancas").innerHTML = c ? resumoCobrancasContrato(c) : "";
+        const vendaAndamento = tipo === "venda" && c && c.status === "em_andamento" && podeGerir();
+        $("finCvAcoes").hidden = !vendaAndamento;
+        $("finCvReabrirBox").hidden = !(tipo === "venda" && c && c.status !== "em_andamento" && podeGerir());
+        if (vendaAndamento) {
+            $("finCvConcluirData").value = hojeIso(); $("finCvMotivo").value = "";
+            [ "finCvConcluirData", "finCvMotivo" ].forEach(id => { $(id).disabled = false; });
+        }
+        $("finCtCobrancas").innerHTML = c && tipo === "locacao" ? resumoCobrancasContrato(c)
+            : c && c.status === "cancelado" ? `<p class="muted-text">Cancelado${c.cancelamento_motivo ? ": " + h(c.cancelamento_motivo) : ""}.</p>` : "";
         $("finCtHistorico").innerHTML = "";
-        $("finCtHistoricoBox").hidden = !c;
+        $("finCtHistoricoBox").hidden = !(c && tipo === "locacao");
         msg($("finCtMsg"), "");
-        if (c) desenharHistorico(c.id);
-        if (window.SKLDocumentos) window.SKLDocumentos.aoAbrirContrato(c);
-        if (window.SKLFinExtra) window.SKLFinExtra.aoAbrirContrato(c);
+        if (c && tipo === "locacao") desenharHistorico(c.id);
+        const ctLoc = tipo === "locacao" ? c : null; // documentos, vistoria e rescisão são da locação
+        if (window.SKLDocumentos) window.SKLDocumentos.aoAbrirContrato(ctLoc);
+        if (window.SKLFinExtra) window.SKLFinExtra.aoAbrirContrato(ctLoc);
         $("finContratoDialog").showModal();
+    }
+    function definirTipo(tipo) {
+        ctTipo = tipo === "venda" ? "venda" : "locacao";
+        document.querySelectorAll("[data-ct-tipo]").forEach(b => b.classList.toggle("ativo", b.dataset.ctTipo === ctTipo));
+        $("finCtLocacaoCampos").hidden = ctTipo !== "locacao";
+        $("finCtVendaCampos").hidden = ctTipo !== "venda";
+        $("finCtInquilinoRot").textContent = ctTipo === "venda" ? "Comprador" : "Inquilino";
+        $("finCtProprietarioRot").textContent = ctTipo === "venda" ? "Vendedor (proprietário)" : "Proprietário";
+        if (!vendaAberta && !contratoAberto) $("finCtAddItem").hidden = ctTipo !== "locacao" || !podeGerir();
+        // imóveis que servem para o tipo escolhido (mantém o que já estava escolhido)
+        const sel = $("finCtImovel").value || $("finCtImovel").dataset.sel || "";
+        const campo = ctTipo === "venda" ? "para_venda" : "para_aluguel";
+        const imoveis = ctx.imoveis().filter(i => i[campo] !== false || i.id === sel)
+            .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+        $("finCtImovel").innerHTML = `<option value="">Escolha o imóvel…</option>` + imoveis.map(i => `<option value="${h(i.id)}"${i.id === sel ? " selected" : ""}>${h((i.codigo ? i.codigo + " · " : "") + i.nome)}</option>`).join("");
+        if (!vendaAberta && !contratoAberto && sel) $("finCtImovel").dispatchEvent(new Event("change"));
+    }
+    function origemAvulsa() { const r = document.querySelector("input[name=finCtOrigem]:checked"); return !!r && r.value === "avulso"; }
+    function mostrarOrigem() {
+        const av = origemAvulsa();
+        $("finCtImovelLabel").hidden = av;
+        $("finCtAvulso").hidden = !av;
+    }
+    function imovelAvulso() {
+        if (!origemAvulsa()) return null;
+        const v = id => $(id).value.trim();
+        return { descricao: v("finCtAvDesc"), tipo: v("finCtAvTipo"), endereco: v("finCtAvEnd"), cidade: v("finCtAvCidade"), matricula: v("finCtAvMatricula"), area: v("finCtAvArea") };
+    }
+    function calcularComissaoVenda() {
+        const v = num($("finCvValor").value), p = num($("finCvComPct").value);
+        if (v != null && p != null) $("finCvComValor").value = pct((Math.round(v * p) / 100).toFixed(2));
     }
     function resumoCobrancasContrato(c) {
         const minhas = cobrancas.filter(b => b.contrato_id === c.id);
@@ -511,8 +619,9 @@
         });
     }
     function coletarContrato() {
+        const avulso = imovelAvulso();
         return {
-            construcao_id: $("finCtImovel").value || null, inquilino_id: $("finCtInquilino").value || null,
+            construcao_id: avulso ? null : ($("finCtImovel").value || null), imovel_avulso: avulso, inquilino_id: $("finCtInquilino").value || null,
             proprietario_id: $("finCtProprietario").value || null, corretor_id: $("finCtCorretor").value || null,
             negociacao_id: $("finCtNegociacao").value || null,
             valor_aluguel: num($("finCtValor").value), dia_vencimento: Number($("finCtDia").value) || 10,
@@ -524,8 +633,52 @@
             repasse_prazo_dias: Number($("finCtRepPrazo").value) || 0, repasse_dados: $("finCtRepDados").value.trim(), observacoes: $("finCtObs").value.trim()
         };
     }
+    function coletarVenda() {
+        const avulso = imovelAvulso();
+        return {
+            construcao_id: avulso ? null : ($("finCtImovel").value || null), imovel_avulso: avulso,
+            comprador_id: $("finCtInquilino").value || null, vendedor_id: $("finCtProprietario").value || null,
+            corretor_id: $("finCtCorretor").value || null, negociacao_id: $("finCtNegociacao").value || null,
+            valor_venda: num($("finCvValor").value), data_contrato: $("finCvData").value, sinal_valor: num($("finCvSinal").value),
+            comissao_pct: num($("finCvComPct").value), comissao_valor: num($("finCvComValor").value),
+            prazo_escritura: $("finCvEscritura").value || null, forma_pagamento: $("finCvForma").value.trim(), observacoes: $("finCtObs").value.trim()
+        };
+    }
+    async function salvarVenda() {
+        const d = coletarVenda();
+        if (d.imovel_avulso ? !d.imovel_avulso.descricao : !d.construcao_id) { msg($("finCtMsg"), d.imovel_avulso ? "Descreva o imóvel não cadastrado." : "Escolha o imóvel (ou marque \"Não cadastrado\")."); return; }
+        if (!d.comprador_id) { msg($("finCtMsg"), "Escolha o comprador (cadastre em Clientes, se ainda não existir)."); return; }
+        if (!d.valor_venda) { msg($("finCtMsg"), "Informe o valor da venda."); return; }
+        if (!d.data_contrato) { msg($("finCtMsg"), "Informe a data do contrato."); return; }
+        $("finCtSalvar").disabled = true;
+        const { data, error } = await ctx.sb.rpc("fin_salvar_contrato_venda", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: vendaAberta });
+        $("finCtSalvar").disabled = false;
+        if (error) { msg($("finCtMsg"), erro(error)); return; }
+        $("finContratoDialog").close();
+        ctx.toast(vendaAberta ? "Contrato de compra e venda atualizado." : `Contrato de compra e venda nº ${data.numero} criado.`);
+        await carregar(true);
+        if (!vendaAberta && d.construcao_id) ctx.recarregarImoveis();
+        renderNegocioAberto();
+    }
+    async function situacaoVenda(status) {
+        const v = venda(vendaAberta); if (!v) return;
+        const motivo = $("finCvMotivo").value.trim(), dataConcl = $("finCvConcluirData").value || null;
+        if (status === "cancelado" && !motivo) { msg($("finCtMsg"), "Informe o motivo do cancelamento."); return; }
+        const pergunta = { concluido: `Marcar a venda nº ${v.numero} como concluída?`, cancelado: `Cancelar o contrato de compra e venda nº ${v.numero}?`,
+            em_andamento: `Voltar o contrato nº ${v.numero} para "em andamento"? A situação do imóvel não muda sozinha.` }[status];
+        if (!window.confirm(pergunta)) return;
+        const { error } = await ctx.sb.rpc("fin_situacao_contrato_venda", { p_id: v.id, p_status: status, p_data: dataConcl, p_motivo: motivo || null });
+        if (error) { msg($("finCtMsg"), erro(error)); return; }
+        $("finContratoDialog").close();
+        ctx.toast({ concluido: "Venda concluída.", cancelado: "Contrato cancelado.", em_andamento: "Contrato voltou para em andamento." }[status]);
+        await carregar(true);
+        if (v.construcao_id) ctx.recarregarImoveis();
+        renderNegocioAberto();
+    }
     async function salvarContrato() {
+        if (ctTipo === "venda") return salvarVenda();
         const d = coletarContrato();
+        if (d.imovel_avulso && !d.imovel_avulso.descricao) { msg($("finCtMsg"), "Descreva o imóvel não cadastrado."); return; }
         if (!d.inquilino_id) { msg($("finCtMsg"), "Escolha o inquilino (cadastre em Clientes, se ainda não existir)."); return; }
         if (!d.valor_aluguel) { msg($("finCtMsg"), "Informe o valor do aluguel."); return; }
         if (!d.inicio) { msg($("finCtMsg"), "Informe o início do contrato."); return; }
@@ -570,10 +723,22 @@
         negAberta = n; negBox = box;
         if (!box) return;
         const crm = window.SKLCRM && window.SKLCRM.interno;
-        const loc = n && crm && (crm.funil(n.funil_id) || {}).finalidade === "locacao";
-        if (!ctx || !ctx.veTudo() || !n || n.situacao !== "ganha" || !loc) { box.hidden = true; return; }
-        const c = contratos.find(x => x.negociacao_id === n.id && x.status === "ativo") || contratos.find(x => x.negociacao_id === n.id);
+        const fin = n && crm && (crm.funil(n.funil_id) || {}).finalidade;
+        if (!ctx || !ctx.veTudo() || !n || n.situacao !== "ganha" || (fin !== "locacao" && fin !== "venda")) { box.hidden = true; return; }
         box.hidden = false;
+        if (fin === "venda") {
+            const v = vendas.find(x => x.negociacao_id === n.id && x.status !== "cancelado") || vendas.find(x => x.negociacao_id === n.id);
+            box.innerHTML = `<span class="eyebrow">CONTRATO DE COMPRA E VENDA</span>` + (v
+                ? `<div class="crm-visita crm-visita-realizada"><span class="crm-visita-quando">Nº ${h(v.numero)}</span><span class="crm-visita-info"><strong>${h(dinheiro(v.valor_venda))} · ${h({ em_andamento: "em andamento", concluido: "concluído", cancelado: "cancelado" }[v.status])}</strong><small>contrato de ${h(dataBr(v.data_contrato))}${v.prazo_escritura ? ` · escritura até ${h(dataBr(v.prazo_escritura))}` : ""}</small></span></div>
+                   <button type="button" class="secondary-button" data-fin-abrir>Abrir no Financeiro</button>`
+                : podeGerir() ? `<p class="muted-text">Venda fechada. Registre o contrato de compra e venda (valor, sinal, forma de pagamento, prazo da escritura).</p>
+                   <button type="button" class="primary-button" data-fin-criar>Criar contrato de compra e venda</button>`
+                  : `<p class="muted-text">Ainda sem contrato no Financeiro.</p>`);
+            const a = box.querySelector("[data-fin-abrir]"); if (a) a.addEventListener("click", () => abrirContrato(v));
+            const b = box.querySelector("[data-fin-criar]"); if (b) b.addEventListener("click", () => criarDaNegociacao(n.id));
+            return;
+        }
+        const c = contratos.find(x => x.negociacao_id === n.id && x.status === "ativo") || contratos.find(x => x.negociacao_id === n.id);
         box.innerHTML = `<span class="eyebrow">CONTRATO DE LOCAÇÃO</span>` + (c
             ? `<div class="crm-visita crm-visita-realizada"><span class="crm-visita-quando">Nº ${h(c.numero)}</span><span class="crm-visita-info"><strong>${h(dinheiro(c.valor_aluguel))}/mês · ${c.status === "ativo" ? "ativo" : "encerrado"}</strong><small>${h(dataBr(c.inicio))} a ${h(dataBr(c.fim))} · vence dia ${h(c.dia_vencimento)}</small></span></div>
                <button type="button" class="secondary-button" data-fin-abrir>Abrir no Financeiro</button>`
@@ -589,6 +754,13 @@
         const n = crm && crm.negs instanceof Map ? crm.negs.get(id) : null;
         if (!n) return;
         const im = n.construcao_id ? imovel(n.construcao_id) : null;
+        if ((crm.funil(n.funil_id) || {}).finalidade === "venda") {
+            return abrirContrato(null, {
+                _tipo: "venda", negociacao_id: n.id, construcao_id: n.construcao_id, comprador_id: n.cliente_id, corretor_id: n.corretor_id,
+                vendedor_id: im && im.proprietario_cliente_id, valor_venda: n.valor ?? (im && im.valor_venda),
+                data_contrato: n.fechado_em ? String(n.fechado_em).slice(0, 10) : hojeIso()
+            });
+        }
         abrirContrato(null, {
             negociacao_id: n.id, construcao_id: n.construcao_id, inquilino_id: n.cliente_id, corretor_id: n.corretor_id,
             proprietario_id: im && im.proprietario_cliente_id, valor_aluguel: n.valor ?? (im && im.valor_aluguel), prazo_meses: n.contrato_meses || 30,
@@ -604,14 +776,14 @@
             if (f === "pagos" && !(r.status === "pago" && noMes(r.pago_em, ym))) return false;
             if (f === "todos" && !noMes(r.competencia, ym)) return false;
             const c = contrato(r.contrato_id) || {};
-            return bate(`${c.numero} ${nomeCli(r.proprietario_id)} ${nomeCli(c.inquilino_id)} ${nomeImovel(c.construcao_id)}`);
+            return bate(`${c.numero} ${nomeCli(r.proprietario_id)} ${nomeCli(c.inquilino_id)} ${nomeImovelCt(c)}`);
         }).sort((a, b) => String(a.previsto_para).localeCompare(String(b.previsto_para)));
         $("finContagem").textContent = `${lista.length} repasse(s) · ${dinheiro(lista.reduce((s, r) => s + Number(r.valor_liquido), 0))}`;
         const hoje = hojeIso();
         $("finLista").innerHTML = lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Proprietário</th><th>Imóvel</th><th>Mês</th><th>Recebido</th><th>Descontos</th><th>A repassar</th><th>Data</th><th></th></tr></thead><tbody>
           ${lista.map(r => { const c = contrato(r.contrato_id) || {}; return `<tr>
             <td data-r="Proprietário"><strong>${h(nomeCli(r.proprietario_id))}</strong>${c.repasse_dados ? `<small class="fin-sub">${h(c.repasse_dados)}</small>` : ""}</td>
-            <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}<small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
+            <td data-r="Imóvel">${h(nomeImovelCt(c))}<small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
             <td data-r="Mês">${h(mesAno(r.competencia))}</td>
             <td data-r="Recebido">${h(dinheiro(r.valor_recebido))}</td>
             <td data-r="Descontos">${Number(r.intermediacao) ? `intermediação ${h(dinheiro(r.intermediacao))}<br>` : ""}adm ${h(dinheiro(r.taxa_adm))}${Number(r.itens_retidos) ? `<br>itens pagos pela imobiliária ${h(dinheiro(r.itens_retidos))}` : ""}</td>
@@ -650,7 +822,7 @@
         abrirImpressao(documento("Recibo de aluguel", `
           <p>Recebemos de <strong>${h(inq.nome || "—")}</strong>${inq.cpf ? `, CPF ${h(inq.cpf)}` : ""}, a importância de <strong>${h(dinheiro(b.valor_pago))}</strong>,
           referente ao aluguel de <strong>${h(mesAno(b.competencia))}</strong> (${h(b.parcela)}ª parcela, contrato nº ${h(c.numero)}) do imóvel
-          <strong>${h(nomeImovel(c.construcao_id))}</strong>${imovel(c.construcao_id) && imovel(c.construcao_id).endereco ? `, ${h(imovel(c.construcao_id).endereco)}` : ""}.</p>
+          <strong>${h(nomeImovelCt(c))}</strong>${enderecoCt(c) ? `, ${h(enderecoCt(c))}` : ""}.</p>
           ${linhas(pares)}
           <p class="fin-doc-rodape">Vencimento ${h(dataBr(b.vencimento))} · pago em ${h(dataBr(b.pago_em))}${b.forma_pagamento ? ` · ${h(b.forma_pagamento)}` : ""}</p>`));
     }
@@ -668,7 +840,7 @@
         pares.push([ "Valor líquido do repasse", dinheiro(r.valor_liquido), true ]);
         abrirImpressao(documento("Demonstrativo de repasse ao proprietário", `
           <p>Proprietário: <strong>${h(prop.nome || "—")}</strong>${prop.cpf ? ` · CPF ${h(prop.cpf)}` : ""}<br>
-          Imóvel: <strong>${h(nomeImovel(c.construcao_id))}</strong> · contrato nº ${h(c.numero)} · inquilino ${h(nomeCli(c.inquilino_id))}<br>
+          Imóvel: <strong>${h(nomeImovelCt(c))}</strong> · contrato nº ${h(c.numero)} · inquilino ${h(nomeCli(c.inquilino_id))}<br>
           Referência: <strong>${h(mesAno(r.competencia))}</strong> · aluguel pago em ${h(dataBr(b.pago_em))}</p>
           ${linhas(pares)}
           <p class="fin-doc-rodape">${r.status === "pago" ? `Repasse feito em ${h(dataBr(r.pago_em))}` : `Repasse previsto até ${h(dataBr(r.previsto_para))}`}${c.repasse_dados ? ` · ${h(c.repasse_dados)}` : ""}${r.observacao ? ` · ${h(r.observacao)}` : ""}</p>`));
@@ -688,7 +860,7 @@
     }
 
     window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length,
-        imprimir: html => abrirImpressao(html), contratos: () => contratos, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
+        imprimir: html => abrirImpressao(html), contratos: () => contratos, vendas: () => vendas, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
         clientes: () => [ ...clientes.values() ], mostrarAba, renderizar: () => render(), recarregar: () => carregar(true),
         abrirContratoId: id => abrirContrato(contrato(id)), abrirPagamentoId: id => abrirPagamento(cobrancas.find(x => x.id === id)) };
 })();

@@ -124,3 +124,9 @@
 .fin-doc footer.fx-assinaturas{justify-content:space-between;gap:16px;flex-wrap:wrap}
 .fx-assinaturas .fin-assinatura{min-width:180px;flex:1}
 @media(max-width:780px){.fx-cartoes{grid-template-columns:1fr}.fx-res-linha{grid-template-columns:minmax(0,1fr) 90px auto}}
+/* contrato: tipo (locação | compra e venda) e imóvel não cadastrado */
+#finContratoDialog .finalidade-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:12px}
+#finContratoDialog .finalidade-row .campo-rotulo{font-weight:800;color:var(--navy-deep);min-width:120px}
+.fin-grade .fin-largo{grid-column:span 2}
+.fin-avulso{background:#f6f9fb;border:1px dashed var(--line);border-radius:12px;padding:10px}
+@media(max-width:560px){.fin-grade .fin-largo{grid-column:auto}#finContratoDialog .finalidade-row .campo-rotulo{min-width:0;width:100%}}

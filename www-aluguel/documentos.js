@@ -28,6 +28,9 @@
         return (crm && crm.clientes instanceof Map && crm.clientes.get(id)) || (window.SKLFinanceiro && window.SKLFinanceiro.cliente(id)) || null;
     }
     const imovel = id => ctx.imoveis().find(i => i.id === id) || null;
+    // imóvel do contrato: cadastrado ou "não cadastrado" (descrito no próprio contrato)
+    const imovelCt = c => (c && c.construcao_id ? imovel(c.construcao_id) : null) || (c && c.imovel_avulso
+        ? { nome: c.imovel_avulso.descricao, tipo_imovel: c.imovel_avulso.tipo, endereco: c.imovel_avulso.endereco, cidade: c.imovel_avulso.cidade } : null);
 
     // ------------------------------------------------------------------ número por extenso (valores em reais)
     function extenso(valor) {
@@ -249,7 +252,7 @@ Testemunhas:
         return p.join(" — ") || i.endereco || "—";
     }
     function valoresContrato(c) {
-        const im = imovel(c.construcao_id) || {};
+        const im = imovelCt(c) || {};
         const loc = cliente(c.proprietario_id) || {}, inq = cliente(c.inquilino_id) || {};
         const comercial = /sala|loja|ponto|comercial|galp|barrac|escrit/i.test(im.tipo_imovel || "");
         const itens = (c.itens_mensais || []).filter(i => i.valor);
@@ -326,7 +329,7 @@ Testemunhas:
     let vistoriasDoContrato = [];
     function abrirVistoria(v, c, lista) {
         vistoria = v; contratoDaVistoria = c; vistoriasDoContrato = lista || [];
-        const im = imovel(c.construcao_id) || {};
+        const im = imovelCt(c) || {};
         $("docVisTitulo").textContent = v ? "Vistoria de " + ({ entrada: "entrada", saida: "saída", periodica: "rotina" }[v.tipo]) : "Nova vistoria";
         $("docVisInfo").textContent = `Contrato nº ${c.numero} · ${im.nome || ""} · ${enderecoImovel(im)}`;
         const temEntrada = vistoriasDoContrato.some(x => x.tipo === "entrada");
@@ -442,7 +445,7 @@ Testemunhas:
     }
     async function imprimirVistoria(v) {
         if (!v) return;
-        const c = contratoDaVistoria, im = imovel(c.construcao_id) || {};
+        const c = contratoDaVistoria, im = imovelCt(c) || {};
         const entrada = v.tipo !== "entrada" ? vistoriasDoContrato.find(x => x.tipo === "entrada") : null;
         const estadoEntrada = (amb, item) => {
             if (!entrada) return null;
