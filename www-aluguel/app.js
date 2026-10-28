@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.1";
+    const APP_VERSION = "0.14.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -819,7 +819,7 @@
             display_name: userData.user.user_metadata?.nome_exibicao || userData.user.email
         };
         const { data, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("papel, expira_em, perfis_atuacao, apelido, carteiras_aluguel(id, nome, slug, ativo)")
+            .select("papel, expira_em, perfis_atuacao, apelido, aviso_antecedencia_min, carteiras_aluguel(id, nome, slug, ativo)")
             .eq("usuario_id", uid).eq("ativo", true);
         if (error) throw error;
         // o nome mostrado vem do perfil (é o que a Central edita); o do login fica guardado no aparelho e pode estar desatualizado
@@ -830,7 +830,7 @@
         const agora = Date.now();
         return (data || [])
             .filter(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora))
-            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [], apelido: v.apelido || null }))
+            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [], apelido: v.apelido || null, aviso_antecedencia_min: v.aviso_antecedencia_min ?? 30 }))
             .filter(c => !MARCA.carteira_id || c.id === MARCA.carteira_id);
     }
 
@@ -875,7 +875,8 @@
     async function entrarNaCarteira(carteira) {
         carteiraId = carteira.id;
         carteiraNomeAtual = carteira.nome;
-        currentUser = { ...pendingUser, papel: carteira.papel, perfis_atuacao: carteira.perfis || [], apelido: carteira.apelido || null };
+        currentUser = { ...pendingUser, papel: carteira.papel, perfis_atuacao: carteira.perfis || [], apelido: carteira.apelido || null,
+            aviso_antecedencia_min: carteira.aviso_antecedencia_min ?? 30 };
         try { localStorage.setItem(CARTEIRA_ESCOLHIDA_KEY, carteira.id); } catch {}
         $("carteiraPicker").hidden = true;
         await enterApp();

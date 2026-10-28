@@ -1109,6 +1109,16 @@
         <button id="avisosAtivar" type="button" class="primary-button" hidden>Ativar avisos neste aparelho</button>
         <button id="avisosDesativar" type="button" class="text-button" hidden>Desligar neste aparelho</button>
       </div>
+      <label class="avisos-antecedencia"><span>Avisar dos compromissos da agenda</span>
+        <select id="avisosAntecedencia">
+          <option value="0">Na hora do compromisso</option>
+          <option value="15">15 minutos antes</option>
+          <option value="30">30 minutos antes</option>
+          <option value="60">1 hora antes</option>
+          <option value="120">2 horas antes</option>
+          <option value="1440">1 dia antes</option>
+        </select>
+      </label>
       <div id="avisosLista" class="avisos-lista"></div>
       <div class="dialog-actions"><button id="avisosLerTodas" type="button" class="secondary-button">Marcar todas como lidas</button></div>
     </form>

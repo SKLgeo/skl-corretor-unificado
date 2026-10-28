@@ -65,6 +65,7 @@
             desenhar();
         });
         $("avisosAtivar").addEventListener("click", ativar);
+        $("avisosAntecedencia").addEventListener("change", trocarAntecedencia);
         $("avisosDesativar").addEventListener("click", desativar);
         document.addEventListener("visibilitychange", () => { if (!document.hidden && ctx) { carregar(); carregarProcurados(); } });
         if ("serviceWorker" in navigator) {
@@ -145,7 +146,18 @@
         st.textContent = "Ative para receber no celular ou no computador os compromissos, lembretes e imóveis novos.";
         $("avisosAtivar").hidden = false;
     }
+    // cada pessoa escolhe quando é avisada dos compromissos; os já marcados passam a seguir a escolha nova
+    async function trocarAntecedencia() {
+        const sel = $("avisosAntecedencia"), eu = ctx.usuario() || {};
+        const antes = eu.aviso_antecedencia_min ?? 30, novo = Number(sel.value);
+        const { error } = await ctx.sb.rpc("definir_aviso_antecedencia", { p_carteira: ctx.carteiraId(), p_minutos: novo });
+        if (error) { sel.value = String(antes); ctx.toast(ctx.traduzErro(error.message)); return; }
+        eu.aviso_antecedencia_min = novo;
+        ctx.toast(`Pronto: você será avisado ${sel.selectedOptions[0].textContent.toLowerCase()}, em todos os seus aparelhos.`);
+    }
     async function abrirPainel() {
+        const valor = String((ctx.usuario() || {}).aviso_antecedencia_min ?? 30);
+        $("avisosAntecedencia").value = [ ...$("avisosAntecedencia").options ].some(o => o.value === valor) ? valor : "30";
         $("avisosDialog").showModal();
         desenhar();
         await carregar();

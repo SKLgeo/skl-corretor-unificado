@@ -153,3 +153,5 @@ dialog.foto-lightbox{overflow:hidden}
 .foto-lightbox img[data-zoom-foto]{position:relative;z-index:1}
 .foto-lightbox .close-button,.foto-lightbox .hero-nav,.foto-lightbox .imovel-hero-contador{z-index:3}
 .sair-dialog .dialog-card{max-width:420px}
+.avisos-antecedencia{display:grid;gap:4px;margin:0 0 12px}
+.avisos-antecedencia span{font-weight:700;color:var(--navy-deep);font-size:14px}
