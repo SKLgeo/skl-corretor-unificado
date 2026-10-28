@@ -439,7 +439,7 @@
             if (loginError) throw loginError;
             await resolverEmpreendimentoEEntrar();
         } catch (error) {
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             showMessage($("loginMessage"), traduzErro(error.message));
         }
     }
@@ -597,7 +597,7 @@
     function logout() {
         cancelarReconexao();
         $("loginMessage").hidden = true;
-        sb.auth.signOut();
+        sb.auth.signOut({ scope: "local" });
         currentUser = null;
         empreendimentoId = null;
         empreendimentoTipo = "loteamento";

@@ -66,7 +66,7 @@
         try {
             const { error } = await sb.auth.updateUser({ password: senha });
             if (error) throw error;
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             modoRecuperacao = false;
             history.replaceState(null, "", location.pathname);
             $("recoverNewPasswordForm").reset();
@@ -104,7 +104,7 @@
             if (!navigator.onLine) return showMessage($("loginMessage"), MSG_SEM_INTERNET);
             // senha certa mas o servidor não respondeu: não sai da conta, tenta de novo
             if (ehErroDeRede(error) && (await sb.auth.getSession()).data?.session) return restoreSession();
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             showMessage($("loginMessage"), traduzErro(error.message));
         } finally {
             $("loginSubmitButton").disabled = false;
@@ -237,7 +237,7 @@
     async function sair() {
         try { localStorage.removeItem(OFFLINE_ACESSO_KEY); } catch {}
         try { localStorage.removeItem("sklu_linhas"); } catch {}
-        await sb.auth.signOut();
+        await sb.auth.signOut({ scope: "local" });
         mostrarLogin();
     }
 

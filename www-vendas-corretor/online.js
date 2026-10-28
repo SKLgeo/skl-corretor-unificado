@@ -131,7 +131,7 @@
             limparAcessoOffline();
             closeRealtime();
             document.getElementById("app").hidden = true;
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             showLogin(traduzErro(error.message));
         }
     }
@@ -337,7 +337,7 @@
                 return showLogin(MSG_SEM_INTERNET_PRIMEIRO_ACESSO);
             }
             limparAcessoOffline();
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             showLogin(error.message || "Entre novamente.");
         }
     }
@@ -408,7 +408,7 @@
             await resolverEmpreendimentoEEntrar();
         } catch (error) {
             if (ehErroDeRede(error)) return setMessage($("brokerLoginMessage"), MSG_SEM_INTERNET_PRIMEIRO_ACESSO);
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             setMessage($("brokerLoginMessage"), traduzErro(error.message));
         }
     });
@@ -885,7 +885,7 @@
         currentEmpreendimento = null;
         modoOffline = false;
         limparAcessoOffline();
-        await sb.auth.signOut();
+        await sb.auth.signOut({ scope: "local" });
         showLogin("Você saiu deste aparelho.");
     }
     $("brokerLogoutButton").addEventListener("click", logout);
