@@ -152,3 +152,4 @@ html{touch-action:manipulation}
 dialog.foto-lightbox{overflow:hidden}
 .foto-lightbox img[data-zoom-foto]{position:relative;z-index:1}
 .foto-lightbox .close-button,.foto-lightbox .hero-nav,.foto-lightbox .imovel-hero-contador{z-index:3}
+.sair-dialog .dialog-card{max-width:420px}

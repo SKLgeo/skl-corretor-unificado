@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.0";
+    const APP_VERSION = "0.14.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -73,6 +73,7 @@
     let carteiraNomeAtual = "";
     let pendingUser = null;
     let zoomLightbox = null; // zoom da foto em tela cheia (zoom-foto.js)
+    let voltarArmado = false, saindoPeloVoltar = false; // botão/gesto Voltar do celular (ver aoVoltar)
     let currentUser = null;
     let construcoes = new Map();
     let realtimeChannel = null;
@@ -288,6 +289,10 @@
             if (event.key === "ArrowLeft") lightboxAnterior();
             if (event.key === "ArrowRight") lightboxProxima();
         });
+        window.addEventListener("popstate", aoVoltar);
+        $("sairNao").addEventListener("click", () => { $("sairDialog").close(); armarVoltar(); });
+        $("sairSim").addEventListener("click", () => { saindoPeloVoltar = true; $("sairDialog").close(); logout(); saindoPeloVoltar = false; });
+        $("sairDialog").addEventListener("close", () => { if (!saindoPeloVoltar && !$("appView").hidden) armarVoltar(); });
         configurarDeslizeToque($("imovelHero"), heroAnterior, heroProxima);
         if (window.SKLZoomFoto) { window.SKLZoomFoto.travarPagina(); zoomLightbox = window.SKLZoomFoto.ligar($("fotoLightboxImg")); }
         configurarDeslizeToque($("fotoLightbox"), lightboxAnterior, lightboxProxima, () => !!(zoomLightbox && zoomLightbox.ampliado()));
@@ -306,6 +311,7 @@
         $("createInviteAluguelButton").addEventListener("click", createInviteAluguel);
         $("newDirectUserAluguelButton").addEventListener("click", () => {
             $("directAluguelNameInput").value = "";
+            $("directAluguelApelidoInput").value = "";
             $("directAluguelTelInput").value = "";
             $("directAluguelEmailInput").value = "";
             $("directAluguelPasswordInput").value = "";
@@ -328,6 +334,26 @@
         });
     }
 
+    // Voltar do celular (botão ou gesto) dentro do app: fecha a janela aberta; numa tela interna, volta para a tela inicial;
+    // na tela inicial, pergunta "Deseja sair do sistema?" em vez de sair direto. Uma entrada extra no histórico segura o Voltar.
+    function armarVoltar() {
+        if (voltarArmado) return;
+        try { history.pushState({ sklApp: true }, ""); voltarArmado = true; } catch { /* navegador sem histórico */ }
+    }
+    function aoVoltar() {
+        if (!voltarArmado) return;
+        voltarArmado = false;
+        if ($("appView").hidden) return; // na tela de entrada o Voltar segue normal
+        const abertas = [ ...document.querySelectorAll("dialog[open]") ];
+        if (abertas.length) {
+            const topo = abertas[abertas.length - 1];
+            if (topo.id === "sairDialog") topo.close(); else { topo.close(); armarVoltar(); }
+            return;
+        }
+        const atual = (document.querySelector(".page.active-page") || {}).id;
+        if (atual !== "page-dashboard" && atual !== "page-hoje") { showPage("dashboard"); armarVoltar(); return; }
+        $("sairDialog").showModal();
+    }
     // botão de olho nos campos de senha da entrada
     function adicionarVerSenha() {
         document.querySelectorAll('#loginView input[type="password"]').forEach(campo => {
@@ -987,6 +1013,7 @@
         if (window.SKLAvisos) await seguro("avisos", () => window.SKLAvisos.iniciar({ ...ctxExtras, irPara: showPage,
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está mais na lista (pode ter sido vendido ou alugado)."); } }));
         atualizarApelidoConta();
+        armarVoltar();
         if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
         if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
@@ -2873,6 +2900,11 @@
             const tel = $("directAluguelTelInput").value.trim(), nome = $("directAluguelNameInput").value.trim(), email = $("directAluguelEmailInput").value.trim();
             let avisoTel = "";
             if (tel && data.usuario_id) { try { await salvarCelularEquipe(data.usuario_id, tel); } catch (e) { avisoTel = " Celular não salvo: " + traduzErro(e.message); } }
+            const apelido = $("directAluguelApelidoInput").value.trim();
+            if (apelido && data.usuario_id) {
+                const { error: eApelido } = await sb.rpc("equipe_definir_apelido", { p_carteira: carteiraId, p_usuario: data.usuario_id, p_apelido: apelido });
+                if (eApelido) avisoTel += " Apelido não salvo: " + traduzErro(eApelido.message);
+            }
             await loadCorretores();
             const aviso = data.reused_existing_account ? " Esse e-mail já tinha um acesso — vinculamos o acesso a esta carteira usando a senha que a pessoa já usa." : "";
             showMessage($("directUserAluguelMessage"), (data.expira_em ? `Acesso criado — expira em ${formatDate(data.expira_em)}.` : "Acesso criado sem prazo de validade.") + aviso + avisoTel, true);
@@ -2886,6 +2918,7 @@
             }
             $("directAluguelTelInput").value = "";
             $("directAluguelNameInput").value = "";
+            $("directAluguelApelidoInput").value = "";
             $("directAluguelCpfInput").value = "";
             $("directAluguelEmailInput").value = "";
             $("directAluguelPasswordInput").value = "";

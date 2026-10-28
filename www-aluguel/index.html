@@ -1087,6 +1087,18 @@
     </form>
   </dialog>
 
+  <dialog id="sairDialog" class="crm-dialog sair-dialog">
+    <form method="dialog" class="dialog-card">
+      <span class="eyebrow">SAIR</span>
+      <h2>Deseja sair do sistema?</h2>
+      <p class="muted-text">Você vai sair da sua conta neste aparelho. Para entrar de novo, será preciso digitar o e-mail e a senha.</p>
+      <div class="dialog-actions">
+        <button id="sairNao" type="button" class="secondary-button">Não, continuar</button>
+        <button id="sairSim" type="button" class="danger-button">Sim, sair</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="avisosDialog" class="crm-dialog avisos-dialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
@@ -1144,6 +1156,7 @@
       <h2>Criar usuário já com senha</h2>
       <p style="color:var(--muted);font-size:12px;margin:-8px 0 0">Cria o login pronto na hora. Se o e-mail já tiver um acesso, a senha digitada é ignorada e só vinculamos o acesso a esta carteira.</p>
       <label><span>Nome da pessoa</span><input id="directAluguelNameInput" required /></label>
+      <label><span>Apelido (opcional)</span><input id="directAluguelApelidoInput" maxlength="40" placeholder="ex.: Vitão — é como assina as mensagens aos clientes" autocomplete="off" /></label>
       <label><span>Celular / WhatsApp</span><input id="directAluguelTelInput" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
       <label><span>CPF do usuário (opcional)</span><input id="directAluguelCpfInput" placeholder="000.000.000-00" /></label>
       <p style="color:var(--muted);font-size:11px;margin:-8px 0 0">Opcional — preencher ajuda a identificar quem cadastrou os dados de um cliente, reforçando a conformidade com a LGPD.</p>
