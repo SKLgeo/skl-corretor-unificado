@@ -23,6 +23,8 @@
     const mesAno = iso => iso ? new Date(String(iso).slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "—";
     const hojeIso = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
     const podeGerir = () => !!ctx && ctx.podeGerir();
+    // contrato pode ter a pessoa cadastrada (…_id) ou só o nome escrito (…_nome)
+    function clienteDe(c, papel) { return cliente(c[papel + "_id"]) || (c[papel + "_nome"] ? { nome: c[papel + "_nome"] } : null); }
     function cliente(id) {
         const crm = window.SKLCRM && window.SKLCRM.interno;
         return (crm && crm.clientes instanceof Map && crm.clientes.get(id)) || (window.SKLFinanceiro && window.SKLFinanceiro.cliente(id)) || null;
@@ -253,7 +255,7 @@ Testemunhas:
     }
     function valoresContrato(c) {
         const im = imovelCt(c) || {};
-        const loc = cliente(c.proprietario_id) || {}, inq = cliente(c.inquilino_id) || {};
+        const loc = clienteDe(c, "proprietario") || {}, inq = clienteDe(c, "inquilino") || {};
         const comercial = /sala|loja|ponto|comercial|galp|barrac|escrit/i.test(im.tipo_imovel || "");
         const itens = (c.itens_mensais || []).filter(i => i.valor);
         const hoje = new Date();
@@ -459,7 +461,7 @@ Testemunhas:
             const { data } = await ctx.sb.storage.from("documentos-aluguel").createSignedUrls(fotos, 3600);
             (data || []).forEach(u => { if (u.signedUrl) urls.set(u.path, u.signedUrl); });
         }
-        const inq = cliente(c.inquilino_id) || {}, prop = cliente(c.proprietario_id) || {};
+        const inq = clienteDe(c, "inquilino") || {}, prop = clienteDe(c, "proprietario") || {};
         const l = v.leituras || {};
         const html = `<div class="fin-doc ext-vistoria"><header><div><strong>${h(ctx.carteiraNome())}</strong><span>Termo de vistoria de ${h({ entrada: "entrada", saida: "saída", periodica: "rotina" }[v.tipo])}</span></div><small>${h(dataBr(v.realizada_em))}</small></header>
           <p>Imóvel: <strong>${h(im.nome || "")}</strong> (cód. ${h(im.codigo || "")}) — ${h(enderecoImovel(im))}<br>
@@ -571,7 +573,7 @@ Testemunhas:
         const ano = new Date().getFullYear();
         $("docInfAno").innerHTML = [ ano - 1, ano, ano - 2 ].map(a => `<option value="${a}">${a}</option>`).join("");
         const props = new Map();
-        ((window.SKLFinanceiro && window.SKLFinanceiro.contratos()) || []).forEach(c => { if (c.proprietario_id) props.set(c.proprietario_id, (cliente(c.proprietario_id) || {}).nome || "Proprietário"); });
+        ((window.SKLFinanceiro && window.SKLFinanceiro.contratos()) || []).forEach(c => { if (c.proprietario_id) props.set(c.proprietario_id, (clienteDe(c, "proprietario") || {}).nome || "Proprietário"); });
         $("docInfProp").innerHTML = `<option value="">Todos os proprietários</option>` + [ ...props ].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([ id, n ]) => `<option value="${h(id)}">${h(n)}</option>`).join("");
         msg($("docInfMsg"), "");
         $("docInformeDialog").showModal();

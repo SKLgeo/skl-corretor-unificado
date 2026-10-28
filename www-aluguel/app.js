@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.13.4";
+    const APP_VERSION = "0.14.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -72,6 +72,7 @@
     let carteiraId = null;
     let carteiraNomeAtual = "";
     let pendingUser = null;
+    let zoomLightbox = null; // zoom da foto em tela cheia (zoom-foto.js)
     let currentUser = null;
     let construcoes = new Map();
     let realtimeChannel = null;
@@ -228,6 +229,8 @@
         $("loteInput").addEventListener("change", atualizarCamposCaracteristicas);
         $("perfilAtuacaoSalvar").addEventListener("click", salvarPerfilAtuacao);
         $("contaPerfilAtuacao").addEventListener("click", () => abrirPerfilAtuacao(currentUser.id));
+        $("contaApelido").addEventListener("click", () => editarApelido(currentUser.id));
+        $("contaAvisos").addEventListener("click", () => $("avisosBotao").click());
         $("zonaImovel").querySelectorAll("[data-zona]").forEach(b => b.addEventListener("click", () => {
             if (modoDialogo === "leitura") return;
             definirZonaImovel(b.dataset.zona === "rural", true);
@@ -286,7 +289,9 @@
             if (event.key === "ArrowRight") lightboxProxima();
         });
         configurarDeslizeToque($("imovelHero"), heroAnterior, heroProxima);
-        configurarDeslizeToque($("fotoLightbox"), lightboxAnterior, lightboxProxima);
+        if (window.SKLZoomFoto) { window.SKLZoomFoto.travarPagina(); zoomLightbox = window.SKLZoomFoto.ligar($("fotoLightboxImg")); }
+        configurarDeslizeToque($("fotoLightbox"), lightboxAnterior, lightboxProxima, () => !!(zoomLightbox && zoomLightbox.ampliado()));
+        adicionarVerSenha();
         document.querySelectorAll(".dialog-close").forEach(button => {
             button.addEventListener("click", () => button.closest("dialog")?.close());
         });
@@ -323,11 +328,36 @@
         });
     }
 
-    function configurarDeslizeToque(elemento, aoDeslizarDireita, aoDeslizarEsquerda) {
+    // botão de olho nos campos de senha da entrada
+    function adicionarVerSenha() {
+        document.querySelectorAll('#loginView input[type="password"]').forEach(campo => {
+            if (campo.dataset.verSenha) return;
+            campo.dataset.verSenha = "1";
+            const caixa = document.createElement("span");
+            caixa.className = "senha-caixa";
+            campo.parentNode.insertBefore(caixa, campo);
+            caixa.appendChild(campo);
+            const botao = document.createElement("button");
+            botao.type = "button";
+            botao.className = "ver-senha";
+            botao.setAttribute("aria-label", "Mostrar senha");
+            botao.title = "Mostrar senha";
+            botao.textContent = "👁";
+            botao.addEventListener("click", () => {
+                const mostrar = campo.type === "password";
+                campo.type = mostrar ? "text" : "password";
+                botao.textContent = mostrar ? "🙈" : "👁";
+                botao.title = mostrar ? "Ocultar senha" : "Mostrar senha";
+                botao.setAttribute("aria-label", botao.title);
+            });
+            caixa.appendChild(botao);
+        });
+    }
+    function configurarDeslizeToque(elemento, aoDeslizarDireita, aoDeslizarEsquerda, bloqueado) {
         let inicioX = null;
-        elemento.addEventListener("touchstart", event => { inicioX = event.touches[0].clientX; }, { passive: true });
+        elemento.addEventListener("touchstart", event => { inicioX = event.touches.length === 1 && !(bloqueado && bloqueado()) ? event.touches[0].clientX : null; }, { passive: true });
         elemento.addEventListener("touchend", event => {
-            if (inicioX == null) return;
+            if (inicioX == null || event.touches.length || (bloqueado && bloqueado())) { if (!event.touches.length) inicioX = null; return; }
             const delta = event.changedTouches[0].clientX - inicioX;
             inicioX = null;
             if (Math.abs(delta) < 40) return;
@@ -498,7 +528,7 @@
         try {
             const { error } = await sb.auth.updateUser({ password: senha });
             if (error) throw error;
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             modoRecuperacao = false;
             history.replaceState(null, "", location.pathname);
             $("recoverNewPasswordForm").reset();
@@ -585,6 +615,23 @@
         const { error } = await sb.rpc("equipe_definir_telefone", { p_carteira: carteiraId, p_usuario: usuarioId, p_telefone: telefone || null });
         if (error) throw error;
     }
+    // apelido: é como o corretor assina as mensagens enviadas aos clientes (sem apelido, vai o nome completo)
+    async function editarApelido(usuarioId) {
+        const user = corretores.find(u => u.id === usuarioId) || (currentUser && currentUser.id === usuarioId ? currentUser : null);
+        if (!user) return;
+        const eu = usuarioId === currentUser.id;
+        const novo = window.prompt(`${eu ? "Seu apelido" : "Apelido de " + user.display_name}: é o nome que vai nas mensagens enviadas aos clientes.\nDeixe vazio para usar o nome completo (${user.display_name}).`, user.apelido || "");
+        if (novo === null) return;
+        const { data, error } = await sb.rpc("equipe_definir_apelido", { p_carteira: carteiraId, p_usuario: usuarioId, p_apelido: novo.trim() });
+        if (error) return toast(traduzErro(error.message));
+        user.apelido = data || null;
+        if (eu) { currentUser.apelido = data || null; atualizarApelidoConta(); }
+        if (veTudo()) await loadCorretores();
+        toast(data ? `Apelido salvo: ${data}.` : "Apelido retirado: vai o nome completo.");
+    }
+    function atualizarApelidoConta() {
+        if ($("contaApelidoTexto")) $("contaApelidoTexto").textContent = currentUser && currentUser.apelido ? currentUser.apelido : "";
+    }
     async function editarCelular(usuarioId) {
         const user = corretores.find(u => u.id === usuarioId);
         if (!user) return;
@@ -667,7 +714,8 @@
     }
     // Só sai da conta quando a sessão é inválida ou a pessoa não tem acesso; falha de rede/servidor mantém a sessão.
     function erroDeSessao(error) {
-        return /Sessão inválida|não tem acesso|JWT|refresh[_ ]token|Invalid Refresh|session|not authenticated|expired/i.test(String((error && error.message) || error || ""));
+        // só estes erros significam "entre de novo"; token vencido ou rede ruim se resolvem tentando outra vez
+        return /Sessão inválida|não tem acesso|refresh[_ ]token|Invalid Refresh|Refresh Token Not Found|Auth session missing|not authenticated|session_not_found/i.test(String((error && error.message) || error || ""));
     }
     let tentativaTimer = null, tentativas = 0;
     function aguardarParaTentarDeNovo(error) {
@@ -697,7 +745,7 @@
             await resolverCarteiraEEntrar();
         } catch (error) {
             if (entrou && !erroDeSessao(error)) return aguardarParaTentarDeNovo(error);
-            await sb.auth.signOut();
+            await sb.auth.signOut({ scope: "local" });
             showMessage($("loginMessage"), traduzErro(error.message));
         }
     }
@@ -709,7 +757,10 @@
         tentativaTimer = null;
         let data = null;
         try {
-            ({ data } = await sb.auth.getSession());
+            const r = await sb.auth.getSession();
+            data = r.data;
+            // a renovação da sessão falhou por rede: continua conectado e tenta de novo (antes isso deslogava)
+            if (r.error && !erroDeSessao(r.error)) return aguardarParaTentarDeNovo(r.error);
         } catch (error) {
             return aguardarParaTentarDeNovo(error);
         }
@@ -742,7 +793,7 @@
             display_name: userData.user.user_metadata?.nome_exibicao || userData.user.email
         };
         const { data, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("papel, expira_em, perfis_atuacao, carteiras_aluguel(id, nome, slug, ativo)")
+            .select("papel, expira_em, perfis_atuacao, apelido, carteiras_aluguel(id, nome, slug, ativo)")
             .eq("usuario_id", uid).eq("ativo", true);
         if (error) throw error;
         // o nome mostrado vem do perfil (é o que a Central edita); o do login fica guardado no aparelho e pode estar desatualizado
@@ -753,7 +804,7 @@
         const agora = Date.now();
         return (data || [])
             .filter(v => v.carteiras_aluguel?.ativo && (!v.expira_em || new Date(v.expira_em).getTime() >= agora))
-            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [] }))
+            .map(v => ({ id: v.carteiras_aluguel.id, nome: v.carteiras_aluguel.nome, slug: v.carteiras_aluguel.slug, papel: v.papel, perfis: v.perfis_atuacao || [], apelido: v.apelido || null }))
             .filter(c => !MARCA.carteira_id || c.id === MARCA.carteira_id);
     }
 
@@ -798,7 +849,7 @@
     async function entrarNaCarteira(carteira) {
         carteiraId = carteira.id;
         carteiraNomeAtual = carteira.nome;
-        currentUser = { ...pendingUser, papel: carteira.papel, perfis_atuacao: carteira.perfis || [] };
+        currentUser = { ...pendingUser, papel: carteira.papel, perfis_atuacao: carteira.perfis || [], apelido: carteira.apelido || null };
         try { localStorage.setItem(CARTEIRA_ESCOLHIDA_KEY, carteira.id); } catch {}
         $("carteiraPicker").hidden = true;
         await enterApp();
@@ -933,6 +984,9 @@
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
         if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
         const ctxExtras = contextoExtras();
+        if (window.SKLAvisos) await seguro("avisos", () => window.SKLAvisos.iniciar({ ...ctxExtras, irPara: showPage,
+            abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está mais na lista (pode ter sido vendido ou alugado)."); } }));
+        atualizarApelidoConta();
         if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
         if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
@@ -947,7 +1001,10 @@
         if (window.SKLPainel) window.SKLPainel.sair();
         if (window.SKLFiscal) window.SKLFiscal.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
-        sb.auth.signOut();
+        if (window.SKLAvisos) window.SKLAvisos.sair();
+        // "scope: local": sai só deste aparelho; o celular e o computador da mesma pessoa continuam conectados
+        sb.auth.signOut({ scope: "local" });
+        document.querySelectorAll("#loginView .ver-senha").forEach(b => b.previousElementSibling && (b.previousElementSibling.type = "password"));
         carteiraId = null;
         currentUser = null;
         construcoes.clear();
@@ -2307,6 +2364,7 @@
         if (!lightboxItens.length) return;
         lightboxIndex = (lightboxIndex + lightboxItens.length) % lightboxItens.length;
         const url = await resolveUrlItem(lightboxItens[lightboxIndex]);
+        if (zoomLightbox) zoomLightbox.reset();
         $("fotoLightboxImg").src = url || "";
         const multiplas = lightboxItens.length > 1;
         $("fotoLightboxPrev").hidden = !multiplas;
@@ -2315,8 +2373,8 @@
         $("fotoLightboxContador").textContent = `${lightboxIndex + 1}/${lightboxItens.length}`;
     }
 
-    function lightboxAnterior() { lightboxIndex--; mostrarFotoLightbox(); }
-    function lightboxProxima() { lightboxIndex++; mostrarFotoLightbox(); }
+    function lightboxAnterior() { if (zoomLightbox && zoomLightbox.ampliado()) return; lightboxIndex--; mostrarFotoLightbox(); }
+    function lightboxProxima() { if (zoomLightbox && zoomLightbox.ampliado()) return; lightboxIndex++; mostrarFotoLightbox(); }
 
     function fecharLightbox() {
         $("fotoLightbox").close();
@@ -2608,7 +2666,7 @@
 
     async function loadCorretores() {
         const { data: vinculos, error } = await sb.from("carteira_aluguel_usuarios")
-            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, contratado_em, perfis(nome_exibicao, foto_path, telefone)")
+            .select("usuario_id, papel, ativo, expira_em, email, percentual_comissao, regra_comissao_id, perfis_atuacao, contratado_em, apelido, perfis(nome_exibicao, foto_path, telefone)")
             .eq("carteira_id", carteiraId);
         if (error) { toast(traduzErro(error.message)); return; }
         corretores = (vinculos || []).map(v => ({
@@ -2623,7 +2681,8 @@
             percentual_comissao: v.percentual_comissao,
             regra_comissao_id: v.regra_comissao_id,
             perfis_atuacao: v.perfis_atuacao || [],
-            contratado_em: v.contratado_em || null
+            contratado_em: v.contratado_em || null,
+            apelido: v.apelido || null
         }));
         const { data: conviteRows } = await sb.from("convites_aluguel")
             .select("id, email, papel, percentual_comissao, token, expira_em, telefone")
@@ -2670,8 +2729,9 @@
         });
     }
     function nomeComFoto(user) {
-        if (!window.SKLAvatar) return `<strong>${h(user.display_name)}</strong>`;
-        return `<span class="skl-avatar-nome">${window.SKLAvatar.html(user.display_name, user.foto_path, 32)}<strong>${h(user.display_name)}</strong></span>`;
+        const apelido = user.apelido ? ` <small class="muted-text">(${h(user.apelido)})</small>` : "";
+        if (!window.SKLAvatar) return `<strong>${h(user.display_name)}</strong>${apelido}`;
+        return `<span class="skl-avatar-nome">${window.SKLAvatar.html(user.display_name, user.foto_path, 32)}<strong>${h(user.display_name)}</strong>${apelido}</span>`;
     }
     function fotoDoUsuario(id, tamanho) {
         if (!window.SKLAvatar || !id) return "";
@@ -2717,14 +2777,15 @@
             const perfilHtml = window.SKLPerfis ? `<div class="perfil-linha">${window.SKLPerfis.chips(user.perfis_atuacao, "Sem perfil de atuação")}</div>` : "";
             const percentualTexto = window.SKLComissoes ? window.SKLComissoes.celulaRegra(user, canManageCorretor(user)) : (user.percentual_comissao != null ? `${user.percentual_comissao}%` : "—");
             if (!canManageCorretor(user)) {
-                return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-foto="${h(user.id)}">Foto</button> <button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button>` : "—"}</td></tr>`;
+                return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td>${user.id === currentUser.id ? `Conta atual <button class="row-button" data-user-apelido="${h(user.id)}">Apelido</button> <button class="row-button" data-user-foto="${h(user.id)}">Foto</button> <button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button>` : "—"}</td></tr>`;
             }
             const toggleLabel = user.active ? "Desativar" : "Reativar";
-            return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${user.telefone ? `<button class="row-button whats-button" data-user-whats="${h(user.id)}" title="Mandar o link do app pelo WhatsApp">WhatsApp</button>` : ""}<button class="row-button" data-user-cel="${h(user.id)}">Celular</button><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
+            return `<tr><td>${nomeComFoto(user)}${perfilHtml}</td><td>${h(user.email || "—")}${user.telefone ? `<br><small class="muted-text">${h(formatarCelular(user.telefone))}</small>` : ""}</td><td>${h(ROLE[user.papel])}</td><td>${percentualTexto}</td><td>${corretorStatusPill(user)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${user.telefone ? `<button class="row-button whats-button" data-user-whats="${h(user.id)}" title="Mandar o link do app pelo WhatsApp">WhatsApp</button>` : ""}<button class="row-button" data-user-cel="${h(user.id)}">Celular</button><button class="row-button" data-user-apelido="${h(user.id)}">Apelido</button><button class="row-button" data-user-foto="${h(user.id)}">Foto</button><button class="row-button" data-user-perfil="${h(user.id)}">Perfil</button><button class="row-button" data-corretor-percentual="${h(user.id)}">Editar %</button><button class="row-button" data-corretor-reset="${h(user.id)}">Redefinir senha</button><button class="row-button" data-corretor-toggle="${h(user.id)}" data-next-active="${user.active ? "0" : "1"}">${toggleLabel}</button><button class="row-button danger-button" data-corretor-remove="${h(user.id)}" data-corretor-name="${h(user.display_name)}">Remover acesso</button></td></tr>`;
         }).join("");
         if (window.SKLComissoes) window.SKLComissoes.ligarCelulas($("corretorTableBody"));
         $("corretorTableBody").querySelectorAll("[data-user-foto]").forEach(button => button.addEventListener("click", () => trocarFotoUsuario(button.dataset.userFoto)));
         $("corretorTableBody").querySelectorAll("[data-user-cel]").forEach(button => button.addEventListener("click", () => editarCelular(button.dataset.userCel)));
+        $("corretorTableBody").querySelectorAll("[data-user-apelido]").forEach(button => button.addEventListener("click", () => editarApelido(button.dataset.userApelido)));
         $("corretorTableBody").querySelectorAll("[data-user-whats]").forEach(button => button.addEventListener("click", () => {
             const user = corretores.find(u => u.id === button.dataset.userWhats);
             if (user) abrirWhatsApp(user.telefone, textoAcesso(user.display_name, user.email || ""));

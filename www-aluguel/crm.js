@@ -114,6 +114,18 @@
     function etapasDoFunil(funilId) {
         return etapas.filter(e => e.funil_id === funilId && e.ativo).sort((a, b) => a.ordem - b.ordem);
     }
+    // "imóvel de interesse" fora do cadastro: o corretor descreve e a equipe recebe um aviso para ajudar na busca
+    const PROCURA = "__procura";
+    function mostrarProcura() { $("crmNegProcura").hidden = $("crmNegImovel").value !== PROCURA; }
+    function preencherProcura(p) {
+        p = p || {};
+        $("crmProcDesc").value = p.descricao || ""; $("crmProcTipo").value = p.tipo || ""; $("crmProcRegiao").value = p.regiao || "";
+        $("crmProcValor").value = p.valor || ""; $("crmProcObs").value = p.observacao || "";
+    }
+    function lerProcura() {
+        const v = id => $(id).value.trim();
+        return { descricao: v("crmProcDesc"), tipo: v("crmProcTipo"), regiao: v("crmProcRegiao"), valor: v("crmProcValor"), observacao: v("crmProcObs") };
+    }
     function imovelNome(id) {
         const c = id && ctx.imoveis().find(i => i.id === id);
         return c ? (c.codigo ? c.codigo + " · " : "") + c.nome : "";
@@ -307,6 +319,7 @@
             abrirCliente(null);
         });
         $("crmNegCliente").addEventListener("change", () => { if (!negAberta) aplicarClienteNaNegociacao($("crmNegCliente").value); });
+        $("crmNegImovel").addEventListener("change", mostrarProcura);
         $("crmNegImovel").addEventListener("change", () => {
             if (negAberta || $("crmNegValor").value.trim()) return;
             const c = ctx.imoveis().find(i => i.id === $("crmNegImovel").value);
@@ -563,6 +576,7 @@
         return `<article class="crm-card" draggable="true" data-neg="${h(n.id)}" style="--fundo:${h(corDoFunil(f))}">
           ${tipo}<strong>${h(c ? c.nome : "Cliente")}</strong>${seloPadrao(n)}
           ${n.titulo || n.construcao_id ? `<small>${h(n.titulo || imovelNome(n.construcao_id))}</small>` : ""}
+          ${!n.construcao_id && n.imovel_procurado ? `<small class="crm-card-procura">🔎 ${h(n.imovel_procurado.descricao)}</small>` : ""}
           <div class="crm-card-linha"><span class="crm-valor">${h(dinheiro(n.valor))}</span><span class="crm-dias" title="Tempo nesta etapa">${et && et.tipo === "aberta" ? (dias ? dias + " d" : "hoje") : h(dataCurta(n.fechado_em))}</span></div>
           ${acao}${perda}${corretor}
         </article>`;
@@ -898,7 +912,7 @@
         const termo = normal($("crmBuscaCli").value.trim());
         if (!termo) return true;
         const d = termo.replace(/\D/g, "");
-        if (normal(c.nome).includes(termo) || normal(c.email).includes(termo)) return true;
+        if (normal(c.nome).includes(termo) || normal(c.apelido).includes(termo) || normal(c.email).includes(termo)) return true;
         return d.length >= 3 && (digitos(c.telefone).includes(d) || String(c.cpf || "").replace(/\D/g, "").includes(d));
     }
     function renderClientes() {
@@ -922,7 +936,7 @@
             const abertas = abertasPorCliente.get(c.id) || 0;
             const total = totalPorCliente.get(c.id) || 0;
             return `<tr data-cli="${h(c.id)}" class="crm-linha">
-              <td><strong>${h(c.nome)}</strong>${aprov}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
+              <td><strong>${h(c.nome)}</strong>${c.apelido ? ` <small class="muted-text">(${h(c.apelido)})</small>` : ""}${aprov}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
               <td>${h(formatarTelefone(c.telefone)) || "—"}${c.email ? `<br><small class="muted-text">${h(c.email)}</small>` : ""}</td>
               <td>${tipos}${window.SKLPerfis && (c.perfis || []).length ? "<br>" + window.SKLPerfis.chips(c.perfis) : ""}${(() => { const q = qualidadeCliente(c); return q.conta ? `<br><span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelas(q.estrelas)}</span>` : ""; })()}</td>
               <td class="crm-col-central" ${central() ? "" : "hidden"}>${c.corretor_id ? `<span class="crm-card-corretor">${ctx.fotoDoUsuario(c.corretor_id, 20)}<span>${h(corretorDe(c.corretor_id))}</span></span>` : "—"}</td>
@@ -949,6 +963,7 @@
         $("crmCliEyebrow").textContent = c ? "CLIENTE" : "NOVO CLIENTE";
         $("crmCliTitulo").textContent = c ? c.nome : "Cadastrar cliente";
         $("crmCliNome").value = c ? c.nome : "";
+        $("crmCliApelido").value = c ? c.apelido || "" : "";
         $("crmCliTelefone").value = c ? formatarTelefone(c.telefone) : "";
         $("crmCliEmail").value = c ? c.email || "" : "";
         $("crmCliCpf").value = c ? c.cpf || "" : "";
@@ -1019,6 +1034,7 @@
         const tipos = [ ...document.querySelectorAll("[data-crm-tipo]") ].filter(cb => cb.checked).map(cb => cb.value);
         const dados = {
             nome: $("crmCliNome").value.trim(),
+            apelido: $("crmCliApelido").value.trim(),
             telefone: $("crmCliTelefone").value.trim(),
             email: $("crmCliEmail").value.trim(),
             cpf: $("crmCliCpf").value.trim(),
@@ -1320,7 +1336,7 @@
             && (!f || f.finalidade !== "venda" || i.para_venda) && (!f || f.finalidade !== "locacao" || i.para_aluguel !== false))
             .sort((a, b) => normal(a.nome).localeCompare(normal(b.nome)));
         const atual = selecionado && !lista.some(i => i.id === selecionado) ? ctx.imoveis().find(i => i.id === selecionado) : null;
-        $("crmNegImovel").innerHTML = `<option value="">Ainda sem imóvel definido</option>`
+        $("crmNegImovel").innerHTML = `<option value="">Ainda sem imóvel definido</option><option value="${PROCURA}">✏️ Não está no cadastro: descrever o imóvel</option>`
             + (atual ? `<option value="${h(atual.id)}">${h(imovelNome(atual.id))}</option>` : "")
             + lista.map(i => `<option value="${h(i.id)}">${h(imovelNome(i.id))}</option>`).join("");
         $("crmNegImovel").value = selecionado || "";
@@ -1355,7 +1371,9 @@
         preencherSelectClientes(base.cliente_id);
         $("crmNegCliente").disabled = !!n;
         $("crmNegNovoCli").hidden = !!n;
-        preencherSelectImoveis($("crmNegFunil").value, base.construcao_id);
+        preencherSelectImoveis($("crmNegFunil").value, base.construcao_id || (n && n.imovel_procurado ? PROCURA : ""));
+        preencherProcura(n && n.imovel_procurado);
+        mostrarProcura();
         $("crmNegValor").value = n && n.valor != null ? dinheiro(n.valor) : "";
         $("crmNegTituloInput").value = n ? n.titulo || "" : "";
         $("crmNegCorretorLabel").hidden = !central();
@@ -1584,7 +1602,7 @@
         box.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.ver)));
         box.querySelectorAll("[data-usar]").forEach(b => b.addEventListener("click", () => {
             const i = ctx.imoveis().find(x => x.id === b.dataset.usar);
-            $("crmNegImovel").value = b.dataset.usar;
+            $("crmNegImovel").value = b.dataset.usar; mostrarProcura();
             const valor = i && valorNaFinalidade(i, f ? f.finalidade : "");
             if (valor != null) $("crmNegValor").value = dinheiro(valor);
             if (i && !$("crmNegTituloInput").value.trim()) $("crmNegTituloInput").value = i.nome;
@@ -1659,7 +1677,8 @@
         const dados = {
             cliente_id: $("crmNegCliente").value,
             funil_id: $("crmNegFunil").value,
-            construcao_id: $("crmNegImovel").value || null,
+            construcao_id: $("crmNegImovel").value === PROCURA ? null : ($("crmNegImovel").value || null),
+            imovel_procurado: $("crmNegImovel").value === PROCURA ? lerProcura() : null,
             titulo: $("crmNegTituloInput").value.trim(),
             valor: valor == null ? "" : String(valor),
             perfil_busca: perfil,
@@ -1673,6 +1692,7 @@
     async function salvarNegociacao() {
         const dados = coletarNegociacao();
         if (!dados.cliente_id) { msg($("crmNegMsg"), "Escolha o cliente (ou cadastre um novo no botão + Novo)."); return; }
+        if (dados.imovel_procurado && !dados.imovel_procurado.descricao) { msg($("crmNegMsg"), "Descreva o imóvel que o cliente procura."); return; }
         if ($("crmNegValor").value.trim() && dados.valor === "") { msg($("crmNegMsg"), "Valor inválido."); return; }
         const n = negAberta ? negs.get(negAberta) : null;
         $("crmNegSalvar").disabled = true;

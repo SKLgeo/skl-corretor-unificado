@@ -4,7 +4,7 @@
 // ("skl-unificado-") e a limpeza só apaga caches com esse prefixo — nunca mexe
 // nos caches de outros sites da mesma conta (que usam outros nomes).
 const CACHE_PREFIX = "skl-unificado-";
-const CACHE_NAME = CACHE_PREFIX + "v36";
+const CACHE_NAME = CACHE_PREFIX + "v37";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -74,4 +74,26 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => caches.match(request)),
   );
+});
+
+// Avisos do app (Web Push, enviados pela Edge Function notificar-push): mostra a notificação mesmo com o app fechado
+// e, ao tocar, abre (ou traz para frente) o app.
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { titulo: "Aviso", corpo: event.data ? event.data.text() : "" }; }
+  const icone = new URL("./assets/icons/icon-192.png", self.registration.scope).href;
+  event.waitUntil(self.registration.showNotification(d.titulo || "Aviso", {
+    body: d.corpo || "", tag: d.id || undefined, renotify: !!d.id, icon: icone, badge: icone, data: { aviso: d }
+  }));
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const aviso = (event.notification.data || {}).aviso || null;
+  const alvo = new URL("./" + (aviso && aviso.id ? "?aviso=" + encodeURIComponent(aviso.id) : ""), self.registration.scope).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+    for (const j of janelas) {
+      if ("focus" in j) { j.postMessage({ tipo: "aviso-aberto", aviso }); return j.focus(); }
+    }
+    return self.clients.openWindow(alvo);
+  }));
 });

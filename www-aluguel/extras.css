@@ -103,3 +103,52 @@
 /* Enviar ao cliente: incluir localização */
 .ext-env-local{margin:4px 0 0}
 .ext-env-local-dica{margin:2px 0 8px;font-size:12px}
+
+/* ---------- 28/10/2026: zoom só nas fotos, ver senha, avisos, imóvel procurado, contrato com equipe e nome livre ---------- */
+html{touch-action:manipulation}
+.foto-lightbox img[data-zoom-foto]{transition:transform .05s linear;user-select:none;-webkit-user-select:none}
+.senha-caixa{position:relative;display:block}
+.senha-caixa input{width:100%;padding-right:46px}
+.ver-senha{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:18px;line-height:1;padding:6px;cursor:pointer;opacity:.75}
+.ver-senha:hover{opacity:1}
+.avisos-botao:not([hidden]){position:relative;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:19px;cursor:pointer;flex:none}
+.avisos-botao .nav-badge{position:absolute;top:-4px;right:-4px;min-width:20px}
+.avisos-dialog .dialog-card{max-width:560px}
+.avisos-estado-box{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f6f9fb;margin-bottom:12px}
+.avisos-estado-box p{margin:0}
+.avisos-lista{display:grid;gap:8px;max-height:52vh;overflow:auto}
+.avisos-item{display:grid;gap:2px;text-align:left;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
+.avisos-item span{color:#4e626b;font-size:14px}
+.avisos-item small{color:#7a8b93;font-size:12px}
+.avisos-item.nao-lida{border-left:4px solid var(--navy);background:#f3f9fd}
+.avisos-pedido{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border:1px solid #f3d38a;background:#fffbea;border-radius:14px;padding:12px 14px;margin:0 0 14px}
+.avisos-pedido-botoes{display:flex;gap:8px;align-items:center}
+.avisos-procura{border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 14px;margin:0 0 14px}
+.avisos-procura summary{cursor:pointer;font-weight:800;color:var(--navy-deep);display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.avisos-procura summary small{flex-basis:100%;font-weight:400;color:#6b7c84}
+.avisos-procura-lista{display:grid;gap:8px;margin-top:10px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.avisos-procura-item{display:grid;gap:4px;border:1px dashed #b9cbd6;border-radius:12px;padding:10px 12px;background:#f8fbfd}
+.avisos-procura-item span,.avisos-procura-item em{font-size:14px;color:#4e626b}
+.avisos-procura-item small{color:#6b7c84}
+.avisos-procura-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.crm-procura{border:1px dashed #b9cbd6;border-radius:12px;background:#f8fbfd;padding:10px 12px;margin-bottom:10px}
+.crm-procura-dica{margin:0 0 8px;font-size:14px;color:#4e626b}
+.crm-card-procura{color:#8a5a00}
+.fin-ct-equipe{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#fbfdfe}
+.fin-ct-equipe-lista{display:grid;gap:6px;margin:6px 0}
+.fin-ct-equipe-lista .muted-text{margin:0}
+.fin-ct-pessoa{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;align-items:center}
+.fin-ct-pessoa select,.fin-ct-pessoa input{min-width:0;width:100%}
+.fin-ct-pessoa input{grid-column:2/3;grid-row:2}
+.fin-ct-tag{font-size:12px;font-weight:800;padding:3px 8px;border-radius:999px;background:#e3f1fb;color:var(--navy-deep);flex:none}
+.fin-ct-tag-parceiro{background:#fff1e3;color:#8a4b00}
+.fin-ct-equipe-botoes{display:flex;gap:8px;flex-wrap:wrap}
+.fin-nome-livre{margin-top:6px}
+.fin-sc-pessoas{display:grid;gap:10px;margin:10px 0}
+.fin-sc-pessoa{border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.fin-sc-pessoa legend{font-weight:800;color:var(--navy-deep);padding:0 4px}
+.fin-sc-acoes{flex-wrap:wrap;gap:8px}
+.avisos-procura summary .nav-badge{position:static}
+dialog.foto-lightbox{overflow:hidden}
+.foto-lightbox img[data-zoom-foto]{position:relative;z-index:1}
+.foto-lightbox .close-button,.foto-lightbox .hero-nav,.foto-lightbox .imovel-hero-contador{z-index:3}

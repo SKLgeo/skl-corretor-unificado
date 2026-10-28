@@ -51,7 +51,9 @@
 
     const contrato = id => (F().contratos() || []).find(c => c.id === id) || null;
     const cliente = id => (id && F().cliente(id)) || null;
-    const nomeCli = id => (cliente(id) || {}).nome || "—";
+    // contrato pode ter a pessoa cadastrada (…_id) ou só o nome escrito (…_nome)
+    const nomeCli = (id, alt) => (cliente(id) || {}).nome || alt || "—";
+    const clienteDe = (c, papel) => cliente(c[papel + "_id"]) || (c[papel + "_nome"] ? { nome: c[papel + "_nome"] } : null);
     const imovel = id => ctx.imoveis().find(c => c.id === id) || null;
     // contrato com imóvel não cadastrado guarda a descrição no próprio contrato (imovel_avulso)
     const imovelCt = c => (c && c.construcao_id ? imovel(c.construcao_id) : null)
@@ -144,7 +146,7 @@
         }).sort((x, y) => x.b.vencimento.localeCompare(y.b.vencimento));
     }
     function mensagem(l) {
-        const inq = cliente(l.c.inquilino_id) || {};
+        const inq = clienteDe(l.c, "inquilino") || {};
         const modelo = regua["msg_" + l.etapa] || MSG_PADRAO[l.etapa];
         const troca = {
             nome: (inq.nome || "").split(" ")[0] || "tudo bem", valor: dinheiro(l.valor.total), vencimento: dataBr(l.b.vencimento),
@@ -156,7 +158,7 @@
     function renderRegua(box) {
         const f = $("finFiltro").value || "avisar";
         const todas = linhasRegua();
-        const lista = todas.filter(l => (f === "todas" || l.avisar) && bate(`${l.c.numero} ${nomeCli(l.c.inquilino_id)} ${nomeImovelCt(l.c)}`));
+        const lista = todas.filter(l => (f === "todas" || l.avisar) && bate(`${l.c.numero} ${nomeCli(l.c.inquilino_id, l.c.inquilino_nome)} ${nomeImovelCt(l.c)}`));
         $("finContagem").textContent = `${lista.length} aviso(s) · ${dinheiro(lista.reduce((s, l) => s + l.valor.total, 0))}`;
         const grupo = etapa => {
             const itens = lista.filter(l => l.etapa === etapa);
@@ -174,7 +176,7 @@
         ligarRegua(box, todas);
     }
     function cartaoRegua(l) {
-        const inq = cliente(l.c.inquilino_id) || {};
+        const inq = clienteDe(l.c, "inquilino") || {};
         const tel = digitos(inq.telefone), texto = mensagem(l);
         const ult = l.ultimo ? `Avisado por ${l.ultimo.canal === "email" ? "e-mail" : l.ultimo.canal === "telefone" ? "telefone" : "WhatsApp"} em ${new Date(l.ultimo.created_at).toLocaleDateString("pt-BR")}` : "Ainda não avisado";
         return `<article class="fx-cartao${l.avisar ? " fx-pendente" : ""}">
@@ -233,7 +235,7 @@
     function nomeEnc(e) { return (TIPOS_ENC[e.tipo] || "Encargo") + (e.descricao ? " · " + e.descricao : "") + (e.parcelas ? ` (${e.parcela}/${e.parcelas})` : ""); }
     function onde(e) {
         const c = e.contrato_id ? contrato(e.contrato_id) : null;
-        return `${h(nomeImovel(e.construcao_id))}${c ? `<small class="fin-sub">Contrato nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</small>` : ""}`;
+        return `${h(nomeImovel(e.construcao_id))}${c ? `<small class="fin-sub">Contrato nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</small>` : ""}`;
     }
     function renderEncargos(box) {
         const f = $("finFiltro").value || "pendentes", hoje = hojeIso();
@@ -243,7 +245,7 @@
             if (f === "proximos" && !(e.status === "pendente" && e.vencimento >= hoje && e.vencimento <= somaDias(hoje, 30))) return false;
             if (f === "pagos" && e.status !== "pago") return false;
             const c = e.contrato_id ? contrato(e.contrato_id) : null;
-            return bate(`${nomeEnc(e)} ${nomeImovel(e.construcao_id)} ${c ? c.numero + " " + nomeCli(c.inquilino_id) + " " + nomeCli(c.proprietario_id) : ""}`);
+            return bate(`${nomeEnc(e)} ${nomeImovel(e.construcao_id)} ${c ? c.numero + " " + nomeCli(c.inquilino_id, c.inquilino_nome) + " " + nomeCli(c.proprietario_id, c.proprietario_nome) : ""}`);
         }).sort((a, b) => f === "pagos" ? String(b.pago_em || "").localeCompare(String(a.pago_em || "")) : a.vencimento.localeCompare(b.vencimento));
         $("finContagem").textContent = `${lista.length} encargo(s) · ${dinheiro(lista.reduce((s, e) => s + Number(e.valor || 0), 0))}`;
         box.innerHTML = `<div class="panel fx-painel">
@@ -279,7 +281,7 @@
     }
     function opcoesContratos(sel, soAtivos) {
         const lista = (F().contratos() || []).filter(c => !soAtivos || c.status === "ativo" || c.id === sel);
-        return `<option value="">Sem contrato (só o imóvel)</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))} · ${h(nomeImovelCt(c))}</option>`).join("");
+        return `<option value="">Sem contrato (só o imóvel)</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))} · ${h(nomeImovelCt(c))}</option>`).join("");
     }
     function opcoesImoveis(sel) {
         const lista = ctx.imoveis().slice().sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
@@ -350,7 +352,7 @@
             if (f === "atrasados" && !(emAberto(c) && c.prazo && c.prazo < hoje)) return false;
             if (f === "concluidos" && c.status !== "concluido") return false;
             const ct = c.contrato_id ? contrato(c.contrato_id) : null;
-            return bate(`${c.numero} ${c.titulo} ${c.fornecedor || ""} ${nomeImovel(c.construcao_id)} ${ct ? nomeCli(ct.inquilino_id) : ""}`);
+            return bate(`${c.numero} ${c.titulo} ${c.fornecedor || ""} ${nomeImovel(c.construcao_id)} ${ct ? nomeCli(ct.inquilino_id, ct.inquilino_nome) : ""}`);
         });
         const ordem = { urgente: 0, alta: 1, media: 2, baixa: 3 };
         if (f !== "concluidos" && f !== "todos") lista.sort((a, b) => ordem[a.prioridade] - ordem[b.prioridade] || String(a.prazo || "9").localeCompare(String(b.prazo || "9")));
@@ -362,7 +364,7 @@
               ${lista.map(c => { const ct = c.contrato_id ? contrato(c.contrato_id) : null; return `<tr class="crm-linha" data-fx-ch="${h(c.id)}">
                 <td data-r="Nº"><strong>${h(c.numero)}</strong></td>
                 <td data-r="Problema"><strong>${h(c.titulo)}</strong><small class="fin-sub">${h(CATS[c.categoria])} · aberto em ${h(dataBr(c.created_at))} · pedido por ${h(SOLIC[c.solicitante].toLowerCase())}</small></td>
-                <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}${ct ? `<small class="fin-sub">Inquilino ${h(nomeCli(ct.inquilino_id))}</small>` : ""}</td>
+                <td data-r="Imóvel">${h(nomeImovel(c.construcao_id))}${ct ? `<small class="fin-sub">Inquilino ${h(nomeCli(ct.inquilino_id, ct.inquilino_nome))}</small>` : ""}</td>
                 <td data-r="Prioridade">${prioridade(c)}</td>
                 <td data-r="Responsável">${c.responsavel_id ? h(nomeUsuario(c.responsavel_id)) : "—"}${c.fornecedor ? `<small class="fin-sub">${h(c.fornecedor)}</small>` : ""}</td>
                 <td data-r="Prazo">${c.prazo ? `<span class="${emAberto(c) && c.prazo < hoje ? "fin-txt-alerta" : ""}">${h(dataBr(c.prazo))}</span>` : "—"}</td>
@@ -441,7 +443,7 @@
     function whatsChamado() {
         const c = chamados.find(x => x.id === chAberto); if (!c) return;
         const ct = c.contrato_id ? contrato(c.contrato_id) : null;
-        const inq = ct ? cliente(ct.inquilino_id) : null;
+        const inq = ct ? clienteDe(ct, "inquilino") : null;
         const tel = digitos(inq && inq.telefone);
         if (tel.length < 10) { ctx.toast("Inquilino sem celular no cadastro."); return; }
         const texto = `Olá, ${((inq.nome || "").split(" ")[0]) || "tudo bem"}! Atualização do chamado nº ${c.numero} (${c.titulo}): ${STATUS_CH[c.status].toLowerCase()}`
@@ -468,7 +470,7 @@
         const enc = encargos.filter(e => e.status === "pendente" && e.vencimento <= somaDias(hoje, 7)).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
         const ch = chamados.filter(c => emAberto(c) && ([ "alta", "urgente" ].includes(c.prioridade) || (c.prazo && c.prazo < hoje)));
         const avisar = linhasRegua().filter(l => l.avisar);
-        return aviso("Régua de cobrança: avisar hoje", avisar.length, avisar.slice(0, 6).map(l => `<li><button type="button" class="text-button" data-fin-ir="regua:avisar">${h(nomeCli(l.c.inquilino_id))}</button><small>${h(ETAPAS[l.etapa])} · ${h(dinheiro(l.valor.total))} · vence ${h(dataBr(l.b.vencimento))}</small></li>`).join(""), "Ninguém para avisar hoje.", "regua:avisar")
+        return aviso("Régua de cobrança: avisar hoje", avisar.length, avisar.slice(0, 6).map(l => `<li><button type="button" class="text-button" data-fin-ir="regua:avisar">${h(nomeCli(l.c.inquilino_id, l.c.inquilino_nome))}</button><small>${h(ETAPAS[l.etapa])} · ${h(dinheiro(l.valor.total))} · vence ${h(dataBr(l.b.vencimento))}</small></li>`).join(""), "Ninguém para avisar hoje.", "regua:avisar")
             + aviso("Encargos vencendo (7 dias) ou vencidos", enc.length, enc.slice(0, 8).map(e => `<li><button type="button" class="text-button" data-fx-abrir-enc="${h(e.id)}">${h(nomeEnc(e))}</button><small>${h(nomeImovel(e.construcao_id))} · ${h(RESP[e.responsavel])} paga · ${e.vencimento < hoje ? "venceu" : "vence"} ${h(dataBr(e.vencimento))}${e.valor ? " · " + h(dinheiro(e.valor)) : ""}</small></li>`).join(""), "Nenhum encargo vencendo.", "encargos:pendentes")
             + aviso("Manutenção urgente ou com prazo vencido", ch.length, ch.slice(0, 8).map(c => `<li><button type="button" class="text-button" data-fx-abrir-ch="${h(c.id)}">Nº ${h(c.numero)} · ${h(c.titulo)}</button><small>${h(PRIOR[c.prioridade])} · ${h(nomeImovel(c.construcao_id))}${c.prazo ? " · prazo " + h(dataBr(c.prazo)) : ""}</small></li>`).join(""), "Nenhum chamado urgente.", "chamados:abertos");
     }
@@ -629,7 +631,7 @@
     }
     function termoRescisao(c, r, previa) {
         if (!r) return;
-        const inq = cliente(c.inquilino_id) || {}, prop = cliente(c.proprietario_id) || {};
+        const inq = clienteDe(c, "inquilino") || {}, prop = clienteDe(c, "proprietario") || {};
         const im = imovelCt(c) || {};
         const nome = ctx.carteiraNome();
         const html = `<div class="fin-doc"><header><div><strong>${h(nome)}</strong><span>Termo de rescisão de contrato de locação${previa ? " (prévia)" : ""}</span></div><small>Emitido em ${h(new Date().toLocaleDateString("pt-BR"))}</small></header>

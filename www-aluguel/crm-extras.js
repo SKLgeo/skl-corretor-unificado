@@ -363,7 +363,9 @@
         if (carac.length) linhas.push(`📐 ${carac.join(" · ")}`);
         if (c.rural && (c.benfeitorias || []).length) linhas.push(`🏗️ ${c.benfeitorias.map(b => b.nome + (b.detalhe ? " (" + b.detalhe + ")" : "")).join(", ")}`);
         if (link) linhas.push(``, `Veja fotos e detalhes: ${link}`);
-        linhas.push(``, `Posso agendar uma visita? — ${(ctx.usuario() || {}).display_name || ""}, ${ctx.carteiraNome()}`);
+        // assina com o apelido do corretor; sem apelido, com o nome completo (evita confundir dois "Victor Alves")
+        const eu = ctx.usuario() || {};
+        linhas.push(``, `Posso agendar uma visita? — ${eu.apelido || eu.display_name || ""}, ${ctx.carteiraNome()}`);
         return linhas.join("\n");
     }
     async function abrirEnviar(c) {

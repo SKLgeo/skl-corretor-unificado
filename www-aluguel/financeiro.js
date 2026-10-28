@@ -19,6 +19,8 @@
     let contratos = [], vendas = [], cobrancas = [], repasses = [], clientes = new Map(), eventos = [];
     let resumo = null, carregando = null, canal = null, recarregarTimer = null;
     let contratoAberto = null, itens = [], cobrancaAberta = null;
+    let parceiros = [], equipeCt = []; // parceiros de fora (crm_parceiros) e quem trabalhou junto no contrato aberto
+    const ESCREVER = "__escrever"; // opção "escrever o nome" (pessoa sem cadastro)
     let ctTipo = "locacao", vendaAberta = null; // tipo do contrato aberto na janela: locação ou compra e venda
 
     const h = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -46,7 +48,9 @@
     function digitos(t) { return String(t || "").replace(/\D/g, ""); }
 
     const cliente = id => clientes.get(id) || null;
-    const nomeCli = id => (cliente(id) || {}).nome || "—";
+    // contrato pode ter a pessoa cadastrada (…_id) ou só o nome escrito (…_nome)
+    const nomeCli = (id, alt) => (cliente(id) || {}).nome || alt || "—";
+    const clienteDe = (c, papel) => cliente(c[papel + "_id"]) || (c[papel + "_nome"] ? { nome: c[papel + "_nome"] } : null);
     const imovel = id => ctx.imoveis().find(c => c.id === id) || null;
     const nomeImovel = id => { const c = imovel(id); return c ? ((c.codigo ? c.codigo + " · " : "") + c.nome) : "—"; };
     const contrato = id => contratos.find(c => c.id === id) || null;
@@ -101,18 +105,20 @@
             const cart = ctx.carteiraId();
             const desde = somaDias(hojeIso(), -400);
             if (!silencioso) await ctx.sb.rpc("fin_atualizar", { p_carteira: cart });
-            const [ c1, c2, c3, c4, c5, c6 ] = await Promise.all([
+            const [ c1, c2, c3, c4, c5, c6, c7 ] = await Promise.all([
                 ctx.sb.from("aluguel_contratos").select("*").eq("carteira_id", cart).order("numero", { ascending: false }),
                 ctx.sb.from("aluguel_cobrancas").select("*").eq("carteira_id", cart).or(`status.eq.aberta,vencimento.gte.${desde}`).order("vencimento"),
                 ctx.sb.from("aluguel_repasses").select("*").eq("carteira_id", cart).or(`status.eq.pendente,competencia.gte.${desde}`).order("competencia", { ascending: false }),
                 ctx.sb.from("crm_clientes").select("id,nome,telefone,email,cpf").eq("carteira_id", cart),
                 ctx.sb.rpc("fin_resumo", { p_carteira: cart, p_mes: mesSel() + "-01" }),
-                ctx.sb.from("imobiliaria_contratos_venda").select("*").eq("carteira_id", cart).order("numero", { ascending: false })
+                ctx.sb.from("imobiliaria_contratos_venda").select("*").eq("carteira_id", cart).order("numero", { ascending: false }),
+                ctx.sb.from("crm_parceiros").select("id, nome, ativo").eq("carteira_id", cart).order("nome")
             ]);
             const falha = [ c1, c2, c3, c4 ].find(r => r.error);
             if (falha) { if (!silencioso) ctx.toast(erro(falha.error)); return; }
             contratos = c1.data || []; cobrancas = c2.data || []; repasses = c3.data || [];
             vendas = (c6.error ? [] : c6.data || []).map(v => ({ ...v, _tipo: "venda" }));
+            parceiros = c7.error ? [] : (c7.data || []).filter(x => x.ativo !== false);
             clientes = new Map((c4.data || []).map(c => [ c.id, c ]));
             resumo = c5.error ? null : c5.data;
             atualizarSelo();
@@ -147,6 +153,12 @@
         });
         document.querySelectorAll("[data-ct-tipo]").forEach(b => b.addEventListener("click", () => definirTipo(b.dataset.ctTipo)));
         document.querySelectorAll("input[name=finCtOrigem]").forEach(r => r.addEventListener("change", mostrarOrigem));
+        [ "finCtInquilino", "finCtProprietario" ].forEach(id => $(id).addEventListener("change", () => {
+            mostrarNomesLivres();
+            if ($(id).value === ESCREVER) $(id + "Nome").focus();
+        }));
+        $("finCtAddCorretor").addEventListener("click", () => { equipeCt.push({ tipo: "corretor", usuario_id: null }); desenharEquipeCt(); });
+        $("finCtAddParceiro").addEventListener("click", () => { equipeCt.push({ tipo: "parceiro", parceiro_id: null, nome: "" }); desenharEquipeCt(); });
         [ "finCvValor", "finCvComPct" ].forEach(id => $(id).addEventListener("input", calcularComissaoVenda));
         $("finCvConcluir").addEventListener("click", () => situacaoVenda("concluido"));
         $("finCvCancelar").addEventListener("click", () => situacaoVenda("cancelado"));
@@ -234,8 +246,8 @@
           </div>
           <div class="fin-avisos">
             ${aviso("Em atraso", atr.length, atr.slice(0, 8).map(b => linhaAtraso(b)).join(""), "Nenhum aluguel em atraso.", "cobrancas:atrasadas")}
-            ${aviso("Reajustes nos próximos 30 dias", reaj.length, reaj.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>${h(INDICES[c.indice_reajuste])} · ${h(dataBr(c.proximo_reajuste))}</small></li>`).join(""), "Nenhum reajuste chegando.", "contratos:reajuste")}
-            ${aviso("Contratos terminando em 60 dias", venc.length, venc.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id))}</button><small>termina em ${h(dataBr(c.fim))}</small></li>`).join(""), "Nenhum contrato terminando.", "contratos:vencendo")}
+            ${aviso("Reajustes nos próximos 30 dias", reaj.length, reaj.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</button><small>${h(INDICES[c.indice_reajuste])} · ${h(dataBr(c.proximo_reajuste))}</small></li>`).join(""), "Nenhum reajuste chegando.", "contratos:reajuste")}
+            ${aviso("Contratos terminando em 60 dias", venc.length, venc.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</button><small>termina em ${h(dataBr(c.fim))}</small></li>`).join(""), "Nenhum contrato terminando.", "contratos:vencendo")}
             ${semContrato.length && podeGerir() ? aviso("Negócios fechados sem contrato", semContrato.length, semContrato.slice(0, 8).map(n => `<li><button type="button" class="text-button" data-fin-neg="${h(n.id)}">${h(n.titulo || nomeCli(n.cliente_id))}</button><small>${h(dinheiro(n.valor))} · criar contrato</small></li>`).join(""), "") : ""}
             ${window.SKLFinExtra ? window.SKLFinExtra.avisosResumo(aviso) : ""}
           </div>
@@ -252,7 +264,7 @@
     }
     function linhaAtraso(b) {
         const c = contrato(b.contrato_id) || {};
-        return `<li><button type="button" class="text-button" data-fin-pagar="${h(b.id)}">${h(nomeCli(c.inquilino_id))}</button>
+        return `<li><button type="button" class="text-button" data-fin-pagar="${h(b.id)}">${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</button>
           <small>${h(dinheiro(b.valor_total))} · venceu ${h(dataBr(b.vencimento))} · ${diasEntre(b.vencimento, hojeIso())} dia(s)</small>${botaoWhats(b)}</li>`;
     }
     function negociosSemContrato() {
@@ -283,7 +295,7 @@
     }
     function botaoWhats(b) {
         const c = contrato(b.contrato_id) || {};
-        const cli = cliente(c.inquilino_id);
+        const cli = clienteDe(c, "inquilino");
         const d = digitos(cli && cli.telefone);
         if (d.length < 10) return "";
         const atraso = b.vencimento < hojeIso();
@@ -301,14 +313,14 @@
             if (f === "canceladas" && b.status !== "cancelada") return false;
             if (f === "todas" && !noMes(b.vencimento, ym)) return false;
             const c = contrato(b.contrato_id) || {};
-            return bate(`${c.numero} ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovelCt(c)}`);
+            return bate(`${c.numero} ${nomeCli(c.inquilino_id, c.inquilino_nome)} ${nomeCli(c.proprietario_id, c.proprietario_nome)} ${nomeImovelCt(c)}`);
         }).sort((a, b) => f === "pagas" ? String(b.pago_em).localeCompare(String(a.pago_em)) : a.vencimento.localeCompare(b.vencimento));
         const total = lista.reduce((s, b) => s + Number(b.status === "paga" ? b.valor_pago : b.valor_total || 0), 0);
         $("finContagem").textContent = `${lista.length} cobrança(s) · ${dinheiro(total)}`;
         $("finLista").innerHTML = lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Vencimento</th><th>Inquilino</th><th>Imóvel</th><th>Parcela</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
           ${lista.map(b => { const c = contrato(b.contrato_id) || {}; return `<tr>
             <td data-r="Vencimento">${h(dataBr(b.vencimento))}</td>
-            <td data-r="Inquilino"><strong>${h(nomeCli(c.inquilino_id))}</strong><small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
+            <td data-r="Inquilino"><strong>${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</strong><small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
             <td data-r="Imóvel">${h(nomeImovelCt(c))}</td>
             <td data-r="Parcela">${b.tipo === "rescisao" ? "Rescisão" : h(b.parcela) + "ª"} · ${h(mesAno(b.competencia))}</td>
             <td data-r="Valor">${h(dinheiro(b.status === "paga" ? b.valor_pago : b.valor_total))}${(b.itens || []).length ? `<small class="fin-sub">aluguel ${h(dinheiro(b.valor_aluguel))} + ${h(b.itens.map(i => i.descricao).join(", "))}</small>` : ""}${Number(b.multa) + Number(b.juros) > 0 ? `<small class="fin-sub">multa+juros ${h(dinheiro(Number(b.multa) + Number(b.juros)))}</small>` : ""}</td>
@@ -358,7 +370,7 @@
         const c = contrato(b.contrato_id) || {};
         cobrancaAberta = b;
         $("finPgTitulo").textContent = `Receber ${b.parcela}ª parcela · ${mesAno(b.competencia)}`;
-        $("finPgInfo").innerHTML = `<strong>${h(nomeCli(c.inquilino_id))}</strong> · ${h(nomeImovelCt(c))}<br>
+        $("finPgInfo").innerHTML = `<strong>${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</strong> · ${h(nomeImovelCt(c))}<br>
           Vencimento ${h(dataBr(b.vencimento))} · aluguel ${h(dinheiro(b.valor_aluguel))}${(b.itens || []).map(i => ` + ${h(i.descricao)} ${h(dinheiro(i.valor))}`).join("")}`;
         $("finPgData").value = hojeIso();
         $("finPgDesconto").value = "";
@@ -430,13 +442,13 @@
             if (f === "encerrados" && c.status !== "encerrado") return false;
             if (f === "reajuste" && !(c.status === "ativo" && c.proximo_reajuste && c.proximo_reajuste <= somaDias(hoje, 30))) return false;
             if (f === "vencendo" && !(c.status === "ativo" && c.fim <= somaDias(hoje, 60))) return false;
-            return bate(`${c.numero} locação ${nomeCli(c.inquilino_id)} ${nomeCli(c.proprietario_id)} ${nomeImovelCt(c)}`);
+            return bate(`${c.numero} locação ${nomeCli(c.inquilino_id, c.inquilino_nome)} ${nomeCli(c.proprietario_id, c.proprietario_nome)} ${nomeImovelCt(c)}`);
         });
         const ven = vendas.filter(v => {
             if ([ "locacao", "reajuste", "vencendo" ].includes(f)) return false;
             if ((f === "ativos" || f === "venda") && v.status !== "em_andamento") return false;
             if (f === "encerrados" && v.status === "em_andamento") return false;
-            return bate(`${v.numero} compra venda ${nomeCli(v.comprador_id)} ${nomeCli(v.vendedor_id)} ${nomeImovelCt(v)}`);
+            return bate(`${v.numero} compra venda ${nomeCli(v.comprador_id, v.comprador_nome)} ${nomeCli(v.vendedor_id, v.vendedor_nome)} ${nomeImovelCt(v)}`);
         });
         const lista = [ ...loc, ...ven ].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
         const mensal = loc.filter(c => c.status === "ativo").reduce((s, c) => s + Number(c.valor_aluguel), 0);
@@ -445,8 +457,8 @@
         const linha = c => c._tipo === "venda" ? `<tr class="crm-linha" data-fin-cv="${h(c.id)}">
             <td data-r="Nº"><strong>${h(c.numero)}</strong><small class="fin-sub">Compra e venda</small></td>
             <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
-            <td data-r="Inquilino / comprador">${h(nomeCli(c.comprador_id))}<small class="fin-sub">comprador</small></td>
-            <td data-r="Proprietário / vendedor">${h(nomeCli(c.vendedor_id))}<small class="fin-sub">vendedor</small></td>
+            <td data-r="Inquilino / comprador">${h(nomeCli(c.comprador_id, c.comprador_nome))}<small class="fin-sub">comprador</small></td>
+            <td data-r="Proprietário / vendedor">${h(nomeCli(c.vendedor_id, c.vendedor_nome))}<small class="fin-sub">vendedor</small></td>
             <td data-r="Valor">${h(dinheiro(c.valor_venda))}${c.comissao_valor != null ? `<small class="fin-sub">comissão ${h(dinheiro(c.comissao_valor))}</small>` : ""}</td>
             <td data-r="Período">${h(dataBr(c.data_contrato))}${c.prazo_escritura ? `<small class="fin-sub">escritura até ${h(dataBr(c.prazo_escritura))}</small>` : ""}</td>
             <td data-r="Reajuste">—</td>
@@ -454,8 +466,8 @@
           : `<tr class="crm-linha" data-fin-ct="${h(c.id)}">
             <td data-r="Nº"><strong>${h(c.numero)}</strong><small class="fin-sub">Locação</small></td>
             <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id || !c.imovel_avulso ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
-            <td data-r="Inquilino / comprador">${h(nomeCli(c.inquilino_id))}<small class="fin-sub">inquilino</small></td>
-            <td data-r="Proprietário / vendedor">${h(nomeCli(c.proprietario_id))}<small class="fin-sub">proprietário</small></td>
+            <td data-r="Inquilino / comprador">${h(nomeCli(c.inquilino_id, c.inquilino_nome))}<small class="fin-sub">inquilino</small></td>
+            <td data-r="Proprietário / vendedor">${h(nomeCli(c.proprietario_id, c.proprietario_nome))}<small class="fin-sub">proprietário</small></td>
             <td data-r="Valor">${h(dinheiro(c.valor_aluguel))}<small class="fin-sub">por mês · vence dia ${h(c.dia_vencimento)} · adm ${h(pct(c.taxa_adm_pct))}%</small></td>
             <td data-r="Período">${h(dataBr(c.inicio))} a ${h(dataBr(c.fim))}</td>
             <td data-r="Reajuste">${h(INDICES[c.indice_reajuste])}${c.proximo_reajuste ? `<small class="fin-sub">${h(dataBr(c.proximo_reajuste))}</small>` : ""}</td>
@@ -468,7 +480,7 @@
     }
     function opcoesClientes(sel) {
         const lista = [ ...clientes.values() ].sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
-        return `<option value="">Escolha…</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>${h(c.nome)}${c.cpf ? ` · ${h(c.cpf)}` : ""}</option>`).join("");
+        return `<option value="">Escolha…</option><option value="${ESCREVER}">✏️ Escrever o nome (sem cadastro)</option>` + lista.map(c => `<option value="${h(c.id)}"${c.id === sel ? " selected" : ""}>${h(c.nome)}${c.cpf ? ` · ${h(c.cpf)}` : ""}</option>`).join("");
     }
     // Uma janela só para os dois tipos: locação (cobranças, repasses, reajuste) e compra e venda (registro da venda).
     // O tipo só é escolhido em contrato novo; o imóvel pode ser um cadastrado no sistema ou um "não cadastrado".
@@ -487,8 +499,15 @@
         $("finCtAvCidade").value = a.cidade || ""; $("finCtAvMatricula").value = a.matricula || ""; $("finCtAvArea").value = a.area || "";
         $("finCtImovel").value = "";
         $("finCtImovel").dataset.sel = base.construcao_id || "";
-        $("finCtInquilino").innerHTML = opcoesClientes(tipo === "venda" ? base.comprador_id : base.inquilino_id);
-        $("finCtProprietario").innerHTML = opcoesClientes(tipo === "venda" ? base.vendedor_id : base.proprietario_id);
+        const pessoa = (sel, idPessoa, nome, input) => {
+            $(sel).innerHTML = opcoesClientes(idPessoa);
+            if (!idPessoa && nome) $(sel).value = ESCREVER;
+            $(input).value = idPessoa ? "" : (nome || "");
+        };
+        pessoa("finCtInquilino", tipo === "venda" ? base.comprador_id : base.inquilino_id, tipo === "venda" ? base.comprador_nome : base.inquilino_nome, "finCtInquilinoNome");
+        pessoa("finCtProprietario", tipo === "venda" ? base.vendedor_id : base.proprietario_id, tipo === "venda" ? base.vendedor_nome : base.proprietario_nome, "finCtProprietarioNome");
+        mostrarNomesLivres();
+        equipeCt = JSON.parse(JSON.stringify(base.participantes || []));
         const equipe = ctx.equipe().filter(u => u.active !== false);
         $("finCtCorretor").innerHTML = `<option value="">Sem corretor</option>` + equipe.map(u => `<option value="${h(u.id)}"${u.id === base.corretor_id ? " selected" : ""}>${h(u.display_name)}</option>`).join("");
         // locação
@@ -520,7 +539,9 @@
         mostrarOrigem();
         mostrarGarantia();
         desenharItens();
+        desenharEquipeCt();
         $("finContratoForm").querySelectorAll("input,select,textarea").forEach(el => { el.disabled = !pode; });
+        $("finCtAddCorretor").hidden = !pode; $("finCtAddParceiro").hidden = !pode;
         $("finCtAddItem").hidden = !pode || tipo !== "locacao";
         $("finCtSalvar").hidden = !pode;
         $("finCtSalvar").textContent = c ? "Salvar alterações" : "Criar contrato";
@@ -567,6 +588,88 @@
             .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
         $("finCtImovel").innerHTML = `<option value="">Escolha o imóvel…</option>` + imoveis.map(i => `<option value="${h(i.id)}"${i.id === sel ? " selected" : ""}>${h((i.codigo ? i.codigo + " · " : "") + i.nome)}</option>`).join("");
         if (!vendaAberta && !contratoAberto && sel) $("finCtImovel").dispatchEvent(new Event("change"));
+    }
+    function mostrarNomesLivres() {
+        $("finCtInquilinoNome").hidden = $("finCtInquilino").value !== ESCREVER;
+        $("finCtProprietarioNome").hidden = $("finCtProprietario").value !== ESCREVER;
+    }
+    // corretores da equipe e parceiros de fora que fecharam junto (além do "corretor que fechou")
+    function desenharEquipeCt() {
+        const equipe = ctx.equipe().filter(u => u.active !== false || equipeCt.some(p => p.usuario_id === u.id));
+        const opt = (v, t, sel) => `<option value="${h(v)}"${v === sel ? " selected" : ""}>${h(t)}</option>`;
+        const tirar = `<button type="button" class="text-button crm-remover" data-remover title="Tirar">✕</button>`;
+        $("finCtEquipe").innerHTML = equipeCt.map((p, i) => p.tipo === "corretor"
+            ? `<div class="fin-ct-pessoa" data-i="${i}"><span class="fin-ct-tag">Corretor</span>
+                <select data-k="usuario_id"><option value="">Escolha o corretor…</option>${equipe.map(u => opt(u.id, u.display_name + (u.apelido ? " (" + u.apelido + ")" : ""), p.usuario_id)).join("")}</select>${tirar}</div>`
+            : `<div class="fin-ct-pessoa" data-i="${i}"><span class="fin-ct-tag fin-ct-tag-parceiro">Parceiro</span>
+                <select data-k="parceiro_id"><option value="">Outro (escrever o nome)</option>${parceiros.map(x => opt(x.id, x.nome, p.parceiro_id)).join("")}</select>
+                <input data-k="nome" placeholder="Nome do corretor ou imobiliária parceira" autocomplete="off" value="${h(p.nome || "")}"${p.parceiro_id ? " hidden" : ""} />${tirar}</div>`).join("")
+            || `<p class="muted-text">Só o corretor que fechou. Se mais gente trabalhou junto, inclua os corretores da equipe e os parceiros de fora.</p>`;
+        $("finCtEquipe").querySelectorAll(".fin-ct-pessoa").forEach(row => {
+            const p = equipeCt[Number(row.dataset.i)];
+            row.querySelectorAll("[data-k]").forEach(el => el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
+                p[el.dataset.k] = el.value || null;
+                if (el.dataset.k === "parceiro_id") { if (el.value) p.nome = null; desenharEquipeCt(); }
+            }));
+            row.querySelector("[data-remover]").addEventListener("click", () => { equipeCt.splice(Number(row.dataset.i), 1); desenharEquipeCt(); });
+        });
+    }
+    function participantesCt() {
+        return equipeCt.map(p => p.tipo === "corretor" ? (p.usuario_id ? { tipo: "corretor", usuario_id: p.usuario_id } : null)
+            : (p.parceiro_id ? { tipo: "parceiro", parceiro_id: p.parceiro_id } : ((p.nome || "").trim() ? { tipo: "parceiro", nome: p.nome.trim() } : null))).filter(Boolean);
+    }
+    // pessoa escrita à mão (sem cadastro): pergunta se quer criar o cadastro antes de salvar
+    function pessoasSemCadastro(d, venda) {
+        const lista = [];
+        const add = (campo, rotulo, tipo) => { if (!d[campo + "_id"] && d[campo + "_nome"]) lista.push({ campo, rotulo, tipo, nome: d[campo + "_nome"] }); };
+        if (venda) { add("comprador", "Comprador", "comprador"); add("vendedor", "Vendedor", "vendedor"); }
+        else { add("inquilino", "Inquilino", "inquilino"); add("proprietario", "Proprietário", "proprietario"); }
+        return lista;
+    }
+    function perguntarCadastro(pessoas) {
+        return new Promise(resolve => {
+            const dlg = $("finSemCadastroDialog");
+            const nomes = pessoas.map(p => `<strong>${h(p.nome)}</strong> (${h(p.rotulo.toLowerCase())})`).join(" e ");
+            const muitos = pessoas.length > 1;
+            $("finScTexto").innerHTML = `${nomes} ${muitos ? "ainda não têm" : "ainda não tem"} cadastro no sistema. Dá para salvar o contrato só com o nome,
+              mas os dados pessoais (celular, CPF, e-mail) não ficam guardados — e eles fazem falta na hora de cobrar pelo WhatsApp,
+              emitir o recibo e preencher a DIMOB. Quer criar o cadastro agora? Leva menos de um minuto.`;
+            $("finScPessoas").innerHTML = pessoas.map((p, i) => `<fieldset class="fin-sc-pessoa"><legend>${h(p.rotulo)}: ${h(p.nome)}</legend>
+                <div class="form-row"><label><span>Celular / WhatsApp</span><input data-sc-tel="${i}" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
+                <label><span>CPF ou CNPJ (opcional)</span><input data-sc-cpf="${i}" inputmode="numeric" autocomplete="off" /></label></div></fieldset>`).join("");
+            msg($("finScMsg"), "");
+            let respondido = false;
+            const fim = valor => { if (respondido) return; respondido = true; dlg.onclose = null; if (dlg.open) dlg.close(); resolve(valor); };
+            dlg.onclose = () => fim(null);
+            $("finScVoltar").onclick = () => fim(null);
+            $("finScSoNome").onclick = () => fim("nome");
+            $("finScCriar").onclick = async () => {
+                const dados = pessoas.map((p, i) => ({ p, tel: dlg.querySelector(`[data-sc-tel="${i}"]`).value.trim(), cpf: dlg.querySelector(`[data-sc-cpf="${i}"]`).value.trim() }));
+                const falta = dados.find(x => digitos(x.tel).length < 10);
+                if (falta) { msg($("finScMsg"), `Informe o celular com DDD de ${falta.p.nome} (ou use "Salvar só com o nome").`); return; }
+                $("finScCriar").disabled = true;
+                try {
+                    for (const x of dados) {
+                        if (x.p.id) continue;
+                        const { data, error } = await ctx.sb.rpc("crm_salvar_cliente", { p_carteira: ctx.carteiraId(), p_id: null,
+                            p_dados: { nome: x.p.nome, telefone: x.tel, cpf: x.cpf, tipos: [ x.p.tipo ], origem: "Contrato" } });
+                        if (error) { msg($("finScMsg"), `${x.p.nome}: ${erro(error)}`); return; }
+                        clientes.set(data.id, data);
+                        x.p.id = data.id;
+                    }
+                    fim("criado");
+                } finally { $("finScCriar").disabled = false; }
+            };
+            dlg.showModal();
+        });
+    }
+    async function confirmarPessoas(d, venda) {
+        const pessoas = pessoasSemCadastro(d, venda);
+        if (!pessoas.length) return true;
+        const r = await perguntarCadastro(pessoas);
+        if (!r) return false;
+        if (r === "criado") pessoas.forEach(p => { d[p.campo + "_id"] = p.id; d[p.campo + "_nome"] = null; });
+        return true;
     }
     function origemAvulsa() { const r = document.querySelector("input[name=finCtOrigem]:checked"); return !!r && r.value === "avulso"; }
     function mostrarOrigem() {
@@ -621,8 +724,8 @@
     function coletarContrato() {
         const avulso = imovelAvulso();
         return {
-            construcao_id: avulso ? null : ($("finCtImovel").value || null), imovel_avulso: avulso, inquilino_id: $("finCtInquilino").value || null,
-            proprietario_id: $("finCtProprietario").value || null, corretor_id: $("finCtCorretor").value || null,
+            construcao_id: avulso ? null : ($("finCtImovel").value || null), imovel_avulso: avulso,
+            ...pessoasDoForm("inquilino", "proprietario"), corretor_id: $("finCtCorretor").value || null, participantes: participantesCt(),
             negociacao_id: $("finCtNegociacao").value || null,
             valor_aluguel: num($("finCtValor").value), dia_vencimento: Number($("finCtDia").value) || 10,
             inicio: $("finCtInicio").value, prazo_meses: Number($("finCtPrazo").value) || 30, indice_reajuste: $("finCtIndice").value,
@@ -633,12 +736,18 @@
             repasse_prazo_dias: Number($("finCtRepPrazo").value) || 0, repasse_dados: $("finCtRepDados").value.trim(), observacoes: $("finCtObs").value.trim()
         };
     }
+    function pessoasDoForm(a, b) {
+        const ler = (sel, campo) => {
+            const v = $(sel).value;
+            return v === ESCREVER ? { [campo + "_id"]: null, [campo + "_nome"]: $(sel + "Nome").value.trim() || null } : { [campo + "_id"]: v || null, [campo + "_nome"]: null };
+        };
+        return { ...ler("finCtInquilino", a), ...ler("finCtProprietario", b) };
+    }
     function coletarVenda() {
         const avulso = imovelAvulso();
         return {
             construcao_id: avulso ? null : ($("finCtImovel").value || null), imovel_avulso: avulso,
-            comprador_id: $("finCtInquilino").value || null, vendedor_id: $("finCtProprietario").value || null,
-            corretor_id: $("finCtCorretor").value || null, negociacao_id: $("finCtNegociacao").value || null,
+            ...pessoasDoForm("comprador", "vendedor"), corretor_id: $("finCtCorretor").value || null, participantes: participantesCt(), negociacao_id: $("finCtNegociacao").value || null,
             valor_venda: num($("finCvValor").value), data_contrato: $("finCvData").value, sinal_valor: num($("finCvSinal").value),
             comissao_pct: num($("finCvComPct").value), comissao_valor: num($("finCvComValor").value),
             prazo_escritura: $("finCvEscritura").value || null, forma_pagamento: $("finCvForma").value.trim(), observacoes: $("finCtObs").value.trim()
@@ -647,9 +756,10 @@
     async function salvarVenda() {
         const d = coletarVenda();
         if (d.imovel_avulso ? !d.imovel_avulso.descricao : !d.construcao_id) { msg($("finCtMsg"), d.imovel_avulso ? "Descreva o imóvel não cadastrado." : "Escolha o imóvel (ou marque \"Não cadastrado\")."); return; }
-        if (!d.comprador_id) { msg($("finCtMsg"), "Escolha o comprador (cadastre em Clientes, se ainda não existir)."); return; }
+        if (!d.comprador_id && !d.comprador_nome) { msg($("finCtMsg"), "Escolha o comprador ou escreva o nome dele."); return; }
         if (!d.valor_venda) { msg($("finCtMsg"), "Informe o valor da venda."); return; }
         if (!d.data_contrato) { msg($("finCtMsg"), "Informe a data do contrato."); return; }
+        if (!(await confirmarPessoas(d, true))) return;
         $("finCtSalvar").disabled = true;
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato_venda", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: vendaAberta });
         $("finCtSalvar").disabled = false;
@@ -679,9 +789,10 @@
         if (ctTipo === "venda") return salvarVenda();
         const d = coletarContrato();
         if (d.imovel_avulso && !d.imovel_avulso.descricao) { msg($("finCtMsg"), "Descreva o imóvel não cadastrado."); return; }
-        if (!d.inquilino_id) { msg($("finCtMsg"), "Escolha o inquilino (cadastre em Clientes, se ainda não existir)."); return; }
+        if (!d.inquilino_id && !d.inquilino_nome) { msg($("finCtMsg"), "Escolha o inquilino ou escreva o nome dele."); return; }
         if (!d.valor_aluguel) { msg($("finCtMsg"), "Informe o valor do aluguel."); return; }
         if (!d.inicio) { msg($("finCtMsg"), "Informe o início do contrato."); return; }
+        if (!(await confirmarPessoas(d, false))) return;
         $("finCtSalvar").disabled = true;
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: contratoAberto });
         $("finCtSalvar").disabled = false;
@@ -776,13 +887,13 @@
             if (f === "pagos" && !(r.status === "pago" && noMes(r.pago_em, ym))) return false;
             if (f === "todos" && !noMes(r.competencia, ym)) return false;
             const c = contrato(r.contrato_id) || {};
-            return bate(`${c.numero} ${nomeCli(r.proprietario_id)} ${nomeCli(c.inquilino_id)} ${nomeImovelCt(c)}`);
+            return bate(`${c.numero} ${nomeCli(r.proprietario_id, r.proprietario_nome)} ${nomeCli(c.inquilino_id, c.inquilino_nome)} ${nomeImovelCt(c)}`);
         }).sort((a, b) => String(a.previsto_para).localeCompare(String(b.previsto_para)));
         $("finContagem").textContent = `${lista.length} repasse(s) · ${dinheiro(lista.reduce((s, r) => s + Number(r.valor_liquido), 0))}`;
         const hoje = hojeIso();
         $("finLista").innerHTML = lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Proprietário</th><th>Imóvel</th><th>Mês</th><th>Recebido</th><th>Descontos</th><th>A repassar</th><th>Data</th><th></th></tr></thead><tbody>
           ${lista.map(r => { const c = contrato(r.contrato_id) || {}; return `<tr>
-            <td data-r="Proprietário"><strong>${h(nomeCli(r.proprietario_id))}</strong>${c.repasse_dados ? `<small class="fin-sub">${h(c.repasse_dados)}</small>` : ""}</td>
+            <td data-r="Proprietário"><strong>${h(nomeCli(r.proprietario_id, r.proprietario_nome))}</strong>${c.repasse_dados ? `<small class="fin-sub">${h(c.repasse_dados)}</small>` : ""}</td>
             <td data-r="Imóvel">${h(nomeImovelCt(c))}<small class="fin-sub">Contrato nº ${h(c.numero || "—")}</small></td>
             <td data-r="Mês">${h(mesAno(r.competencia))}</td>
             <td data-r="Recebido">${h(dinheiro(r.valor_recebido))}</td>
@@ -812,7 +923,7 @@
     function recibo(b) {
         if (!b) return;
         const c = contrato(b.contrato_id) || {};
-        const inq = cliente(c.inquilino_id) || {};
+        const inq = clienteDe(c, "inquilino") || {};
         const pares = [ [ "Aluguel", dinheiro(b.valor_aluguel) ] ];
         (b.itens || []).forEach(i => pares.push([ i.descricao, dinheiro(i.valor) ]));
         if (Number(b.multa)) pares.push([ "Multa por atraso", dinheiro(b.multa) ]);
@@ -829,7 +940,7 @@
     function demonstrativo(r) {
         if (!r) return;
         const c = contrato(r.contrato_id) || {};
-        const prop = cliente(r.proprietario_id) || {};
+        const prop = clienteDe(r, "proprietario") || {};
         const b = cobrancas.find(x => x.id === r.cobranca_id) || {};
         const pares = [ [ "Aluguel recebido do inquilino", dinheiro(b.valor_aluguel) ] ];
         if (Number(b.multa) + Number(b.juros)) pares.push([ "Multa e juros", dinheiro(Number(b.multa) + Number(b.juros)) ]);
@@ -840,7 +951,7 @@
         pares.push([ "Valor líquido do repasse", dinheiro(r.valor_liquido), true ]);
         abrirImpressao(documento("Demonstrativo de repasse ao proprietário", `
           <p>Proprietário: <strong>${h(prop.nome || "—")}</strong>${prop.cpf ? ` · CPF ${h(prop.cpf)}` : ""}<br>
-          Imóvel: <strong>${h(nomeImovelCt(c))}</strong> · contrato nº ${h(c.numero)} · inquilino ${h(nomeCli(c.inquilino_id))}<br>
+          Imóvel: <strong>${h(nomeImovelCt(c))}</strong> · contrato nº ${h(c.numero)} · inquilino ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}<br>
           Referência: <strong>${h(mesAno(r.competencia))}</strong> · aluguel pago em ${h(dataBr(b.pago_em))}</p>
           ${linhas(pares)}
           <p class="fin-doc-rodape">${r.status === "pago" ? `Repasse feito em ${h(dataBr(r.pago_em))}` : `Repasse previsto até ${h(dataBr(r.previsto_para))}`}${c.repasse_dados ? ` · ${h(c.repasse_dados)}` : ""}${r.observacao ? ` · ${h(r.observacao)}` : ""}</p>`));

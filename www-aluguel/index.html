@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://xigwlofqkmiibzbongkn.supabase.co wss://xigwlofqkmiibzbongkn.supabase.co; font-src 'self' data:;" />
   <title>SKL Gestão imobiliária</title>
   <meta name="theme-color" content="#06202f" />
@@ -103,6 +103,7 @@
       <header class="topbar">
         <div><span class="eyebrow">SKL SOLUÇÕES DIGITAIS</span><h1 id="pageTitle">Visão geral</h1></div>
         <div class="connection-area">
+          <button id="avisosBotao" type="button" class="avisos-botao" title="Avisos" aria-label="Avisos" hidden>🔔<b id="avisosBadge" class="nav-badge" hidden>0</b></button>
           <button id="modoCorretorButton" type="button" class="secondary-button" hidden>📱 Modo corretor</button>
           <button id="topbarSwitchCarteiraButton" type="button" class="secondary-button">Trocar carteira</button>
           <span id="syncTime">Ainda não sincronizado</span><span id="connectionBadge" class="connection-badge offline">Desconectado</span>
@@ -153,6 +154,8 @@
           <button type="button" data-go="cadastros"><span>✚</span><em id="contaCadastrosTexto">Meus cadastros de imóveis</em><b id="contaCadastrosBadge" class="ct-badge" hidden>0</b><i>›</i></button>
           <button type="button" data-go="agenda"><span>◷</span><em>Agenda completa</em><i>›</i></button>
           <button type="button" data-go="comissoes"><span>%</span><em>Minhas comissões</em><i>›</i></button>
+          <button type="button" id="contaApelido"><span>☺</span><em>Meu apelido</em><span id="contaApelidoTexto" class="conta-perfil-chips"></span><i>›</i></button>
+          <button type="button" id="contaAvisos"><span>🔔</span><em>Avisos neste aparelho</em><i>›</i></button>
           <button type="button" id="contaPerfilAtuacao"><span>★</span><em>Meu perfil de atuação</em><span id="contaPerfilChips" class="conta-perfil-chips"></span><i>›</i></button>
           <button type="button" data-go="indicadores"><span>▥</span><em>Indicadores</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
@@ -767,7 +770,10 @@
       <h2 id="crmCliTitulo">Novo cliente</h2>
       <div id="crmCliAprovacao" class="aprovacao-banner" hidden></div>
       <div id="crmCliContato" class="crm-contato-rapido" hidden></div>
-      <label><span>Nome completo</span><input id="crmCliNome" autocomplete="off" /></label>
+      <div class="form-row">
+        <label><span>Nome completo</span><input id="crmCliNome" autocomplete="off" /></label>
+        <label><span>Apelido (opcional)</span><input id="crmCliApelido" maxlength="40" placeholder="como a pessoa é chamada" autocomplete="off" /></label>
+      </div>
       <div class="form-row">
         <label><span>Celular / WhatsApp</span><input id="crmCliTelefone" inputmode="tel" placeholder="(66) 99999-9999" autocomplete="off" /></label>
         <label><span>E-mail</span><input id="crmCliEmail" type="email" autocomplete="off" /></label>
@@ -866,6 +872,19 @@
       <div class="form-row">
         <label><span>Imóvel de interesse</span><select id="crmNegImovel"></select></label>
         <label><span>Valor da negociação</span><input id="crmNegValor" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
+      </div>
+      <div id="crmNegProcura" class="crm-procura" hidden>
+        <p class="crm-procura-dica">🔎 <strong>Imóvel que o cliente procura e não está no cadastro.</strong> A Central e os corretores recebem um aviso
+          para ajudar na busca. O nome e o contato do cliente não aparecem para eles.</p>
+        <label><span>O que o cliente procura</span><input id="crmProcDesc" maxlength="300" placeholder="ex.: casa 3 quartos com quintal grande" autocomplete="off" /></label>
+        <div class="form-row">
+          <label><span>Tipo de imóvel</span><input id="crmProcTipo" maxlength="60" placeholder="casa, apartamento, chácara…" autocomplete="off" /></label>
+          <label><span>Bairro ou região</span><input id="crmProcRegiao" maxlength="160" placeholder="ex.: Vila Aurora ou perto do centro" autocomplete="off" /></label>
+        </div>
+        <div class="form-row">
+          <label><span>Valor aproximado</span><input id="crmProcValor" maxlength="40" placeholder="ex.: até R$ 600 mil" autocomplete="off" /></label>
+          <label><span>Observação</span><input id="crmProcObs" maxlength="500" placeholder="ex.: precisa aceitar financiamento" autocomplete="off" /></label>
+        </div>
       </div>
       <div class="form-row">
         <label><span>Resumo</span><input id="crmNegTituloInput" placeholder="ex.: casa 3 quartos perto da escola" autocomplete="off" /></label>
@@ -1068,6 +1087,21 @@
     </form>
   </dialog>
 
+  <dialog id="avisosDialog" class="crm-dialog avisos-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">AVISOS</span>
+      <h2>Seus avisos</h2>
+      <div class="avisos-estado-box">
+        <p id="avisosEstado" class="muted-text"></p>
+        <button id="avisosAtivar" type="button" class="primary-button" hidden>Ativar avisos neste aparelho</button>
+        <button id="avisosDesativar" type="button" class="text-button" hidden>Desligar neste aparelho</button>
+      </div>
+      <div id="avisosLista" class="avisos-lista"></div>
+      <div class="dialog-actions"><button id="avisosLerTodas" type="button" class="secondary-button">Marcar todas como lidas</button></div>
+    </form>
+  </dialog>
+
   <dialog id="fotoLightbox" class="foto-lightbox">
     <button id="fotoLightboxClose" class="close-button" type="button" aria-label="Fechar">×</button>
     <button id="fotoLightboxPrev" class="hero-nav hero-nav-prev" type="button" aria-label="Foto anterior">‹</button>
@@ -1225,9 +1259,19 @@
         <label><span>Matrícula</span><input id="finCtAvMatricula" autocomplete="off" /></label>
         <label><span>Área</span><input id="finCtAvArea" placeholder="ex.: 360 m²" autocomplete="off" /></label>
       </div>
+      <div class="fin-ct-equipe">
+        <span class="crm-rotulo">Trabalharam junto neste negócio</span>
+        <div id="finCtEquipe" class="fin-ct-equipe-lista"></div>
+        <div class="fin-ct-equipe-botoes">
+          <button id="finCtAddCorretor" type="button" class="secondary-button fin-mini">+ Corretor da equipe</button>
+          <button id="finCtAddParceiro" type="button" class="secondary-button fin-mini">+ Parceiro de fora</button>
+        </div>
+      </div>
       <div class="form-row">
-        <label><span id="finCtInquilinoRot">Inquilino</span><select id="finCtInquilino"></select></label>
-        <label><span id="finCtProprietarioRot">Proprietário</span><select id="finCtProprietario"></select></label>
+        <label><span id="finCtInquilinoRot">Inquilino</span><select id="finCtInquilino"></select>
+          <input id="finCtInquilinoNome" class="fin-nome-livre" placeholder="Nome completo" autocomplete="off" hidden /></label>
+        <label><span id="finCtProprietarioRot">Proprietário</span><select id="finCtProprietario"></select>
+          <input id="finCtProprietarioNome" class="fin-nome-livre" placeholder="Nome completo" autocomplete="off" hidden /></label>
       </div>
       <div id="finCtVendaCampos" hidden>
         <div class="fin-grade">
@@ -1303,6 +1347,22 @@
     </form>
   </dialog>
 
+  <dialog id="finSemCadastroDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">CADASTRO</span>
+      <h2>Dados pessoais não salvos</h2>
+      <p id="finScTexto" class="muted-text"></p>
+      <div id="finScPessoas" class="fin-sc-pessoas"></div>
+      <p id="finScMsg" class="form-message" hidden></p>
+      <div class="dialog-actions fin-sc-acoes">
+        <button id="finScVoltar" type="button" class="text-button">Voltar ao contrato</button>
+        <button id="finScSoNome" type="button" class="secondary-button">Salvar só com o nome</button>
+        <button id="finScCriar" type="button" class="primary-button">Criar cadastro e salvar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="finPagamentoDialog" class="crm-dialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" type="button" value="cancel">×</button>
@@ -1334,6 +1394,8 @@
   <script src="marca.js"></script>
   <script src="marca-dagua.js"></script>
   <script src="vendor/supabase/supabase.js"></script>
+  <script src="zoom-foto.js"></script>
+  <script src="avisos.js"></script>
   <script src="avatar.js"></script>
   <script src="crm.js"></script>
   <script src="crm-painel.js"></script>
