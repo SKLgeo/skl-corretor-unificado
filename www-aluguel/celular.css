@@ -1,0 +1,61 @@
+/* Celular (até 780 px): menu em gaveta, topo compacto, tabelas em cartões e letras/botões maiores (celular.js).
+   Carregado por último, para valer sobre os outros estilos. O modo corretor tem a tela própria (corretor-ui.css). */
+.menu-gaveta-botao,.menu-gaveta-fundo{display:none}
+
+@media(max-width:780px){
+  /* menu lateral vira gaveta */
+  body:not(.modo-corretor) .sidebar{position:fixed;top:0;bottom:0;left:0;width:min(84vw,320px);transform:translateX(-105%);transition:transform .22s ease;z-index:900;box-shadow:12px 0 40px rgba(0,0,0,.28);overflow-y:auto}
+  body.menu-aberto:not(.modo-corretor) .sidebar{transform:none}
+  body.menu-aberto .menu-gaveta-fundo{display:block;position:fixed;inset:0;background:rgba(4,16,22,.45);z-index:899}
+  body:not(.modo-corretor) .menu-gaveta-botao{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:24px;line-height:1;color:var(--navy-deep);flex:none;cursor:pointer}
+
+  /* topo compacto: ☰ + título numa linha, botões numa faixa que rola de lado */
+  .topbar{display:flex!important;flex-wrap:wrap;align-items:center;gap:10px 12px;height:auto!important;min-height:0!important;padding:12px 0 10px!important}
+  .topbar>div:not(.connection-area){flex:1;min-width:0}
+  .topbar .eyebrow{display:none}
+  .topbar h1{font-size:24px!important;margin:0;line-height:1.15}
+  .connection-area{order:3;width:100%;display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:8px;overflow-x:auto;text-align:left!important;padding-bottom:2px}
+  .connection-area>*{flex:none}
+  #syncTime{display:none}
+
+  /* letras, campos e botões maiores */
+  body{font-size:16px}
+  label{font-size:14.5px}
+  .muted-text{font-size:14.5px}
+  th,td{font-size:15px}
+  .primary-button,.secondary-button,.danger-button{min-height:46px;font-size:15.5px}
+  .row-button{min-height:40px;padding:8px 13px!important;font-size:14.5px!important}
+  .crm-btn-contato{padding:9px 14px;font-size:14px}
+
+  /* janelas aproveitam a largura da tela */
+  dialog:not(.foto-lightbox){width:calc(100vw - 12px)!important;max-width:none}
+  .dialog-card{padding:20px 15px;border-radius:16px}
+  .dialog-card h2{font-size:22px}
+
+  /* tabelas viram cartões (o título de cada coluna aparece em cima do valor) */
+  table.cartoes-celular{min-width:0!important;width:100%}
+  table.cartoes-celular thead{display:none}
+  table.cartoes-celular,table.cartoes-celular tbody,table.cartoes-celular tr,table.cartoes-celular td{display:block;width:auto!important}
+  table.cartoes-celular tr{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 13px;margin:0 0 10px}
+  table.cartoes-celular td{border:0!important;padding:4px 0!important;font-size:15.5px;white-space:normal!important}
+  table.cartoes-celular td[data-r]::before{content:attr(data-r);display:block;font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
+  table.cartoes-celular td:empty{display:none}
+  table.cartoes-celular td small,table.cartoes-celular td .muted-text{font-size:13.5px}
+  table.cartoes-celular td[colspan]{text-align:center}
+  table.cartoes-celular tr:has(td[colspan]){border:0;background:none}
+  .table-wrap,.table-scroll{overflow-x:visible!important}
+}
+@media(max-width:780px){.table-panel{padding:8px!important}}
+/* cartão mais baixo: o 1º campo na largura toda, os outros dois por linha; botões na largura toda */
+@media(max-width:780px){
+  table.cartoes-celular tr{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 14px}
+  table.cartoes-celular td:first-child,table.cartoes-celular td:has(button),table.cartoes-celular td:has(select),table.cartoes-celular td[colspan]{grid-column:1/-1}
+  table.cartoes-celular td:has(button){display:flex!important;flex-wrap:wrap;gap:6px}
+  table.cartoes-celular td:has(button)::before{flex-basis:100%}
+}
+/* filtros e listas de escolha nunca passam da largura da tela */
+@media(max-width:780px){
+  select{max-width:100%}
+  .cadastros-acoes{width:100%;min-width:0}
+  .cadastros-acoes select{width:100%!important;min-width:0}
+}

@@ -1,0 +1,56 @@
+// Celular (tela até 780 px): o menu lateral vira uma gaveta aberta pelo botão ☰ do topo (antes ocupava a primeira tela inteira)
+// e as tabelas viram cartões, com o nome de cada coluna em cima do valor (os estilos ficam em celular.css).
+// O modo corretor tem a própria navegação com abas embaixo e não usa a gaveta.
+(function () {
+    "use strict";
+    const telaPequena = () => !!(window.matchMedia && matchMedia("(max-width: 780px)").matches);
+    const menuAberto = () => document.body.classList.contains("menu-aberto");
+    function abrirMenu(abrir) { document.body.classList.toggle("menu-aberto", !!abrir); }
+
+    function montarGaveta() {
+        const topbar = document.querySelector(".topbar"), sidebar = document.querySelector(".sidebar");
+        if (!topbar || !sidebar || document.getElementById("menuGavetaBotao")) return;
+        const botao = document.createElement("button");
+        botao.id = "menuGavetaBotao";
+        botao.type = "button";
+        botao.className = "menu-gaveta-botao";
+        botao.setAttribute("aria-label", "Abrir o menu");
+        botao.textContent = "☰";
+        botao.addEventListener("click", () => abrirMenu(true));
+        topbar.insertBefore(botao, topbar.firstChild);
+        const fundo = document.createElement("div");
+        fundo.className = "menu-gaveta-fundo";
+        fundo.addEventListener("click", () => abrirMenu(false));
+        document.body.appendChild(fundo);
+        // escolheu uma tela no menu: fecha a gaveta
+        sidebar.addEventListener("click", e => { if (e.target.closest("button, a")) setTimeout(() => abrirMenu(false), 60); });
+    }
+
+    // cada célula ganha o título da sua coluna (data-r), que aparece em cima do valor quando a linha vira cartão
+    function rotularTabelas() {
+        if (!telaPequena()) return;
+        document.querySelectorAll("table").forEach(tabela => {
+            if (tabela.classList.contains("fin-tabela")) return; // o Financeiro já tem os próprios cartões
+            const titulos = [ ...tabela.querySelectorAll("thead th") ].map(th => th.textContent.trim());
+            if (!titulos.length) return;
+            tabela.classList.add("cartoes-celular");
+            tabela.querySelectorAll("tbody tr").forEach(tr => {
+                [ ...tr.children ].forEach((td, i) => {
+                    if (td.tagName === "TD" && !td.hasAttribute("data-r") && !td.hasAttribute("colspan") && titulos[i]) td.setAttribute("data-r", titulos[i]);
+                });
+            });
+        });
+    }
+
+    let espera = null;
+    function iniciar() {
+        montarGaveta();
+        rotularTabelas();
+        new MutationObserver(() => { clearTimeout(espera); espera = setTimeout(rotularTabelas, 120); })
+            .observe(document.body, { childList: true, subtree: true });
+        if (window.matchMedia) matchMedia("(max-width: 780px)").addEventListener("change", () => { abrirMenu(false); rotularTabelas(); });
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
+
+    window.SKLCelular = { menuAberto, fecharMenu: () => abrirMenu(false) };
+})();

@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.4";
+    const APP_VERSION = "0.14.5";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -344,6 +344,7 @@
         if (!voltarArmado) return;
         voltarArmado = false;
         if ($("appView").hidden) return; // na tela de entrada o Voltar segue normal
+        if (window.SKLCelular && window.SKLCelular.menuAberto()) { window.SKLCelular.fecharMenu(); armarVoltar(); return; }
         const abertas = [ ...document.querySelectorAll("dialog[open]") ];
         if (abertas.length) {
             const topo = abertas[abertas.length - 1];
