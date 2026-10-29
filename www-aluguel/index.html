@@ -722,13 +722,13 @@
 
       <details class="dialog-section coordenada-details">
         <summary class="eyebrow">COORDENADA E MAPA ▾</summary>
-        <p class="muted-text" style="margin:8px 0 8px">Clique no mapa pra marcar a localização, ou cole abaixo um link do Google Maps do local.</p>
-        <label><span>Link do Google Maps (opcional)</span><input id="construcaoLinkMapaInput" placeholder="Cole aqui o link compartilhado do Google Maps" /></label>
+        <p class="muted-text" style="margin:8px 0 8px">Três jeitos de marcar: cole o link do Google Maps (o link curto do botão Compartilhar também serve), digite a latitude e a longitude, ou toque no mapa no ponto do imóvel.</p>
+        <label><span>Link do Google Maps ou coordenada</span><input id="construcaoLinkMapaInput" placeholder="Ex.: https://maps.app.goo.gl/... ou -16.467108, -54.614374" /></label>
         <div id="construcaoLinkMapaMensagem" class="form-message" hidden style="margin:-4px 0 8px"></div>
         <div id="construcaoPickerMap" class="picker-map"></div>
-        <div class="form-row" hidden>
-          <label><span>Latitude</span><input id="construcaoLatInput" type="number" step="0.000001" /></label>
-          <label><span>Longitude</span><input id="construcaoLngInput" type="number" step="0.000001" /></label>
+        <div class="form-row" id="coordManualRow">
+          <label><span>Latitude</span><input id="construcaoLatInput" inputmode="decimal" autocomplete="off" placeholder="Ex.: -16.467108" /></label>
+          <label><span>Longitude</span><input id="construcaoLngInput" inputmode="decimal" autocomplete="off" placeholder="Ex.: -54.614374" /></label>
         </div>
         <div class="mapa-links-row">
           <a id="googleMapsButton" class="secondary-button" href="#" target="_blank" rel="noopener" hidden>Ir pelo Google Maps</a>

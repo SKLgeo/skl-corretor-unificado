@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.6";
+    const APP_VERSION = "0.14.7";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1805,6 +1805,7 @@
         $("codigoLabel").hidden = modoDialogo !== "central";
         $("opcoesCentralRow").hidden = modoDialogo !== "central";
         $("construcaoLinkMapaInput").closest("label").hidden = leitura;
+        $("coordManualRow").hidden = leitura;
         document.querySelectorAll(".foto-add-button").forEach(botao => { botao.hidden = leitura; });
         $("construcaoFotosInput").disabled = leitura;
         $("construcaoCameraInput").disabled = leitura;
@@ -2186,8 +2187,8 @@
             cidade: $("cidadeInput").value.trim() || null,
             uf: $("ufInput").value.trim().toUpperCase() || null,
             descricao: $("construcaoDescricaoInput").value.trim() || null,
-            latitude: $("construcaoLatInput").value === "" ? null : parseFloat($("construcaoLatInput").value),
-            longitude: $("construcaoLngInput").value === "" ? null : parseFloat($("construcaoLngInput").value),
+            latitude: Number.isNaN(lerCoord("construcaoLatInput")) ? null : lerCoord("construcaoLatInput"),
+            longitude: Number.isNaN(lerCoord("construcaoLngInput")) ? null : lerCoord("construcaoLngInput"),
             destaque: $("destaqueInput").checked,
             publicar_site: $("publicarSiteInput").checked
         };
@@ -2244,8 +2245,8 @@
     }
 
     function syncPickerFromInputs() {
-        const lat = parseFloat($("construcaoLatInput").value);
-        const lng = parseFloat($("construcaoLngInput").value);
+        const lat = lerCoord("construcaoLatInput");
+        const lng = lerCoord("construcaoLngInput");
         atualizarBotoesMapa();
         if (Number.isNaN(lat) || Number.isNaN(lng) || !pickerMap) return;
         posicionarPickerMarker(lat, lng);
@@ -2253,8 +2254,8 @@
     }
 
     function atualizarBotoesMapa() {
-        const lat = parseFloat($("construcaoLatInput").value);
-        const lng = parseFloat($("construcaoLngInput").value);
+        const lat = lerCoord("construcaoLatInput");
+        const lng = lerCoord("construcaoLngInput");
         atualizarQualidade();
         const google = $("googleMapsButton");
         const apple = $("appleMapsButton");
@@ -2269,44 +2270,85 @@
         apple.hidden = false;
     }
 
-    // Reconhece coordenadas coladas de um link do Google Maps. Cobre os
-    // formatos mais comuns (link completo com "@lat,lng", e "q=lat,lng" ou
-    // "ll=lat,lng" de links de compartilhar/pesquisa). Links curtos
-    // (maps.app.goo.gl/...) não têm a coordenada no próprio texto — o
-    // Google só revela isso depois de seguir o redirecionamento, que exigiria
-    // uma chamada de rede; por ora pedimos pro usuário colar o link completo
-    // (o menu "Compartilhar > Copiar link" do app já costuma dar o link
-    // completo com @lat,lng).
+    // Latitude/longitude digitadas aceitam vírgula ou ponto ("-16,467108"); fora da faixa vira NaN (não salva lixo)
+    function lerCoord(id) {
+        const v = parseFloat(String($(id).value || "").trim().replace(",", "."));
+        const limite = id === "construcaoLatInput" ? 90 : 180;
+        return Number.isFinite(v) && Math.abs(v) <= limite ? v : NaN;
+    }
+
+    // Reconhece a coordenada no que foi colado: link completo do Google Maps (@lat,lng, /search/lat,lng, !3d..!4d..,
+    // q=/ll=/query=/destination=), coordenada solta ("-16.467108, -54.614374" ou com vírgula decimal) ou em graus
+    // (16°28'01.6"S 54°36'51.7"W). Link curto (maps.app.goo.gl) não traz a coordenada no texto: aplicarLinkMapa
+    // pede ao servidor (função resolver-link-mapa) para seguir o link.
     function extrairCoordenadasDeLink(texto) {
         if (!texto) return null;
+        let t = texto;
+        try { t = decodeURIComponent(texto); } catch (e) { /* usa o texto como veio */ }
+        t = t.replace(/\+/g, " ");
+        const N = "(-?\d{1,3}(?:\.\d+)?)";
         const padroes = [
-            /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
-            /[?&]q=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
-            /[?&]ll=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
-            /^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/
+            new RegExp(`!3d${N}!4d${N}`),
+            new RegExp(`@${N},\s*${N}`),
+            new RegExp(`/(?:search|place|dir)/${N},\s*${N}`),
+            new RegExp(`[?&](?:q|ll|query|center|destination|daddr)=(?:loc:)?${N},\s*${N}`),
+            /^\s*(-?\d{1,3}[.,]\d+)\s*[,;\s]\s*(-?\d{1,3}[.,]\d+)\s*$/
         ];
+        const valida = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
         for (const padrao of padroes) {
-            const encontrado = texto.match(padrao);
-            if (encontrado) return { lat: parseFloat(encontrado[1]), lng: parseFloat(encontrado[2]) };
+            const m = t.match(padrao);
+            if (!m) continue;
+            const lat = parseFloat(m[1].replace(",", ".")), lng = parseFloat(m[2].replace(",", "."));
+            if (valida(lat, lng)) return { lat, lng };
+        }
+        const gms = /(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.,]+)["″]?\s*([NS])[\s,]+(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.,]+)["″]?\s*([LOEW])/i.exec(t);
+        if (gms) {
+            const grau = (g, m, s, h) => (Number(g) + Number(m) / 60 + parseFloat(s.replace(",", ".")) / 3600) * (/[SOW]/i.test(h) ? -1 : 1);
+            const lat = grau(gms[1], gms[2], gms[3], gms[4]), lng = grau(gms[5], gms[6], gms[7], gms[8]);
+            if (valida(lat, lng)) return { lat, lng };
         }
         return null;
     }
 
-    function aplicarLinkMapa() {
+    function aplicarCoordenada(lat, lng) {
+        $("construcaoLatInput").value = lat.toFixed(6);
+        $("construcaoLngInput").value = lng.toFixed(6);
+        if (pickerMap) {
+            posicionarPickerMarker(lat, lng);
+            pickerMap.setView([ lat, lng ], 16);
+        }
+        atualizarBotoesMapa();
+    }
+
+    let linkMapaPedido = 0;
+    async function aplicarLinkMapa() {
         const texto = $("construcaoLinkMapaInput").value.trim();
         const msg = $("construcaoLinkMapaMensagem");
         if (!texto) { msg.hidden = true; return; }
         const coordenadas = extrairCoordenadasDeLink(texto);
-        if (!coordenadas) {
-            showMessage(msg, "Não reconheci coordenadas nesse link — tente colar o link completo (com \"@lat,lng\") ou clique direto no mapa.");
+        if (coordenadas) {
+            aplicarCoordenada(coordenadas.lat, coordenadas.lng);
+            showMessage(msg, `Localização marcada: ${coordenadas.lat.toFixed(6)}, ${coordenadas.lng.toFixed(6)}`, true);
             return;
         }
-        msg.hidden = true;
-        $("construcaoLatInput").value = coordenadas.lat.toFixed(6);
-        $("construcaoLngInput").value = coordenadas.lng.toFixed(6);
-        posicionarPickerMarker(coordenadas.lat, coordenadas.lng);
-        pickerMap.setView([ coordenadas.lat, coordenadas.lng ], 16);
-        atualizarBotoesMapa();
+        const ehGoogle = /^https?:\/\/([a-z0-9-]+\.)*(goo\.gl|g\.co|google\.com(\.br)?)\//i.test(texto);
+        if (!ehGoogle) {
+            showMessage(msg, "Não achei a localização nesse texto. Cole o link do Google Maps (pode ser o link curto do botão Compartilhar), digite a latitude e a longitude abaixo ou toque no mapa.");
+            return;
+        }
+        const meu = ++linkMapaPedido;
+        showMessage(msg, "Buscando a localização do link…", true);
+        try {
+            const { data, error } = await sb.functions.invoke("resolver-link-mapa", { body: { url: texto } });
+            if (meu !== linkMapaPedido) return;
+            const c = !error && data && Number.isFinite(data.lat) ? data : (data && data.url ? extrairCoordenadasDeLink(data.url) : null);
+            if (!c) throw new Error("sem coordenada");
+            aplicarCoordenada(c.lat, c.lng);
+            showMessage(msg, `Localização marcada: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`, true);
+        } catch (e) {
+            if (meu !== linkMapaPedido) return;
+            showMessage(msg, "Não consegui achar a localização nesse link. Digite a latitude e a longitude abaixo ou toque no mapa no ponto do imóvel.");
+        }
     }
 
     function obterItensFotos() {
