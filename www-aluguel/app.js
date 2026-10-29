@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.2";
+    const APP_VERSION = "0.14.3";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -894,6 +894,7 @@
             imoveis: () => [ ...construcoes.values() ],
             equipe: () => corretores,
             tiposImovel: () => [ ...TIPOS_URBANOS, ...TIPOS_RURAIS ],
+            fotosCapa,
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); }
         };
     }
@@ -1511,6 +1512,26 @@
         if (campos.includes("banheiros") && Number(c.banheiros) > 0) partes.push(`🚿 ${c.banheiros}`);
         if (campos.includes("vagas") && Number(c.vagas) > 0) partes.push(`🚗 ${c.vagas}`);
         return partes.join(" · ");
+    }
+
+    // capas de vários imóveis de uma vez (busca de imóvel e compatíveis do CRM): um pedido só ao Storage
+    async function fotosCapa(lista) {
+        const saida = new Map(), faltam = [];
+        for (const c of lista || []) {
+            const path = ((c.fotos || [])[0] || {}).path;
+            if (!path) continue;
+            const cached = signedUrlCache.get(path);
+            if (cached && cached.expiresAt > Date.now()) saida.set(c.id, cached.url); else faltam.push([ c.id, path ]);
+        }
+        if (faltam.length) {
+            const { data } = await sb.storage.from(FOTOS_BUCKET).createSignedUrls(faltam.map(f => f[1]), 3600);
+            (data || []).forEach((d, i) => {
+                if (!d || !d.signedUrl) return;
+                signedUrlCache.set(faltam[i][1], { url: d.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 });
+                saida.set(faltam[i][0], d.signedUrl);
+            });
+        }
+        return saida;
     }
 
     function preencherFotoCapa(c, seletor) {

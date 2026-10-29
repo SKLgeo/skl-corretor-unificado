@@ -138,9 +138,9 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
 /* imóveis compatíveis (negociação) e clientes interessados (ficha do imóvel) */
 .crm-compat{display:grid;gap:8px;border:1px solid #cfe6f5;background:#f5fbff;border-radius:12px;padding:12px 14px}
 .crm-compat .eyebrow em,.crm-interessados .eyebrow em{font-style:normal;background:var(--navy);color:#fff;border-radius:99px;padding:1px 8px;margin-left:6px;letter-spacing:0}
-.crm-compat-item{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.crm-compat-item{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .crm-compat-item.escolhido{border-color:var(--navy);box-shadow:0 0 0 2px rgba(41,171,226,.18)}
-.crm-compat-pct{display:flex;align-items:center;justify-content:center;height:40px;border-radius:9px;background:#fff1cf;color:#7a520c;font-weight:900;font-size:14px}
+.crm-compat-pct{position:absolute;right:4px;bottom:4px;display:inline-flex;align-items:center;justify-content:center;padding:1px 6px;border-radius:7px;background:#fff1cf;color:#7a520c;font-weight:900;font-size:11.5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .crm-compat-pct.total{background:#dff4e8;color:#247346}
 .crm-compat-info{display:grid;gap:2px;min-width:0}
 .crm-compat-info strong{font-size:13.5px}
@@ -304,4 +304,41 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
   .crm-faixa-num strong{font-size:17px}
   .crm-faixa-num small{display:none}
   .crm-faixa-itens{grid-template-columns:1fr}
+}
+
+/* 29/10/2026: foto nos compatíveis e busca do imóvel de interesse */
+.crm-compat-foto,.crm-im-foto{position:relative;display:block;width:92px;height:68px;border-radius:9px;background:#e9eef1 center/cover no-repeat;overflow:hidden;flex:none}
+.crm-compat-foto .sem-foto,.crm-im-foto .sem-foto{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8a9aa2;font-weight:700}
+.crm-compat-aviso{margin:0;font-size:12.5px;color:#5b6b73}
+.crm-campo-imovel{display:grid;gap:7px;min-width:0}
+.crm-campo-rotulo{font-size:13px;font-weight:700;color:#4e626b}
+.crm-imovel-escolhido{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;text-align:left;border:1px solid var(--line);border-radius:11px;background:#fff;padding:7px 10px;cursor:pointer;font:inherit;color:var(--ink)}
+.crm-imovel-escolhido:hover{border-color:var(--navy)}
+.crm-imovel-escolhido .crm-im-foto{width:64px;height:48px}
+.crm-imovel-vazio{display:grid;font-weight:700;color:var(--navy-deep)}
+.crm-imovel-vazio small{font-weight:400;color:#6b7c84;font-size:12px}
+.crm-imovel-trocar{margin-left:auto;font-size:12px;font-weight:800;color:var(--navy-deep);flex:none}
+.crm-im-info{display:grid;gap:1px;min-width:0}
+.crm-im-info strong{font-size:13.5px;overflow:hidden;text-overflow:ellipsis}
+.crm-im-info small{font-size:12px;color:#5b6b73}
+.crm-im-dono{color:#8a5a00!important}
+.crm-im-busca .dialog-card{max-width:760px}
+.crm-im-busca-topo{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:6px}
+.crm-im-busca-topo input[type=search]{flex:1 1 260px;min-width:0}
+.crm-im-busca-dica{margin:0 0 8px;font-size:12.5px}
+.crm-im-busca-fixos{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.crm-im-busca-contagem{margin:0 0 6px;font-size:12.5px;font-weight:700;color:#4e626b}
+.crm-im-busca-lista{display:grid;gap:8px;max-height:58vh;overflow:auto;padding-right:2px}
+.crm-im-card{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);border-radius:11px;background:#fff;padding:8px;cursor:pointer;font:inherit;color:var(--ink)}
+.crm-im-card:hover{border-color:var(--navy);background:#f6fbff}
+.crm-im-card.escolhido{border-color:var(--navy);box-shadow:0 0 0 2px rgba(41,171,226,.2)}
+.crm-im-situacao{font-size:11.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#e6edef;color:#4e626b;white-space:nowrap}
+.crm-im-situacao.situacao-disponivel{background:#dff4e8;color:#247346}
+@media(max-width:560px){
+  .crm-im-card{grid-template-columns:78px minmax(0,1fr)}
+  .crm-im-card .crm-im-foto{width:78px;height:60px}
+  .crm-im-situacao{grid-column:2;justify-self:start}
+  .crm-compat-item{grid-template-columns:78px minmax(0,1fr)}
+  .crm-compat-foto{width:78px;height:60px}
+  .crm-compat-acoes{grid-column:1/-1}
 }

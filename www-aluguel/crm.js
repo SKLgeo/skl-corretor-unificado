@@ -116,7 +116,137 @@
     }
     // "imóvel de interesse" fora do cadastro: o corretor descreve e a equipe recebe um aviso para ajudar na busca
     const PROCURA = "__procura";
-    function mostrarProcura() { $("crmNegProcura").hidden = $("crmNegImovel").value !== PROCURA; }
+    function mostrarProcura() { $("crmNegProcura").hidden = $("crmNegImovel").value !== PROCURA; desenharEscolhido(); }
+    // Busca do "imóvel de interesse": em vez da lista enorme com nomes parecidos, uma janela com busca livre
+    // ("casa 3 quartos village", código, rua, bairro) ou pelo nome do proprietário, com foto e dados para reconhecer o imóvel.
+    const SITUACAO_IMOVEL = { disponivel: "Disponível", reservado: "Reservado", alugado: "Alugado", em_negociacao: "Em negociação", vendido: "Vendido", indisponivel: "Indisponível" };
+    const PALAVRAS_VAZIAS = new Set([ "de", "da", "do", "das", "dos", "com", "em", "e", "a", "o", "as", "os", "no", "na", "para", "pra", "um", "uma", "ate" ]);
+    const CAMPOS_NUMERO = [ [ /^(quartos?|qtos?|dorm\w*)$/, "quartos" ], [ /^(suites?)$/, "suites" ], [ /^(vagas?|garage\w*)$/, "vagas" ], [ /^(banheiros?|wc)$/, "banheiros" ] ];
+    let buscaModo = "imovel", buscaTimer = null;
+    function campoNumerico(palavra) { const c = CAMPOS_NUMERO.find(([ re ]) => re.test(palavra)); return c ? c[1] : null; }
+    function nomeProprietario(i) {
+        const p = i.proprietario_cliente_id ? clientes.get(i.proprietario_cliente_id) : null;
+        return p ? [ p.nome, p.apelido ].filter(Boolean).join(" ") : "";
+    }
+    function textoDoImovel(i) {
+        return normal([ i.codigo, i.nome, i.tipo_imovel, i.bairro, i.logradouro, i.numero, i.complemento, i.cidade, i.edificio, i.endereco, i.localidade ]
+            .filter(Boolean).join(" "));
+    }
+    function buscarImoveis(texto, modo, finalidade, soDisponiveis, atual) {
+        const palavras = normal(texto).split(/[\s,;]+/).filter(Boolean);
+        const minimos = [], resto = [];
+        for (let k = 0; k < palavras.length; k++) {
+            const p = palavras[k], junto = p.match(/^(\d+)([a-z]+)$/);
+            if (/^\d+$/.test(p) && palavras[k + 1] && campoNumerico(palavras[k + 1])) { minimos.push([ campoNumerico(palavras[k + 1]), Number(p) ]); k++; continue; }
+            if (junto && campoNumerico(junto[2])) { minimos.push([ campoNumerico(junto[2]), Number(junto[1]) ]); continue; }
+            if (!PALAVRAS_VAZIAS.has(p)) resto.push(p);
+        }
+        return ctx.imoveis()
+            .filter(i => (i.aprovacao || "aprovado") === "aprovado" || i.id === atual)
+            .filter(i => i.id === atual || !finalidade || finalidade === "captacao"
+                || (finalidade === "venda" ? !!i.para_venda : i.para_aluguel !== false))
+            .filter(i => !soDisponiveis || i.status === "disponivel" || i.id === atual)
+            .map(i => {
+                const alvo = modo === "proprietario" ? normal(nomeProprietario(i)) : textoDoImovel(i);
+                if (modo === "proprietario" && resto.length && !alvo) return null;
+                if (!resto.every(p => alvo.includes(p))) return null;
+                if (modo !== "proprietario" && !minimos.every(([ campo, n ]) => Number(i[campo] || 0) >= n)) return null;
+                let pontos = 0;
+                const codigo = String(i.codigo || "");
+                resto.forEach(p => {
+                    if (codigo === p || codigo.replace(/^0+/, "") === p.replace(/^0+/, "")) pontos += 50;
+                    if (normal(i.nome).includes(p)) pontos += 3;
+                    if (normal(i.bairro).includes(p)) pontos += 2;
+                });
+                minimos.forEach(([ campo, n ]) => { if (Number(i[campo] || 0) === n) pontos += 4; }); // o número exato pedido vem primeiro
+                if (i.status === "disponivel") pontos += 1;
+                return { i, pontos };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.pontos - a.pontos || normal(a.i.nome).localeCompare(normal(b.i.nome)) || String(a.i.codigo || "").localeCompare(String(b.i.codigo || "")))
+            .map(x => x.i);
+    }
+    function abrirBuscaImovel() {
+        $("crmImBuscaTexto").value = "";
+        definirModoBusca("imovel");
+        $("crmImBuscaDialog").showModal();
+        desenharBuscaImovel();
+        setTimeout(() => $("crmImBuscaTexto").focus(), 50);
+    }
+    function definirModoBusca(modo) {
+        buscaModo = modo;
+        document.querySelectorAll("[data-busca-modo]").forEach(b => b.classList.toggle("ativo", b.dataset.buscaModo === modo));
+        $("crmImBuscaTexto").placeholder = modo === "proprietario" ? "Nome do proprietário" : "Ex.: casa 3 quartos village, 00145, Rua das Flores";
+        $("crmImBuscaDica").textContent = modo === "proprietario"
+            ? (central() ? "Digite o nome (ou o apelido) do proprietário." : "Aparecem só os proprietários que você pode ver: os dos imóveis que você captou.")
+            : "Digite o que lembrar do imóvel: tipo, bairro, rua, condomínio, código ou número de quartos.";
+    }
+    function desenharBuscaImovel() {
+        const f = funil($("crmNegFunil").value);
+        const finalidade = f ? f.finalidade : "";
+        const atual = $("crmNegImovel").value;
+        const lista = buscarImoveis($("crmImBuscaTexto").value, buscaModo, finalidade, $("crmImBuscaDisp").checked, atual);
+        const mostrar = lista.slice(0, 40);
+        $("crmImBuscaContagem").textContent = lista.length
+            ? (lista.length > mostrar.length ? `${lista.length} imóveis encontrados · mostrando os ${mostrar.length} primeiros (refine a busca)` : `${lista.length} imóve${lista.length === 1 ? "l" : "is"} encontrado${lista.length === 1 ? "" : "s"}`)
+            : "Nenhum imóvel encontrado. Tente outra palavra, desmarque \"Só disponíveis\" ou use \"Não está no cadastro\".";
+        $("crmImBuscaLista").innerHTML = mostrar.map(i => {
+            const valor = valorNaFinalidade(i, finalidade === "venda" ? "venda" : finalidade === "locacao" ? "locacao" : (i.para_venda && !i.para_aluguel ? "venda" : "locacao"));
+            const dono = nomeProprietario(i);
+            return `<button type="button" class="crm-im-card${i.id === atual ? " escolhido" : ""}" data-im-escolher="${h(i.id)}">
+                <span class="crm-im-foto" data-foto-id="${h(i.id)}"><span class="sem-foto">sem foto</span></span>
+                <span class="crm-im-info">
+                  <strong>${h(i.codigo ? i.codigo + " · " : "")}${h(i.nome)}</strong>
+                  <small>${h([ i.tipo_imovel, i.bairro, i.cidade ].filter(Boolean).join(" · "))}</small>
+                  ${i.logradouro ? `<small>${h([ i.logradouro, i.numero ].filter(Boolean).join(", "))}${i.edificio ? " · " + h(i.edificio) : ""}</small>` : ""}
+                  <small>${h([ valor != null ? dinheiro(valor) : "", resumoImovel(i) ].filter(Boolean).join(" · "))}</small>
+                  ${dono ? `<small class="crm-im-dono">Proprietário: ${h(dono)}</small>` : ""}
+                </span>
+                <span class="crm-im-situacao situacao-${h(i.status)}">${h(SITUACAO_IMOVEL[i.status] || i.status || "")}</span>
+              </button>`;
+        }).join("");
+        $("crmImBuscaDialog").querySelectorAll("[data-im-escolher]").forEach(b => { b.onclick = () => escolherImovelBusca(b.dataset.imEscolher); });
+        preencherFotos($("crmImBuscaLista"), mostrar);
+    }
+    // foto de capa nos cartões (busca e compatíveis); a % fica como selo pequeno
+    function preencherFotos(box, imoveis) {
+        if (!ctx.fotosCapa || !imoveis.length) return;
+        ctx.fotosCapa(imoveis).then(mapa => {
+            box.querySelectorAll("[data-foto-id]").forEach(el => {
+                const url = mapa.get(el.dataset.fotoId);
+                if (!url) return;
+                el.style.backgroundImage = `url("${url}")`;
+                const vazio = el.querySelector(".sem-foto");
+                if (vazio) vazio.remove();
+            });
+        }).catch(() => {});
+    }
+    function escolherImovelBusca(id) {
+        const sel = $("crmNegImovel");
+        if (id && id !== PROCURA && ![ ...sel.options ].some(o => o.value === id)) {
+            sel.insertAdjacentHTML("beforeend", `<option value="${h(id)}">${h(imovelNome(id))}</option>`);
+        }
+        sel.value = id;
+        sel.dispatchEvent(new Event("change"));
+        $("crmImBuscaDialog").close();
+    }
+    // mostra no lugar da lista o imóvel escolhido (foto, código, nome, bairro e valor)
+    function desenharEscolhido() {
+        const v = $("crmNegImovel").value, botao = $("crmNegImovelBotao");
+        if (!botao) return;
+        if (!v) { botao.innerHTML = `<span class="crm-imovel-vazio">🔎 Buscar imóvel <small>nenhum escolhido ainda</small></span>`; return; }
+        if (v === PROCURA) { botao.innerHTML = `<span class="crm-imovel-vazio">✏️ Não está no cadastro <small>descrito abaixo · toque para trocar</small></span>`; return; }
+        const i = ctx.imoveis().find(x => x.id === v);
+        if (!i) { botao.innerHTML = `<span class="crm-imovel-vazio">${h(imovelNome(v) || "Imóvel")} <small>toque para trocar</small></span>`; return; }
+        const f = funil($("crmNegFunil").value);
+        const valor = valorNaFinalidade(i, f && f.finalidade === "venda" ? "venda" : "locacao");
+        botao.innerHTML = `<span class="crm-im-foto" data-foto-id="${h(i.id)}"><span class="sem-foto">sem foto</span></span>
+          <span class="crm-im-info"><strong>${h(i.codigo ? i.codigo + " · " : "")}${h(i.nome)}</strong>
+          <small>${h([ i.bairro, valor != null ? dinheiro(valor) : "", resumoImovel(i) ].filter(Boolean).join(" · "))}</small></span>
+          <span class="crm-imovel-trocar">Trocar</span>`;
+        preencherFotos(botao, [ i ]);
+    }
+
     function preencherProcura(p) {
         p = p || {};
         $("crmProcDesc").value = p.descricao || ""; $("crmProcTipo").value = p.tipo || ""; $("crmProcRegiao").value = p.regiao || "";
@@ -320,6 +450,10 @@
         });
         $("crmNegCliente").addEventListener("change", () => { if (!negAberta) aplicarClienteNaNegociacao($("crmNegCliente").value); });
         $("crmNegImovel").addEventListener("change", mostrarProcura);
+        $("crmNegImovelBotao").addEventListener("click", abrirBuscaImovel);
+        $("crmImBuscaTexto").addEventListener("input", () => { clearTimeout(buscaTimer); buscaTimer = setTimeout(desenharBuscaImovel, 180); });
+        $("crmImBuscaDisp").addEventListener("change", desenharBuscaImovel);
+        document.querySelectorAll("[data-busca-modo]").forEach(b => b.addEventListener("click", () => { definirModoBusca(b.dataset.buscaModo); desenharBuscaImovel(); }));
         $("crmNegImovel").addEventListener("change", () => {
             if (negAberta || $("crmNegValor").value.trim()) return;
             const c = ctx.imoveis().find(i => i.id === $("crmNegImovel").value);
@@ -1340,6 +1474,7 @@
             + (atual ? `<option value="${h(atual.id)}">${h(imovelNome(atual.id))}</option>` : "")
             + lista.map(i => `<option value="${h(i.id)}">${h(imovelNome(i.id))}</option>`).join("");
         $("crmNegImovel").value = selecionado || "";
+        desenharEscolhido();
     }
     function aplicarClienteNaNegociacao(clienteId) {
         const c = clientes.get(clienteId);
@@ -1584,8 +1719,9 @@
         const cli = clientes.get($("crmNegCliente").value);
         const temFone = cli && digitos(cli.telefone).length >= 10;
         box.innerHTML = `<span class="eyebrow">IMÓVEIS QUE COMBINAM <em>${lista.length ? lista.length : "nenhum"}</em></span>`
+            + (lista.length ? `<p class="crm-compat-aviso">A % mostra o quanto cada imóvel combina com o que o cliente procura. Para uma % mais precisa, preencha melhor o que o cliente procura (bairros, tipo, valor, quartos e vagas).</p>` : "")
             + (lista.length ? lista.map(({ i, r }) => `<div class="crm-compat-item${i.id === atual ? " escolhido" : ""}">
-                <span class="crm-compat-pct ${r.pct === 100 ? "total" : ""}">${r.pct}%</span>
+                <span class="crm-compat-foto" data-foto-id="${h(i.id)}"><span class="sem-foto">sem foto</span><span class="crm-compat-pct ${r.pct === 100 ? "total" : ""}">${r.pct}%</span></span>
                 <div class="crm-compat-info">
                   <strong>${h(i.codigo ? i.codigo + " · " : "")}${h(i.nome)}</strong>
                   <small>${h([ i.bairro, dinheiro(r.valor), resumoImovel(i) ].filter(Boolean).join(" · "))}</small>
@@ -1599,6 +1735,7 @@
                 </div>
               </div>`).join("")
             : `<p class="muted-text">Nenhum imóvel disponível combina com esse perfil. Esse pedido entra na "demanda sem estoque" do painel.</p>`);
+        preencherFotos(box, lista.map(x => x.i));
         box.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.ver)));
         box.querySelectorAll("[data-usar]").forEach(b => b.addEventListener("click", () => {
             const i = ctx.imoveis().find(x => x.id === b.dataset.usar);

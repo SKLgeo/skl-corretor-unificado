@@ -870,7 +870,10 @@
         <label><span>Funil</span><select id="crmNegFunil"></select></label>
       </div>
       <div class="form-row">
-        <label><span>Imóvel de interesse</span><select id="crmNegImovel"></select></label>
+        <div class="crm-campo-imovel"><span class="crm-campo-rotulo">Imóvel de interesse</span>
+          <select id="crmNegImovel" hidden></select>
+          <button id="crmNegImovelBotao" type="button" class="crm-imovel-escolhido"></button>
+        </div>
         <label><span>Valor da negociação</span><input id="crmNegValor" inputmode="decimal" placeholder="R$" autocomplete="off" /></label>
       </div>
       <div id="crmNegProcura" class="crm-procura" hidden>
@@ -934,6 +937,29 @@
         <button id="crmAtSalvar" type="button" class="primary-button">Registrar atendimento</button>
         <div id="crmNegHistorico" class="crm-timeline"></div>
       </section>
+    </form>
+  </dialog>
+
+  <dialog id="crmImBuscaDialog" class="crm-dialog crm-dialog-larga crm-im-busca">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">IMÓVEL DE INTERESSE</span>
+      <h2>Buscar imóvel</h2>
+      <div class="crm-im-busca-topo">
+        <div id="crmImBuscaModo" class="segmentado" role="group" aria-label="Buscar por">
+          <button type="button" data-busca-modo="imovel" class="ativo">Pelo imóvel</button>
+          <button type="button" data-busca-modo="proprietario">Pelo proprietário</button>
+        </div>
+        <input id="crmImBuscaTexto" type="search" autocomplete="off" placeholder="Ex.: casa 3 quartos village, 00145, Rua das Flores" />
+        <label class="check-inline"><input id="crmImBuscaDisp" type="checkbox" checked /> Só disponíveis</label>
+      </div>
+      <p id="crmImBuscaDica" class="muted-text crm-im-busca-dica"></p>
+      <div class="crm-im-busca-fixos">
+        <button type="button" class="secondary-button" data-im-escolher="">Ainda sem imóvel definido</button>
+        <button type="button" class="secondary-button" data-im-escolher="__procura">✏️ Não está no cadastro: descrever o imóvel</button>
+      </div>
+      <p id="crmImBuscaContagem" class="crm-im-busca-contagem"></p>
+      <div id="crmImBuscaLista" class="crm-im-busca-lista"></div>
     </form>
   </dialog>
 
