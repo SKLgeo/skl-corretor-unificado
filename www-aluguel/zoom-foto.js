@@ -29,7 +29,10 @@
     }
     function desfazerZoom() {
         const vv = window.visualViewport;
-        if (!vv || vv.scale <= 1.01) return;
+        const cel = window.SKLCelular;
+        const base = cel && cel.escalaBase ? cel.escalaBase() : 1; // no celular em pé a escala normal é maior que 1 (celular.js)
+        if (!vv || vv.scale <= base * 1.01) return;
+        if (cel && cel.reaplicarViewport) { cel.reaplicarViewport(); return; }
         const meta = document.querySelector('meta[name="viewport"]');
         if (!meta) return;
         const original = meta.getAttribute("content");

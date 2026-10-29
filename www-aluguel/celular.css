@@ -59,3 +59,16 @@
   .cadastros-acoes{width:100%;min-width:0}
   .cadastros-acoes select{width:100%!important;min-width:0}
 }
+/* grades com largura mínima (260–320 px) passavam da tela no celular em pé: viram uma coluna só; margens laterais menores */
+@media(max-width:780px){
+  .settings-grid,.com-regras-lista,.ext-int-grade,.fin-avisos,.fx-cartoes,.fx-res-listas,.fg-resultado-grade,.construcao-grid,.fin-tabela tbody{grid-template-columns:minmax(0,1fr)!important}
+  .workspace{padding-left:12px!important;padding-right:12px!important}
+}
+/* botões do topo quebram em linhas (antes ficavam numa faixa que cortava "Modo corretor" na borda) */
+@media(max-width:780px){
+  .connection-area{flex-wrap:wrap!important;overflow-x:visible!important;gap:8px!important}
+  .connection-area>*{flex:0 1 auto;max-width:100%}
+  .connection-area .secondary-button{min-height:42px;padding:8px 12px;font-size:14.5px;white-space:nowrap}
+}
+@media(max-width:780px){.panel,.form-panel{grid-template-columns:minmax(0,1fr)}select{min-width:0;width:100%}}
+@media(max-width:780px){.busca-linha{flex-wrap:wrap}.busca-linha #construcaoSearchInput,.busca-linha #construcaoStatusFilter{flex:1 1 100%;width:100%;min-width:0}}
