@@ -14,6 +14,27 @@
         // Safari (iPhone/iPad) ignora o "user-scalable=no": a pinça é barrada aqui
         [ "gesturestart", "gesturechange", "gestureend" ].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
         document.addEventListener("touchmove", e => { if (e.touches.length > 1 && !naFoto(e.target)) e.preventDefault(); }, { passive: false });
+        // se o iPhone ampliou mesmo assim (ao tocar num campo), volta ao tamanho normal quando sai do campo
+        document.addEventListener("focusout", () => setTimeout(desfazerZoom, 80));
+        window.addEventListener("orientationchange", () => setTimeout(desfazerZoom, 300));
+        // tela ampliada fora de um campo (a pinça está travada, então a pessoa não conseguiria afastar): volta sozinha
+        const campoAtivo = () => { const el = document.activeElement; return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName); };
+        let espera = null;
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", () => {
+            clearTimeout(espera);
+            espera = setTimeout(() => { if (!campoAtivo()) desfazerZoom(); }, 400);
+        });
+        window.addEventListener("pageshow", () => setTimeout(desfazerZoom, 300));
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(desfazerZoom, 300); });
+    }
+    function desfazerZoom() {
+        const vv = window.visualViewport;
+        if (!vv || vv.scale <= 1.01) return;
+        const meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) return;
+        const original = meta.getAttribute("content");
+        meta.setAttribute("content", original.replace(/,?\s*maximum-scale=[^,]*/, "") + ", maximum-scale=1.0");
+        setTimeout(() => meta.setAttribute("content", original), 60);
     }
 
     // liga o zoom numa <img>; devolve { reset(), ampliado() } (ampliado = não trocar de foto ao arrastar)

@@ -171,7 +171,8 @@
         definirModoBusca("imovel");
         $("crmImBuscaDialog").showModal();
         desenharBuscaImovel();
-        setTimeout(() => $("crmImBuscaTexto").focus(), 50);
+        // no celular não põe o cursor sozinho: abriria o teclado (e o iPhone ampliava a tela)
+        if (!(window.matchMedia && matchMedia("(pointer: coarse)").matches)) setTimeout(() => $("crmImBuscaTexto").focus(), 50);
     }
     function definirModoBusca(modo) {
         buscaModo = modo;

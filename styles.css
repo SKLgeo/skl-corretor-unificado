@@ -180,6 +180,10 @@ html, body {
 .boot-view { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: linear-gradient(135deg, #29ABE2, #061B2E); color: #fff; font-weight: 800; letter-spacing: .04em; }
 .boot-view img { width: min(260px, 62vw); height: auto; border-radius: 10px; }
 
+/* no celular os campos ficam com 16 px: com letra menor o iPhone amplia a tela sozinho ao tocar no campo */
+@media (pointer: coarse){input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px!important}}
+html{touch-action:manipulation}
+
 
 /* ---- acrescentado na versão web (link) ---- */
 .chooser-view { padding-top: max(32px, env(safe-area-inset-top)); padding-bottom: max(32px, env(safe-area-inset-bottom)); }

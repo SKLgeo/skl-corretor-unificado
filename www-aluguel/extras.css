@@ -155,3 +155,8 @@ dialog.foto-lightbox{overflow:hidden}
 .sair-dialog .dialog-card{max-width:420px}
 .avisos-antecedencia{display:grid;gap:4px;margin:0 0 12px}
 .avisos-antecedencia span{font-weight:700;color:var(--navy-deep);font-size:14px}
+
+/* 29/10/2026: no celular os campos ficam com 16 px; com letra menor o iPhone amplia a tela sozinho ao tocar no campo */
+@media (pointer: coarse){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
+}
