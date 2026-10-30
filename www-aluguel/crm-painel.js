@@ -33,6 +33,8 @@
         [ "painelPeriodo", "painelFunil", "painelCorretor", "painelPadrao" ].forEach(id => $(id).addEventListener("change", render));
         $("painelImprimir").addEventListener("click", imprimir);
         $("painelExportar").addEventListener("click", exportarCsv);
+        let esperaBusca = null;
+        $("painelCaptacaoBusca").addEventListener("input", () => { clearTimeout(esperaBusca); esperaBusca = setTimeout(render, 200); });
     }
 
     async function carregarAtividades(desde) {
@@ -184,6 +186,8 @@
         ultimoCsv.push([ "Corretor", "Novos", "Atendimentos", "Visitas", "Fechados", "Conversão", "Valor fechado", "Ações atrasadas" ],
             ...listaEquipe.map(p => [ x.corretorDe(p.id), String(p.novos), String(p.atend), String(p.visitas), String(p.ganhos), p.ganhos + p.perdidos ? pct(p.ganhos, p.ganhos + p.perdidos) + "%" : "", String(p.valor), String(p.atrasadas) ]), []);
 
+        renderCaptacao(x, ctx, noPeriodo, filtroCorretor, periodo);
+
         // ---------- estoque
         const imoveis = ctx.imoveis().filter(i => (i.aprovacao || "aprovado") === "aprovado");
         const disponiveis = imoveis.filter(i => i.status === "disponivel");
@@ -296,6 +300,42 @@
           ${recebido.map(([ m, v ], i) => `<div class="painel-funil-linha"><span class="painel-funil-nome">${h(nomeMes(m))}</span>
             <span class="painel-barra"><i style="width:${pct(v, max)}%;background:#29ABE2"></i></span><strong>${h(x.dinheiroCurto(v))}</strong><small>receita ${h(x.dinheiroCurto(receita[i][1]))}</small></div>`).join("")}`;
         ultimoCsv.push([ "Mês", "Recebido", "Receita da imobiliária" ], ...recebido.map(([ m, v ], i) => [ m, v.toFixed(2).replace(".", ","), receita[i][1].toFixed(2).replace(".", ",") ]), []);
+    }
+
+    // Ranking de captação (só Central/admin/gestor): imóveis aprovados no período, agrupados por quem captou
+    // (captador_id, ou quem cadastrou). Data da captação = aprovação, senão cadastro.
+    function renderCaptacao(x, ctx, noPeriodo, filtroCorretor, periodo) {
+        const bloco = $("painelCaptacaoBloco");
+        bloco.hidden = !ctx.central();
+        if (bloco.hidden) return;
+        const captador = i => i.captador_id || i.cadastrado_por || null;
+        const aprovados = ctx.imoveis().filter(i => (i.aprovacao || "aprovado") === "aprovado");
+        const semCaptador = aprovados.filter(i => !captador(i)).length;
+        const pessoas = new Map();
+        aprovados.filter(i => captador(i) && (periodo === "tudo" || noPeriodo(i.aprovado_em || i.cadastrado_em || i.created_at))).forEach(i => {
+            const id = captador(i);
+            if (!pessoas.has(id)) pessoas.set(id, { id, qtd: 0, venda: 0, aluguel: 0, disponiveis: 0, valorVenda: 0 });
+            const p = pessoas.get(id);
+            p.qtd++;
+            if (i.para_venda) { p.venda++; p.valorVenda += Number(i.valor_venda) || 0; }
+            if (i.para_aluguel !== false) p.aluguel++;
+            if (i.status === "disponivel") p.disponiveis++;
+        });
+        const ranking = [ ...pessoas.values() ].sort((a, b) => b.qtd - a.qtd || b.valorVenda - a.valorVenda);
+        ranking.forEach((p, i) => { p.pos = i + 1; });
+        const busca = x.normal($("painelCaptacaoBusca").value || "").trim();
+        const lista = ranking.filter(p => (!filtroCorretor || p.id === filtroCorretor) && (!busca || x.normal(x.corretorDe(p.id)).includes(busca)));
+        const medalha = n => n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n + "º";
+        $("painelCaptacao").innerHTML = (ranking.length
+            ? (lista.length ? tabela([ "Posição", "Corretor", "Captados", "Para venda", "Para aluguel", "Disponíveis hoje", "Valor de venda captado" ],
+                lista.map(p => [ { html: `<span class="painel-captacao-pos">${medalha(p.pos)}</span>` },
+                    { html: `<span class="crm-card-corretor">${ctx.fotoDoUsuario(p.id, 22)}<span>${h(x.corretorDe(p.id))}</span></span>` },
+                    { html: `<strong>${p.qtd}</strong>` }, p.venda, p.aluguel, p.disponiveis, p.valorVenda ? x.dinheiro(p.valorVenda) : "—" ]))
+                : `<p class="muted-text">Ninguém com esse nome no ranking do período.</p>`)
+            : `<p class="muted-text">Nenhum imóvel captado em ${h(rotuloPeriodo(periodo))}.</p>`)
+            + (semCaptador ? `<p class="muted-text painel-nota">⚠️ ${semCaptador} imóvel(is) aprovado(s) sem captador informado não entram no ranking. Abra o imóvel e use "Informar quem captou".</p>` : "");
+        ultimoCsv.push([ "Ranking de captação", "Corretor", "Captados", "Para venda", "Para aluguel", "Disponíveis hoje", "Valor de venda captado" ],
+            ...lista.map(p => [ p.pos + "º", x.corretorDe(p.id), String(p.qtd), String(p.venda), String(p.aluguel), String(p.disponiveis), p.valorVenda.toFixed(2).replace(".", ",") ]), []);
     }
 
     function tabela(cabecalho, linhas) {

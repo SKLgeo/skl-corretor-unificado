@@ -165,6 +165,9 @@
         $("finCvReabrir").addEventListener("click", () => situacaoVenda("em_andamento"));
         $("finCtGarantia").addEventListener("change", mostrarGarantia);
         $("finCtAddItem").addEventListener("click", () => { itens.push({ descricao: "", valor: "", repassar: false }); desenharItens(); });
+        $("finPgAdd").addEventListener("click", () => { parcelasPg.push({ vencimento: "", valor: "", status: "" }); desenharParcelasPg(true); });
+        $("finPgGerarBotao").addEventListener("click", gerarParcelasPg);
+        $("finCvValor").addEventListener("input", () => notaParcelasPg());
         $("finCtSalvar").addEventListener("click", salvarContrato);
         $("finReajPct").addEventListener("input", () => {
             const c = contrato(contratoAberto); const p = num($("finReajPct").value);
@@ -248,6 +251,7 @@
             ${aviso("Em atraso", atr.length, atr.slice(0, 8).map(b => linhaAtraso(b)).join(""), "Nenhum aluguel em atraso.", "cobrancas:atrasadas")}
             ${aviso("Reajustes nos próximos 30 dias", reaj.length, reaj.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</button><small>${h(INDICES[c.indice_reajuste])} · ${h(dataBr(c.proximo_reajuste))}</small></li>`).join(""), "Nenhum reajuste chegando.", "contratos:reajuste")}
             ${aviso("Contratos terminando em 60 dias", venc.length, venc.map(c => `<li><button type="button" class="text-button" data-fin-ct="${h(c.id)}">Nº ${h(c.numero)} · ${h(nomeCli(c.inquilino_id, c.inquilino_nome))}</button><small>termina em ${h(dataBr(c.fim))}</small></li>`).join(""), "Nenhum contrato terminando.", "contratos:vencendo")}
+            ${(() => { const pa = parcelasAtencao(); return pa.length ? aviso("Parcelas de contratos", pa.length, pa.slice(0, 8).map(x => `<li><button type="button" class="text-button" ${x.tipo === "venda" ? "data-fin-cv" : "data-fin-ct"}="${h(x.c.id)}">Nº ${h(x.c.numero)} · ${h(x.tipo === "venda" ? nomeCli(x.c.comprador_id, x.c.comprador_nome) : nomeCli(x.c.inquilino_id, x.c.inquilino_nome))}</button><small${x.vencida ? ' class="fin-vencida"' : ""}>${x.n}ª parcela${x.p.valor != null ? " · " + h(dinheiro(x.p.valor)) : ""} · ${x.vencida ? "venceu" : "vence"} ${h(dataBr(x.p.vencimento))}${x.p.status ? " · " + h(x.p.status) : ""}</small></li>`).join(""), "") : ""; })()}
             ${semContrato.length && podeGerir() ? aviso("Negócios fechados sem contrato", semContrato.length, semContrato.slice(0, 8).map(n => `<li><button type="button" class="text-button" data-fin-neg="${h(n.id)}">${h(n.titulo || nomeCli(n.cliente_id))}</button><small>${h(dinheiro(n.valor))} · criar contrato</small></li>`).join(""), "") : ""}
             ${window.SKLFinExtra ? window.SKLFinExtra.avisosResumo(aviso) : ""}
           </div>
@@ -276,6 +280,7 @@
     }
     function ligarLinks(box) {
         box.querySelectorAll("[data-fin-ct]").forEach(b => b.addEventListener("click", () => abrirContrato(contrato(b.dataset.finCt))));
+        box.querySelectorAll("[data-fin-cv]").forEach(b => b.addEventListener("click", () => abrirContrato(venda(b.dataset.finCv))));
         box.querySelectorAll("[data-fin-neg]").forEach(b => b.addEventListener("click", () => criarDaNegociacao(b.dataset.finNeg)));
         box.querySelectorAll("[data-fin-pagar]").forEach(b => b.addEventListener("click", () => abrirPagamento(cobrancas.find(x => x.id === b.dataset.finPagar))));
         box.querySelectorAll("[data-fin-ir]").forEach(b => b.addEventListener("click", () => {
@@ -459,7 +464,7 @@
             <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
             <td data-r="Inquilino / comprador">${h(nomeCli(c.comprador_id, c.comprador_nome))}<small class="fin-sub">comprador</small></td>
             <td data-r="Proprietário / vendedor">${h(nomeCli(c.vendedor_id, c.vendedor_nome))}<small class="fin-sub">vendedor</small></td>
-            <td data-r="Valor">${h(dinheiro(c.valor_venda))}${c.comissao_valor != null ? `<small class="fin-sub">comissão ${h(dinheiro(c.comissao_valor))}</small>` : ""}</td>
+            <td data-r="Valor">${h(dinheiro(c.valor_venda))}${c.comissao_valor != null ? `<small class="fin-sub">comissão ${h(dinheiro(c.comissao_valor))}</small>` : ""}${resumoPagamento(c)}</td>
             <td data-r="Período">${h(dataBr(c.data_contrato))}${c.prazo_escritura ? `<small class="fin-sub">escritura até ${h(dataBr(c.prazo_escritura))}</small>` : ""}</td>
             <td data-r="Reajuste">—</td>
             <td data-r="Situação">${situacaoVenda_(c)}</td></tr>`
@@ -468,7 +473,7 @@
             <td data-r="Imóvel">${h(nomeImovelCt(c))}${c.construcao_id || !c.imovel_avulso ? "" : `<small class="fin-sub">não cadastrado</small>`}</td>
             <td data-r="Inquilino / comprador">${h(nomeCli(c.inquilino_id, c.inquilino_nome))}<small class="fin-sub">inquilino</small></td>
             <td data-r="Proprietário / vendedor">${h(nomeCli(c.proprietario_id, c.proprietario_nome))}<small class="fin-sub">proprietário</small></td>
-            <td data-r="Valor">${h(dinheiro(c.valor_aluguel))}<small class="fin-sub">por mês · vence dia ${h(c.dia_vencimento)} · adm ${h(pct(c.taxa_adm_pct))}%</small></td>
+            <td data-r="Valor">${h(dinheiro(c.valor_aluguel))}<small class="fin-sub">por mês · vence dia ${h(c.dia_vencimento)} · adm ${h(pct(c.taxa_adm_pct))}%</small>${resumoPagamento(c)}</td>
             <td data-r="Período">${h(dataBr(c.inicio))} a ${h(dataBr(c.fim))}</td>
             <td data-r="Reajuste">${h(INDICES[c.indice_reajuste])}${c.proximo_reajuste ? `<small class="fin-sub">${h(dataBr(c.proximo_reajuste))}</small>` : ""}</td>
             <td data-r="Situação">${situacaoContrato(c)}</td></tr>`;
@@ -534,13 +539,18 @@
         $("finCvComValor").value = base.comissao_valor != null ? pct(base.comissao_valor) : "";
         $("finCvEscritura").value = base.prazo_escritura || "";
         $("finCvForma").value = base.forma_pagamento || "";
+        $("finPgForma").value = (base.pagamento && base.pagamento.forma) || base.forma_pagamento || "";
+        parcelasPg = ((base.pagamento && base.pagamento.parcelas) || []).map(p => ({ vencimento: p.vencimento || "", valor: valorCampo(p.valor), status: p.status || "" }));
+        $("finPgGerar").open = false; $("finPgValor").value = ""; $("finPgPrimeiro").value = "";
         $("finCtObs").value = base.observacoes || "";
         definirTipo(tipo);
         mostrarOrigem();
         mostrarGarantia();
         desenharItens();
         desenharEquipeCt();
+        desenharParcelasPg(pode);
         $("finContratoForm").querySelectorAll("input,select,textarea").forEach(el => { el.disabled = !pode; });
+        $("finPgAdd").hidden = !pode; $("finPgGerar").hidden = !pode;
         $("finCtAddCorretor").hidden = !pode; $("finCtAddParceiro").hidden = !pode;
         $("finCtAddItem").hidden = !pode || tipo !== "locacao";
         $("finCtSalvar").hidden = !pode;
@@ -581,6 +591,7 @@
         $("finCtInquilinoRot").textContent = ctTipo === "venda" ? "Comprador" : "Inquilino";
         $("finCtProprietarioRot").textContent = ctTipo === "venda" ? "Vendedor (proprietário)" : "Proprietário";
         if (!vendaAberta && !contratoAberto) $("finCtAddItem").hidden = ctTipo !== "locacao" || !podeGerir();
+        notaParcelasPg();
         // imóveis que servem para o tipo escolhido (mantém o que já estava escolhido)
         const sel = $("finCtImovel").value || $("finCtImovel").dataset.sel || "";
         const campo = ctTipo === "venda" ? "para_venda" : "para_aluguel";
@@ -706,6 +717,75 @@
         $("finCtGarantiaDetLabel").hidden = g === "nenhuma";
         $("finCtCaucaoLabel").hidden = g !== "caucao";
     }
+    // Forma de pagamento do contrato (locação e compra e venda): texto livre + parcelas com vencimento, valor e situação
+    // escrita à mão ("Pago", "a vencer"…). Fica no contrato (fin_definir_pagamento_contrato); a lista de contratos mostra
+    // quantas estão pagas e o Resumo avisa as parcelas que vencem em 30 dias ou já venceram sem estar pagas.
+    let parcelasPg = [];
+    function valorCampo(v) { return v == null || v === "" ? "" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function parcelaPaga(p) { const s = String(p.status || ""); return /pag|quit|receb|liquid|baixad/i.test(s) && !/(a|n[aã]o|sem)\s+(pag|receb)/i.test(s); }
+    function parcelaPendente(p) { return !parcelaPaga(p) && !/cancel/i.test(String(p.status || "")); }
+    function desenharParcelasPg(pode) {
+        const box = $("finPgParcelas");
+        box.innerHTML = parcelasPg.map((p, i) => `<div class="fin-pg-linha" data-i="${i}">
+            <span class="fin-pg-n">${i + 1}ª</span>
+            <label><span>${i + 1}º vencimento</span><input type="date" data-pg="vencimento" value="${h(p.vencimento)}"${pode ? "" : " disabled"} /></label>
+            <label><span>${i + 1}ª parcela (R$)</span><input inputmode="decimal" autocomplete="off" data-pg="valor" value="${h(p.valor)}"${pode ? "" : " disabled"} /></label>
+            <label><span>${i + 1}º status</span><input list="finPgSituacoes" autocomplete="off" data-pg="status" placeholder="ex.: Pago, a vencer" value="${h(p.status)}"${pode ? "" : " disabled"} /></label>
+            ${pode ? `<button type="button" class="text-button fin-pg-del" title="Tirar esta parcela">✕</button>` : ""}
+          </div>`).join("") || `<p class="muted-text">Nenhuma parcela informada.${pode ? ' Use "+ Parcela" para incluir uma por uma ou "Gerar várias parcelas de uma vez".' : ""}</p>`;
+        box.querySelectorAll(".fin-pg-linha").forEach(linha => {
+            const i = Number(linha.dataset.i);
+            linha.querySelectorAll("[data-pg]").forEach(inp => inp.addEventListener("input", () => { parcelasPg[i][inp.dataset.pg] = inp.value; notaParcelasPg(); }));
+            const del = linha.querySelector(".fin-pg-del");
+            if (del) del.addEventListener("click", () => { parcelasPg.splice(i, 1); desenharParcelasPg(true); });
+        });
+        notaParcelasPg();
+    }
+    function notaParcelasPg() {
+        const vals = parcelasPg.map(p => ({ v: num(p.valor) || 0, p }));
+        const total = vals.reduce((s, x) => s + x.v, 0), pago = vals.filter(x => parcelaPaga(x.p)).reduce((s, x) => s + x.v, 0);
+        const partes = parcelasPg.length ? [ `${parcelasPg.length} parcela(s) · total ${dinheiro(total)}`, `${parcelasPg.filter(parcelaPaga).length} paga(s) · ${dinheiro(pago)}` ] : [];
+        if (ctTipo === "venda") {
+            const valor = num($("finCvValor").value);
+            if (valor && parcelasPg.length && Math.abs(valor - total) >= 0.01) partes.push(`o valor da venda é ${dinheiro(valor)} (diferença de ${dinheiro(valor - total)})`);
+        } else partes.push("as cobranças mensais do aluguel continuam automáticas em Cobranças; aqui fica como o contrato é pago (caução parcelada, acordos…)");
+        $("finPgNota").textContent = partes.join(" · ");
+    }
+    function gerarParcelasPg() {
+        const qtd = Math.min(360, Math.max(1, parseInt($("finPgQtd").value, 10) || 0));
+        const valor = num($("finPgValor").value), primeiro = $("finPgPrimeiro").value;
+        const passo = Math.min(12, Math.max(1, parseInt($("finPgIntervalo").value, 10) || 1));
+        if (!primeiro) { msg($("finCtMsg"), "Informe o 1º vencimento para gerar as parcelas."); return; }
+        const [ a, m, d ] = primeiro.split("-").map(Number);
+        for (let k = 0; k < qtd; k++) {
+            const mes = m - 1 + k * passo, ano = a + Math.floor(mes / 12), mm = (mes % 12) + 1;
+            const dia = Math.min(d, new Date(ano, mm, 0).getDate());
+            parcelasPg.push({ vencimento: `${ano}-${String(mm).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, valor: valorCampo(valor), status: "A vencer" });
+        }
+        $("finPgGerar").open = false;
+        desenharParcelasPg(true);
+    }
+    async function salvarPagamentoCt(tipo, id) {
+        const pagamento = { forma: $("finPgForma").value.trim(), parcelas: parcelasPg.map(p => ({ vencimento: p.vencimento || null, valor: num(p.valor), status: (p.status || "").trim() })) };
+        const { error } = await ctx.sb.rpc("fin_definir_pagamento_contrato", { p_tipo: tipo, p_id: id, p_pagamento: pagamento });
+        if (error) ctx.toast("O contrato foi salvo, mas a forma de pagamento não: " + erro(error));
+    }
+    function resumoPagamento(c) {
+        const ps = (c.pagamento && c.pagamento.parcelas) || [];
+        if (!ps.length) return c.pagamento && c.pagamento.forma ? `<small class="fin-sub">${h(c.pagamento.forma)}</small>` : "";
+        const prox = ps.filter(parcelaPendente).filter(p => p.vencimento).sort((a, b) => a.vencimento.localeCompare(b.vencimento))[0];
+        return `<small class="fin-sub">${c.pagamento.forma ? h(c.pagamento.forma) + " · " : ""}${ps.filter(parcelaPaga).length}/${ps.length} parcelas pagas${prox ? ` · próxima ${h(dataBr(prox.vencimento))}` : ""}</small>`;
+    }
+    function parcelasAtencao() {
+        const limite = somaDias(hojeIso(), 30), hoje = hojeIso(), lista = [];
+        [ ...contratos.filter(c => c.status === "ativo").map(c => ({ c, tipo: "locacao" })), ...vendas.filter(v => v.status === "em_andamento").map(c => ({ c, tipo: "venda" })) ].forEach(({ c, tipo }) => {
+            ((c.pagamento && c.pagamento.parcelas) || []).forEach((p, i) => {
+                if (p.vencimento && p.vencimento <= limite && parcelaPendente(p)) lista.push({ c, tipo, p, n: i + 1, vencida: p.vencimento < hoje });
+            });
+        });
+        return lista.sort((a, b) => a.p.vencimento.localeCompare(b.p.vencimento));
+    }
+
     function desenharItens() {
         $("finCtItens").innerHTML = itens.map((it, i) => `<div class="fin-item" data-i="${i}">
             <input data-k="descricao" value="${h(it.descricao || "")}" placeholder="ex.: Condomínio, IPTU" autocomplete="off" />
@@ -750,7 +830,7 @@
             ...pessoasDoForm("comprador", "vendedor"), corretor_id: $("finCtCorretor").value || null, participantes: participantesCt(), negociacao_id: $("finCtNegociacao").value || null,
             valor_venda: num($("finCvValor").value), data_contrato: $("finCvData").value, sinal_valor: num($("finCvSinal").value),
             comissao_pct: num($("finCvComPct").value), comissao_valor: num($("finCvComValor").value),
-            prazo_escritura: $("finCvEscritura").value || null, forma_pagamento: $("finCvForma").value.trim(), observacoes: $("finCtObs").value.trim()
+            prazo_escritura: $("finCvEscritura").value || null, forma_pagamento: $("finPgForma").value.trim(), observacoes: $("finCtObs").value.trim()
         };
     }
     async function salvarVenda() {
@@ -764,6 +844,7 @@
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato_venda", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: vendaAberta });
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
+        await salvarPagamentoCt("venda", data.id);
         $("finContratoDialog").close();
         ctx.toast(vendaAberta ? "Contrato de compra e venda atualizado." : `Contrato de compra e venda nº ${data.numero} criado.`);
         await carregar(true);
@@ -797,6 +878,7 @@
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: contratoAberto });
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
+        await salvarPagamentoCt("locacao", data.id);
         $("finContratoDialog").close();
         ctx.toast(contratoAberto ? "Contrato atualizado. As cobranças em aberto acompanham as mudanças." : `Contrato nº ${data.numero} criado. As cobranças já estão em Financeiro → Cobranças.`);
         await carregar(true);

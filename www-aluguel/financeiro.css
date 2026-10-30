@@ -130,3 +130,21 @@
 .fin-grade .fin-largo{grid-column:span 2}
 .fin-avulso{background:#f6f9fb;border:1px dashed var(--line);border-radius:12px;padding:10px}
 @media(max-width:560px){.fin-grade .fin-largo{grid-column:auto}#finContratoDialog .finalidade-row .campo-rotulo{min-width:0;width:100%}}
+
+/* Forma de pagamento do contrato: parcelas com vencimento, valor e situação livre */
+.fin-pg-bloco{display:grid;gap:8px;margin:8px 0 6px;padding:10px 12px;border:1px solid #d9e6f2;border-radius:12px;background:#f7fbff}
+.fin-pg-parcelas{display:grid;gap:8px}
+.fin-pg-linha{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.fin-pg-linha input{min-width:0}
+.fin-pg-n{font-weight:800;color:#0a5c8a;padding-bottom:10px}
+.fin-pg-del{color:#b23b32;font-size:16px;padding:8px}
+.fin-pg-acoes{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.fin-pg-gerar{flex:1 1 280px}
+.fin-pg-gerar summary{cursor:pointer;font-weight:700;color:#0a5c8a;padding:6px 0}
+.fin-pg-nota{margin:0;font-size:12.5px}
+.fin-vencida,.fin-aviso li small.fin-vencida{color:#b23b32;font-weight:700}
+@media(max-width:780px){
+  .fin-pg-linha{grid-template-columns:28px minmax(0,1fr) auto;grid-auto-flow:row}
+  .fin-pg-linha label:nth-of-type(2),.fin-pg-linha label:nth-of-type(3){grid-column:2/3}
+  .fin-pg-del{grid-column:3;grid-row:1}
+}

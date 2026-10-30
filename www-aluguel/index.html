@@ -273,6 +273,11 @@
           <article class="panel painel-bloco"><h3>Motivos de perda</h3><div id="painelPerdas"></div></article>
         </div>
         <article class="panel painel-bloco"><h3>Equipe</h3><div id="painelEquipe"></div></article>
+        <article id="painelCaptacaoBloco" class="panel painel-bloco" hidden>
+          <div class="painel-captacao-topo"><h3>Ranking de captação</h3><input id="painelCaptacaoBusca" type="search" placeholder="Buscar corretor" autocomplete="off" /></div>
+          <p class="muted-text">Imóveis aprovados no período, por quem captou. A Central informa ou troca o captador dentro do imóvel ("📸 Captado por").</p>
+          <div id="painelCaptacao"></div>
+        </article>
         <article class="panel painel-bloco">
           <h3>Estoque de imóveis</h3>
           <div id="painelEstoqueNumeros" class="crm-resumo painel-kpis"></div>
@@ -572,6 +577,7 @@
       </div>
       <div id="aprovacaoBanner" class="aprovacao-banner" hidden></div>
       <div id="autoriaInfo" class="autoria-info" hidden></div>
+      <div id="captadorInfo" class="captador-info" hidden></div>
       <div id="qualidadeBox" class="qualidade-box" hidden>
         <div class="qualidade-topo"><span class="eyebrow">QUALIDADE DO CADASTRO</span><strong id="qualidadeEstrelas">☆☆☆☆☆</strong><span id="qualidadePct">0%</span></div>
         <div class="qualidade-barra"><div id="qualidadeBarra"></div></div>
@@ -1332,7 +1338,7 @@
           <label><span>Comissão (R$)</span><input id="finCvComValor" inputmode="decimal" autocomplete="off" /></label>
           <label><span>Prazo para a escritura</span><input id="finCvEscritura" type="date" /></label>
         </div>
-        <label><span>Forma de pagamento</span><input id="finCvForma" placeholder="ex.: sinal + financiamento bancário, à vista, permuta" autocomplete="off" /></label>
+        <input id="finCvForma" type="hidden" />
       </div>
       <div id="finCtLocacaoCampos">
       <div class="fin-grade">
@@ -1357,6 +1363,26 @@
       <button id="finCtAddItem" type="button" class="secondary-button fin-mini">+ Item (condomínio, IPTU…)</button>
       <label><span>Dados para o repasse ao proprietário (PIX, banco)</span><input id="finCtRepDados" autocomplete="off" /></label>
       </div>
+      <section class="fin-pg-bloco">
+        <span class="crm-rotulo">Forma de pagamento do contrato</span>
+        <label><span>Forma de pagamento</span><input id="finPgForma" list="finPgFormas" placeholder="ex.: entrada + parcelas, financiamento bancário, à vista, permuta" autocomplete="off" /></label>
+        <datalist id="finPgFormas"><option value="À vista"><option value="Entrada + parcelas"><option value="Financiamento bancário"><option value="Entrada + financiamento bancário"><option value="Parcelado direto com o proprietário"><option value="Permuta"><option value="Consórcio"><option value="FGTS + financiamento"></datalist>
+        <datalist id="finPgSituacoes"><option value="Pago"><option value="A vencer"><option value="Em aberto"><option value="Atrasado"><option value="Cancelado"></datalist>
+        <div id="finPgParcelas" class="fin-pg-parcelas"></div>
+        <div class="fin-pg-acoes">
+          <button id="finPgAdd" type="button" class="secondary-button fin-mini">+ Parcela</button>
+          <details id="finPgGerar" class="fin-pg-gerar"><summary>Gerar várias parcelas de uma vez</summary>
+            <div class="fin-grade">
+              <label><span>Quantas parcelas</span><input id="finPgQtd" type="number" min="1" max="360" value="12" /></label>
+              <label><span>Valor de cada (R$)</span><input id="finPgValor" inputmode="decimal" autocomplete="off" /></label>
+              <label><span>1º vencimento</span><input id="finPgPrimeiro" type="date" /></label>
+              <label><span>A cada (meses)</span><input id="finPgIntervalo" type="number" min="1" max="12" value="1" /></label>
+            </div>
+            <button id="finPgGerarBotao" type="button" class="secondary-button fin-mini">Gerar parcelas</button>
+          </details>
+        </div>
+        <p id="finPgNota" class="muted-text fin-pg-nota"></p>
+      </section>
       <label><span>Observações</span><textarea id="finCtObs" rows="2"></textarea></label>
       <p id="finCtMsg" class="form-message" hidden></p>
       <div class="dialog-actions"><button id="finCtSalvar" type="button" class="primary-button">Criar contrato</button></div>

@@ -160,3 +160,14 @@ dialog.foto-lightbox{overflow:hidden}
 @media (pointer: coarse){
   input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
 }
+/* Captador do imóvel (equipe vê; não vai para o link do cliente) e ranking de captação nos Indicadores */
+.captador-info:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px;padding:8px 12px;border:1px solid #cfe4f6;border-radius:10px;background:#f2f8fe;font-size:13.5px}
+.captador-info .captador-rotulo{font-weight:800;color:#0a5c8a}
+.captador-info strong{color:#0b2235}
+.captador-info .secondary-button{padding:5px 11px;font-size:12.5px;min-height:0;margin-left:auto}
+.captador-info .captador-editar:not([hidden]){display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
+.captador-info .captador-select{flex:1 1 220px;min-width:0}
+.painel-captacao-topo{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.painel-captacao-topo h3{margin:0}
+.painel-captacao-topo input{max-width:260px;flex:1 1 180px}
+.painel-captacao-pos{font-size:16px;font-weight:800}

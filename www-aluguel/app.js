@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.14.7";
+    const APP_VERSION = "0.14.8";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1811,6 +1811,7 @@
         $("construcaoCameraInput").disabled = leitura;
         renderAprovacaoBanner(construcao);
         renderAutoria(construcao);
+        renderCaptador(construcao);
         definirPerimetro(construcao?.perimetro || null, construcao?.perimetro_nome || null);
         benfeitoriasAtuais = (construcao?.benfeitorias || []).map(b => ({ ...b }));
         renderBenfeitorias();
@@ -2073,6 +2074,47 @@
         if (c.aprovado_por && c.aprovado_por !== c.cadastrado_por) texto += ` · aprovado por ${nomeDoUsuario(c.aprovado_por)}${c.aprovado_em ? " em " + formatDate(c.aprovado_em) : ""}`;
         box.textContent = texto;
         box.hidden = false;
+    }
+
+    // Quem captou o imóvel: aparece para toda a equipe no imóvel aprovado (nunca no link enviado ao cliente).
+    // Captador = captador_id (definido pela Central) ou, sem ele, quem cadastrou. A Central define ou troca aqui.
+    let equipeCache = { carteira: null, lista: null };
+    async function equipeDaCarteira() {
+        if (equipeCache.carteira !== carteiraId || !equipeCache.lista) {
+            equipeCache = { carteira: carteiraId, lista: sb.rpc("equipe_da_carteira", { p_carteira: carteiraId }).then(({ data }) => data || [], () => []) };
+        }
+        return equipeCache.lista;
+    }
+    function captadorDe(c) { return c ? (c.captador_id || c.cadastrado_por || null) : null; }
+    async function renderCaptador(c) {
+        const box = $("captadorInfo");
+        if (!c || !c.id || (c.aprovacao || "aprovado") !== "aprovado") { box.hidden = true; box.innerHTML = ""; return; }
+        const equipe = await equipeDaCarteira();
+        if (editandoId !== c.id) return;
+        const id = captadorDe(c);
+        const nome = id ? (corretores.find(u => u.id === id)?.display_name || equipe.find(p => p.id === id)?.nome || "pessoa que não está mais na equipe") : null;
+        box.innerHTML = `<span class="captador-rotulo">📸 Captado por</span>${id ? `${fotoDoUsuario(id, 26)}<strong>${h(nome)}</strong>` : `<span class="muted-text">não informado</span>`}
+          ${podeGerenciar() ? `<button type="button" class="secondary-button captador-trocar">${id ? "Trocar" : "Informar quem captou"}</button>
+          <span class="captador-editar" hidden><select class="captador-select"><option value="">Ninguém (não informado)</option>${equipe.slice()
+              .sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR"))
+              .map(p => `<option value="${h(p.id)}"${p.id === id ? " selected" : ""}>${h(p.nome)}${p.apelido ? " (" + h(p.apelido) + ")" : ""}</option>`).join("")}</select>
+            <button type="button" class="primary-button captador-salvar">Salvar</button><button type="button" class="text-button captador-cancelar">Cancelar</button></span>` : ""}`;
+        box.hidden = false;
+        if (!podeGerenciar()) return;
+        const editar = box.querySelector(".captador-editar"), trocar = box.querySelector(".captador-trocar");
+        trocar.addEventListener("click", () => { editar.hidden = false; trocar.hidden = true; });
+        box.querySelector(".captador-cancelar").addEventListener("click", () => { editar.hidden = true; trocar.hidden = false; });
+        box.querySelector(".captador-salvar").addEventListener("click", async ev => {
+            ev.target.disabled = true;
+            const novo = box.querySelector(".captador-select").value || null;
+            const { data, error } = await sb.rpc("definir_captador_imovel", { p_construcao: c.id, p_usuario: novo });
+            ev.target.disabled = false;
+            if (error) { toast(traduzErro(error.message)); return; }
+            const atual = construcoes.get(c.id);
+            if (atual) atual.captador_id = data ? data.captador_id : novo;
+            toast(novo ? "Captador salvo." : "Captador retirado.");
+            renderCaptador(atual || { ...c, captador_id: novo });
+        });
     }
 
     // Ficha só-leitura (corretor vendo imóvel aprovado), com as características em blocos como no app de prédios.
