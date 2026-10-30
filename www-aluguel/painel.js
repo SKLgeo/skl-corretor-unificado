@@ -94,10 +94,12 @@
                   <select id="pgPeriodo" aria-label="Período">
                     <option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="trimestre">Este trimestre</option>
                     <option value="ano" selected>Este ano</option><option value="12m">Últimos 12 meses</option><option value="tudo">Todo o período</option>
+                    <option value="" hidden>Escolhido abaixo</option>
                   </select>
                   <button type="button" class="pg-fechar" data-pg-fechar aria-label="Fechar">×</button>
                 </div>
               </header>
+              <div id="pgFatias" class="fatias pg-fatias" aria-label="Escolher ano, trimestre ou mês"></div>
               <div id="pgGrade" class="pg-grade"><p class="pg-carregando">Carregando…</p></div>
             </div>
           </div>
@@ -109,7 +111,7 @@
             p.querySelectorAll("[data-pg-filtro]").forEach(x => x.classList.toggle("ativo", x === b));
             if (ultimo) desenhar(ultimo);
         }));
-        $("pgPeriodo").addEventListener("change", () => { periodo = $("pgPeriodo").value; per = {}; carregar(); });
+        $("pgPeriodo").addEventListener("change", () => { if (!$("pgPeriodo").value) return; periodo = $("pgPeriodo").value; per = {}; carregar(); });
         document.addEventListener("keydown", e => { if (e.key === "Escape" && !p.hidden) fechar(); });
         let t = null;
         window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (!p.hidden && redesenhar) redesenhar(); }, 150); });
@@ -139,6 +141,8 @@
     const pad = n => String(n).padStart(2, "0");
     const fimMes = (ano, mes) => `${ano}-${pad(mes)}-${pad(new Date(ano, mes, 0).getDate())}`;
     function intervaloDe(p) {
+        const fatia = window.SKLFatias && window.SKLFatias.intervalo(p);
+        if (fatia) return fatia;
         const hoje = hojeIso(), [ a, m ] = hoje.split("-").map(Number);
         if (p === "semana") { // segunda a domingo
             const d = new Date(hoje + "T12:00:00"), dow = (d.getDay() + 6) % 7;
@@ -154,7 +158,7 @@
     }
     const perDe = id => per[id] || periodo;
     const rotuloPer = p => ({ semana: "esta semana", mes: "este mês", trimestre: "este trimestre", ano: "este ano", "12m": "últimos 12 meses", "24m": "últimos 24 meses", tudo: "todo o período" })[p]
-        || (/^\d{4}-\d{2}$/.test(p) ? new Date(p + "-15T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "");
+        || (window.SKLFatias && window.SKLFatias.rotulo(p)) || "";
     async function indicadores(p) {
         const [ ini, fim ] = intervaloDe(p), k = ini + "|" + fim;
         if (!indCache.has(k)) {
@@ -167,14 +171,24 @@
         const grade = $("pgGrade");
         grade.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
         indCache = new Map();
-        const hoje = new Date();
-        const tri = Math.floor(hoje.getMonth() / 3) + 1;
+        const ref = window.SKLFatias ? window.SKLFatias.trimestre(periodo) : { ano: new Date().getFullYear(), tri: Math.floor(new Date().getMonth() / 3) + 1 };
+        const tri = ref.tri;
+        montarFatias();
         let ind;
         try { ind = await indicadores(periodo); } catch (e) { grade.innerHTML = `<p class="pg-carregando">${h(ctx.traduzErro(e.message))}</p>`; return; }
-        const met = await ctx.sb.rpc("metas_painel", { p_carteira: ctx.carteiraId(), p_ano: hoje.getFullYear(), p_trimestre: tri });
+        const met = await ctx.sb.rpc("metas_painel", { p_carteira: ctx.carteiraId(), p_ano: ref.ano, p_trimestre: tri });
         if (window.SKLFinGestao && window.SKLFinGestao.carregar) await window.SKLFinGestao.carregar();
-        ultimo = { ind, metas: met.data || null, tri };
+        ultimo = { ind, metas: met.data || null, tri, ano: ref.ano };
         desenhar(ultimo);
+    }
+    // botões de ano / trimestre / mês acima dos quadros: o escolhido vale para todos (como o seletor do topo)
+    function montarFatias() {
+        if (!window.SKLFatias) return;
+        const primeiro = negocios().map(n => n.dia).sort()[0];
+        window.SKLFatias.montar($("pgFatias"), {
+            codigo: periodo, anoInicial: primeiro ? Number(primeiro.slice(0, 4)) : null,
+            aoEscolher: cod => { periodo = cod; per = {}; $("pgPeriodo").value = ""; carregar(); }
+        });
     }
     // negócios ganhos (do CRM) com finalidade, comissão total (a da divisão ou a estimada, igual ao banco) e imóvel
     function negocios() {
@@ -244,8 +258,8 @@
             cartao("pgPend", "pg-c-largo", "Pendências e recebimentos", `<div class="pg-abas" role="tablist">
                 <button type="button" data-pend="receber" aria-pressed="${abaPend === "receber"}">A receber</button>
                 <button type="button" data-pend="pagar" aria-pressed="${abaPend === "pagar"}">A pagar</button></div>`),
-            cartao("pgMeta", "pg-c-meta", `Metas — ${d.tri}º trimestre`),
-            cartao("pgCorr", "pg-c-largo", `VGC por corretor — ${d.tri}º trimestre`, botaoTabela("pgCorr")),
+            cartao("pgMeta", "pg-c-meta", `Metas — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`),
+            cartao("pgCorr", "pg-c-largo", `VGC por corretor — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`, botaoTabela("pgCorr")),
             cartao("pgVxl", "pg-c-largo", "Negócios no tempo: venda × locação", botaoTabela("pgVxl"), true),
             cartao("pgFunil", "pg-c-largo", "Funil de conversão", `<button type="button" class="pg-tab" data-pg-ir="settings" title="Metas de conversão por etapa">⚙ metas</button>`, true),
             cartao("pgDesp", "pg-c-largo", "Despesas pagas por plano de contas", `<div class="pg-abas" role="group">

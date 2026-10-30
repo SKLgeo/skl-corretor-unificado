@@ -228,3 +228,19 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
   .pg-pend li{grid-template-columns:78px 1fr;}
   .pg-pend-acoes{grid-column:2}
 }
+
+/* Botões de ano / trimestre / mês (periodo-fatias.js), no Painel e nos Indicadores */
+.fatias{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 14px;align-items:center}
+.fatias-linha{display:flex;flex-wrap:wrap;gap:5px}
+.fatias button{border:1px solid #cfe2e6;background:#fff;border-radius:8px;font:inherit;font-size:12.5px;font-weight:600;padding:5px 11px;cursor:pointer;color:#365560;min-width:44px}
+.fatias button:disabled{opacity:.38;cursor:default}
+.fatias button.fatia-ano-base{border-color:var(--navy);color:var(--navy)}
+.fatias button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.pg-fatias{background:#fff;border-radius:16px;padding:10px 12px;box-shadow:0 4px 12px rgba(0,30,50,.06)}
+.painel-fatias{background:var(--panel,#fff);border:1px solid var(--line,#dde6ea);border-radius:12px;padding:10px 12px}
+@media(max-width:780px){
+  .fatias{display:grid;gap:6px}
+  .fatias-linha{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  .fatias-meses{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .fatias button{min-width:0;font-size:13.5px;padding:7px 2px}
+}

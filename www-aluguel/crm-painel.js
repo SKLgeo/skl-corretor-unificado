@@ -10,10 +10,17 @@
     let atividadesDesde = null;
     let carregando = null;
     let ultimoCsv = [];
+    let periodoEscolhido = null;   // "mes", "90"… do seletor, ou "2026", "2026-T3", "2026-05" dos botões
 
     const I = () => window.SKLCRM && window.SKLCRM.interno;
     const h = v => I().ctx().h(v);
 
+    // [início, fim] do período: os atalhos (mês, 30/90 dias, ano, tudo) terminam hoje; ano/trimestre/mês escolhidos nos botões têm fim próprio
+    function intervaloPeriodo(valor) {
+        const f = window.SKLFatias && window.SKLFatias.intervalo(valor);
+        if (f) return { desde: new Date(f[0] + "T00:00:00"), ate: new Date(f[1] + "T23:59:59.999") };
+        return { desde: inicioDoPeriodo(valor), ate: new Date(8640000000000000) };
+    }
     function inicioDoPeriodo(valor) {
         const agora = new Date();
         if (valor === "mes") return new Date(agora.getFullYear(), agora.getMonth(), 1);
@@ -22,7 +29,8 @@
         return new Date(Date.now() - Number(valor) * DIA);
     }
     function rotuloPeriodo(valor) {
-        return { mes: "este mês", "30": "últimos 30 dias", "90": "últimos 90 dias", ano: "este ano", tudo: "todo o período" }[valor] || "";
+        return { mes: "este mês", "30": "últimos 30 dias", "90": "últimos 90 dias", ano: "este ano", tudo: "todo o período" }[valor]
+            || (window.SKLFatias && window.SKLFatias.rotulo(valor)) || "";
     }
     function pct(a, b) { return b ? Math.round(a * 100 / b) : 0; }
     function media(lista) { return lista.length ? lista.reduce((s, x) => s + x, 0) / lista.length : 0; }
@@ -30,7 +38,8 @@
     function ligar() {
         if (ligado) return;
         ligado = true;
-        [ "painelPeriodo", "painelFunil", "painelCorretor", "painelPadrao" ].forEach(id => $(id).addEventListener("change", render));
+        [ "painelFunil", "painelCorretor", "painelPadrao" ].forEach(id => $(id).addEventListener("change", render));
+        $("painelPeriodo").addEventListener("change", () => { if (!$("painelPeriodo").value) return; periodoEscolhido = $("painelPeriodo").value; render(); });
         $("painelImprimir").addEventListener("click", imprimir);
         $("painelExportar").addEventListener("click", exportarCsv);
         let esperaBusca = null;
@@ -69,9 +78,15 @@
         if (!x || !x.ctx() || !$("page-indicadores")) return;
         ligar();
         preencherFiltros();
-        const periodo = $("painelPeriodo").value || "90";
-        const desde = inicioDoPeriodo(periodo);
+        const periodo = periodoEscolhido || $("painelPeriodo").value || "90";
+        const { desde, ate } = intervaloPeriodo(periodo);
+        window.SKLFatias && window.SKLFatias.montar($("painelFatias"), {
+            codigo: periodo,
+            anoInicial: [ ...x.negs.values() ].map(n => String(n.created_at || "").slice(0, 4)).filter(Boolean).sort()[0],
+            aoEscolher: cod => { periodoEscolhido = cod; $("painelPeriodo").value = ""; render(); }
+        });
         await carregarAtividades(desde);
+        const dentro = d => { const t = new Date(d); return t >= desde && t <= ate; };
         const filtroFunil = $("painelFunil").value;
         const filtroCorretor = x.ctx().central() ? $("painelCorretor").value : "";
         const filtroPadrao = $("painelPadrao").value;
@@ -80,7 +95,7 @@
         const todas = [ ...x.negs.values() ].filter(n => idsFunis.has(n.funil_id)
             && (!filtroCorretor || n.corretor_id === filtroCorretor)
             && (!filtroPadrao || x.padraoDe(n) === filtroPadrao));
-        const noPeriodo = d => d && new Date(d) >= desde;
+        const noPeriodo = d => !!d && dentro(d);
         const novas = todas.filter(n => noPeriodo(n.created_at));
         const ganhas = todas.filter(n => n.situacao === "ganha" && noPeriodo(n.fechado_em));
         const perdidas = todas.filter(n => n.situacao === "perdida" && noPeriodo(n.fechado_em));
@@ -108,7 +123,7 @@
             let max = et && et.tipo === "aberta" ? et.ordem : (et && et.tipo === "ganho" ? 999 : 0);
             alcancePorNeg.set(n.id, max);
         });
-        atividades.filter(a => a.tipo === "etapa" && alcancePorNeg.has(a.negociacao_id)).forEach(a => {
+        atividades.filter(a => a.tipo === "etapa" && alcancePorNeg.has(a.negociacao_id) && dentro(a.created_at)).forEach(a => {
             [ a.dados && a.dados.de, a.dados && a.dados.para ].forEach(id => {
                 const et = id && x.etapa(id);
                 if (!et) return;
@@ -174,7 +189,7 @@
         ganhas.forEach(n => { const p = pessoa(n.corretor_id); p.ganhos++; p.valor += Number(n.valor) || 0; });
         perdidas.forEach(n => pessoa(n.corretor_id).perdidos++);
         abertas.filter(n => x.situacaoAcao(n) === "atrasada").forEach(n => pessoa(n.corretor_id).atrasadas++);
-        atividades.filter(a => [ "ligacao", "whatsapp", "visita", "email", "anotacao" ].includes(a.tipo) && (!filtroCorretor || a.autor_id === filtroCorretor)).forEach(a => pessoa(a.autor_id).atend++);
+        atividades.filter(a => [ "ligacao", "whatsapp", "visita", "email", "anotacao" ].includes(a.tipo) && dentro(a.created_at) && (!filtroCorretor || a.autor_id === filtroCorretor)).forEach(a => pessoa(a.autor_id).atend++);
         [ ...(x.visitas ? x.visitas.values() : []) ].filter(v => v.situacao === "realizada" && noPeriodo(v.registrado_em || v.agendada_para)
             && (!filtroCorretor || v.corretor_id === filtroCorretor)).forEach(v => pessoa(v.corretor_id).visitas++);
         const listaEquipe = [ ...pessoas.values() ].filter(p => p.novos || p.atend || p.ganhos || p.perdidos || p.atrasadas || p.visitas)

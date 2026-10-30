@@ -258,6 +258,7 @@
             <option value="90" selected>Últimos 90 dias</option>
             <option value="ano">Este ano</option>
             <option value="tudo">Todo o período</option>
+            <option value="" hidden>Escolhido abaixo</option>
           </select>
           <select id="painelFunil"><option value="">Venda e locação</option><option value="venda">Só venda</option><option value="locacao">Só locação</option></select>
           <select id="painelCorretor"></select>
@@ -266,6 +267,7 @@
           <button id="painelExportar" type="button" class="secondary-button">Excel (CSV)</button>
           <button id="painelImprimir" type="button" class="primary-button">Imprimir / PDF</button>
         </div>
+        <div id="painelFatias" class="fatias painel-fatias" aria-label="Escolher ano, trimestre ou mês"></div>
         <div id="painelKpis" class="crm-resumo painel-kpis"></div>
         <div id="painelFunis" class="painel-grade"></div>
         <div class="painel-grade">
@@ -1483,6 +1485,7 @@
   <script src="financeiro.js"></script>
   <script src="financeiro-extra.js"></script>
   <script src="fin-gestao.js"></script>
+  <script src="periodo-fatias.js"></script>
   <script src="painel.js"></script>
   <script src="integracoes.js"></script>
   <script src="rural.js"></script>
