@@ -202,7 +202,7 @@
         const f = FILTROS[aba] || (window.SKLFinExtra && window.SKLFinExtra.filtros[aba]);
         $("finFiltro").hidden = !f;
         if (f) $("finFiltro").innerHTML = Object.entries(f).map(([ v, t ]) => `<option value="${v}">${h(t)}</option>`).join("");
-        $("finBusca").hidden = aba === "resumo" || aba === "extrato" || !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
+        $("finBusca").hidden = aba === "resumo" || aba === "extrato" || aba === "contabil" || !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
         $("finBusca").value = "";
         render();
     }
@@ -213,7 +213,8 @@
         const gestao = !!(window.SKLFinGestao && window.SKLFinGestao.temAba(aba));
         const fiscal = !!(window.SKLFiscal && window.SKLFiscal.temAba(aba)); // Fiscal · DIMOB fica em fiscal.js
         const conc = !!(window.SKLConciliacao && window.SKLConciliacao.temAba(aba)); // Extrato do banco fica em conciliacao.js
-        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba)) || gestao || fiscal || conc;
+        const contabil = !!(window.SKLContabil && window.SKLContabil.temAba(aba)); // Contabilidade fica em contabil.js
+        const extra = !!(window.SKLFinExtra && window.SKLFinExtra.temAba(aba)) || gestao || fiscal || conc || contabil;
         $("finResumo").hidden = aba !== "resumo";
         $("finLista").hidden = aba === "resumo" || extra;
         $("finMes").hidden = aba === "contratos" || extra;
@@ -222,6 +223,7 @@
         if (window.SKLFinGestao) window.SKLFinGestao.render(aba);
         if (window.SKLFiscal) window.SKLFiscal.render(aba);
         if (window.SKLConciliacao) window.SKLConciliacao.render(aba);
+        if (window.SKLContabil) window.SKLContabil.render(aba);
         if (gestao) $("finContagem").textContent = "";
         if (extra) return;
         if (aba === "resumo") return renderResumo();

@@ -71,6 +71,20 @@
               </div>
               <pre id="intExemplo" class="ext-codigo" hidden></pre>
             </section>
+            <section class="ext-int-bloco ext-int-portais">
+              <header><strong>3. Contatos do ZAP Imóveis, Viva Real e OLX</strong></header>
+              <p>Quando alguém pede informação de um imóvel nesses portais, o contato entra sozinho no CRM: cria o cliente e a negociação
+                 com o imóvel que a pessoa viu, já com o <b>perfil de busca</b> parecido (bairro, tipo, faixa de valor, quartos), passa pela
+                 roleta e avisa o corretor no 🔔. Se o portal mandar o mesmo contato de novo, ele não é duplicado.</p>
+              <ol class="ext-int-passos">
+                <li>Ligue o <b>recebimento de contatos</b> (quadro 2) e gere a chave. Na hora aparece o <b>endereço para os portais</b>, já com a chave.</li>
+                <li>No <b>Canal Pro</b> (Grupo OLX: ZAP, Viva Real e OLX), na parte de integração de leads, cole esse endereço.</li>
+                <li>Para os imóveis aparecerem nos portais, use o endereço <b>XML VRSync</b> do quadro 1 na integração de anúncios do Canal Pro.</li>
+              </ol>
+              ${pode ? `<div class="ext-int-acoes"><select id="intSimPortal" aria-label="Portal"><option>ZAP Imóveis</option><option>Viva Real</option><option>OLX</option></select>
+                <button type="button" class="secondary-button" id="intSimular">Simular um contato do portal</button></div>
+                <p class="muted-text">A simulação faz o caminho inteiro com um imóvel disponível ao acaso e cria um "Contato de teste" (pode excluir depois).</p>` : ""}
+            </section>
           </div>
           <details class="ext-int-ultimos"${leads.length ? "" : " hidden"}><summary>Últimos contatos recebidos (${leads.length})</summary>
             <table class="crm-tabela ext-tabela"><thead><tr><th>Quando</th><th>Origem</th><th>Nome</th><th>Contato</th><th>Imóvel</th><th>Resultado</th></tr></thead><tbody>
@@ -83,6 +97,7 @@
         $("intSalvar").addEventListener("click", salvar);
         $("intNovaChave").addEventListener("click", novaChave);
         $("intNovoToken").addEventListener("click", novoToken);
+        $("intSimular").addEventListener("click", simular);
         ligarExemplo();
     }
     function campoCopia(rotulo, valor) {
@@ -135,8 +150,21 @@ fetch("${BASE_FUNCOES}imobiliaria-leads", {
         await carregar();
         const box = $("intChaveNova");
         box.hidden = false;
-        box.innerHTML = `<div class="ext-chave-nova"><strong>Chave nova — copie agora, ela não aparece de novo:</strong>${campoCopia("Chave", data)}</div>`;
-        box.querySelector("[data-copiar]").addEventListener("click", () => copiar(data));
+        const paraPortais = `${BASE_FUNCOES}imobiliaria-leads?chave=${encodeURIComponent(data)}`;
+        box.innerHTML = `<div class="ext-chave-nova"><strong>Chave nova — copie agora, ela não aparece de novo:</strong>${campoCopia("Chave", data)}
+          ${campoCopia("Endereço para os portais (ZAP, Viva Real, OLX), já com a chave", paraPortais)}</div>`;
+        box.querySelectorAll("[data-copiar]").forEach(b => b.addEventListener("click", () => copiar(b.dataset.copiar)));
+    }
+    async function simular() {
+        const btn = $("intSimular");
+        btn.disabled = true;
+        const { data, error } = await ctx.sb.rpc("integracao_simular_lead", { p_carteira: ctx.carteiraId(), p_portal: $("intSimPortal").value });
+        btn.disabled = false;
+        if (error) { ctx.toast(erro(error)); return; }
+        if (!data || !data.ok) { ctx.toast((data && data.erro) || "Não foi possível simular o contato."); return; }
+        ctx.toast(data.corretor ? "Contato de teste recebido e distribuído pela roleta. Veja no 🔔 e em Negociações." : "Contato de teste recebido. Veja em Negociações (sem roleta ligada, ficou sem corretor).");
+        if (window.SKLCRM && window.SKLCRM.recarregar) window.SKLCRM.recarregar();
+        carregar();
     }
     async function novoToken() {
         if (!window.confirm("Trocar o endereço do feed? O endereço atual para de funcionar: o site e os portais precisam do novo.")) return;

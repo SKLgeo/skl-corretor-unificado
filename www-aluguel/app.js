@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.15.4";
+    const APP_VERSION = "0.16.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -79,6 +79,7 @@
     let realtimeChannel = null;
     let toastTimer = null;
     let mapaVisivel = false;
+    let mapaChaveAtual = "", soAreaDoMapa = false; // busca no mapa (ver "Mapa (lista)")
 
     let map = null;
     let markersById = new Map();
@@ -1013,6 +1014,7 @@
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
         if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
         if (window.SKLConciliacao) await seguro("extrato do banco", () => window.SKLConciliacao.iniciar(contextoFinanceiro()));
+        if (window.SKLContabil) await seguro("contabilidade", () => window.SKLContabil.iniciar(contextoFinanceiro()));
         const ctxExtras = contextoExtras();
         if (window.SKLAvisos) await seguro("avisos", () => window.SKLAvisos.iniciar({ ...ctxExtras, irPara: showPage,
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está mais na lista (pode ter sido vendido ou alugado)."); } }));
@@ -1022,6 +1024,7 @@
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
         if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
         if (window.SKLPortalCliente) await seguro("portal do cliente", () => window.SKLPortalCliente.iniciar(ctxExtras));
+        if (window.SKLAgendaCelular) await seguro("agenda no celular", () => window.SKLAgendaCelular.iniciar(ctxExtras));
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
@@ -1033,6 +1036,7 @@
         if (window.SKLPainel) window.SKLPainel.sair();
         if (window.SKLFiscal) window.SKLFiscal.sair();
         if (window.SKLConciliacao) window.SKLConciliacao.sair();
+        if (window.SKLContabil) window.SKLContabil.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         if (window.SKLAvisos) window.SKLAvisos.sair();
         // "scope: local": sai só deste aparelho; o celular e o computador da mesma pessoa continuam conectados
@@ -1554,9 +1558,12 @@
         renderChipsBairro();
         const rurais = baseBusca().filter(c => c.rural).length;
         $("zonaRuralQtd").textContent = rurais ? ` (${rurais})` : "";
-        const rows = filteredConstrucoes();
+        const todos = filteredConstrucoes();
+        const soArea = mapaVisivel && soAreaDoMapa && !!map;
+        const rows = soArea ? todos.filter(noMapa) : todos;
         const gerencia = podeGerenciar();
-        $("buscaResultado").textContent = rows.length === 1 ? "1 imóvel encontrado" : `${rows.length} imóveis encontrados`;
+        $("buscaResultado").textContent = soArea ? `${rows.length} de ${todos.length} imóveis nesta área do mapa`
+            : rows.length === 1 ? "1 imóvel encontrado" : `${rows.length} imóveis encontrados`;
         $("construcaoGridEmpty").hidden = rows.length > 0;
         $("construcaoGrid").innerHTML = rows.map(c => {
             const q = gerencia ? qualidadeImovel(c) : null;
@@ -1575,7 +1582,7 @@
         }).join("");
         $("construcaoGrid").querySelectorAll("[data-id]").forEach(card => card.addEventListener("click", () => openConstrucaoDialog(construcoes.get(card.dataset.id))));
         rows.forEach(c => preencherFotoCapa(c, `[data-foto-holder="${CSS.escape(c.id)}"]`));
-        if (mapaVisivel) { ensureMap(); renderMapMarkers(rows); }
+        if (mapaVisivel) { ensureMap(); renderMapMarkers(todos); }
     }
 
     // ===== Cadastros feitos pelos corretores (aprovação da Central) =====
@@ -1674,34 +1681,97 @@
 
     // ===== Mapa (lista) =====
 
+    // Busca no mapa: cada imóvel é uma etiqueta com o preço (na cor da situação); tocar abre um cartão com foto e "Abrir ficha".
+    // "Só os imóveis desta área" faz a lista mostrar apenas o que está visível no mapa (muda ao arrastar ou ampliar).
+    // Em tela larga o mapa fica ao lado da lista (classe .com-mapa na página).
     function toggleConstrucaoView() {
         mapaVisivel = !mapaVisivel;
         $("construcaoMapPanel").hidden = !mapaVisivel;
-        if (mapaVisivel) {
-            setTimeout(() => { ensureMap(); map && map.invalidateSize(); renderMapMarkers(filteredConstrucoes()); }, 60);
-        }
+        $("page-construcoes").classList.toggle("com-mapa", mapaVisivel);
+        $("toggleConstrucaoViewButton").textContent = mapaVisivel ? "☰ Só a lista" : "🗺️ Ver no mapa";
+        mapaChaveAtual = "";
+        if (mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); renderConstrucoes(); }, 60);
+        else renderConstrucoes();
     }
 
     function ensureMap() {
         if (map) return;
         map = L.map("construcaoMap", { zoomControl: true });
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        const ruas = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 20, attribution: "© OpenStreetMap"
         }).addTo(map);
+        const satelite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+            maxZoom: 20, maxNativeZoom: 19, attribution: "Imagens © Esri"
+        });
+        L.control.layers({ "Mapa": ruas, "Satélite": satelite }, null, { position: "topright" }).addTo(map);
+        const Area = L.Control.extend({
+            onAdd() {
+                const box = L.DomUtil.create("label", "mapa-so-area");
+                box.innerHTML = `<input type="checkbox" /> Listar só o que está no mapa`;
+                L.DomEvent.disableClickPropagation(box);
+                box.querySelector("input").addEventListener("change", ev => { soAreaDoMapa = ev.target.checked; renderConstrucoes(); });
+                return box;
+            }
+        });
+        new Area({ position: "topleft" }).addTo(map);
+        let espera = null;
+        map.on("moveend", () => {
+            if (!soAreaDoMapa) return;
+            clearTimeout(espera);
+            espera = setTimeout(renderConstrucoes, 150);
+        });
         map.setView(CENTRO_PADRAO, 4);
     }
 
-    function statusDivIcon(status) {
+    function noMapa(c) {
+        return !!map && c.latitude != null && c.longitude != null && map.getBounds().contains([ c.latitude, c.longitude ]);
+    }
+
+    // "R$ 2,5 mil", "R$ 450 mil", "R$ 1,2 mi"
+    function valorNoMapa(v) {
+        const n = Number(v);
+        if (!n) return "";
+        const f = x => x.toLocaleString("pt-BR", { maximumFractionDigits: x < 10 ? 1 : 0 });
+        if (n >= 1e6) return `R$ ${f(n / 1e6)} mi`;
+        if (n >= 1e3) return `R$ ${f(n / 1e3)} mil`;
+        return `R$ ${f(n)}`;
+    }
+    function precoDivIcon(c) {
+        const v = finalidadeFiltro === "venda" ? c.valor_venda
+            : finalidadeFiltro === "aluguel" ? c.valor_aluguel
+            : (c.para_aluguel !== false && Number(c.valor_aluguel) ? c.valor_aluguel : c.valor_venda);
+        const texto = valorNoMapa(v) || (c.codigo ? "Cód. " + c.codigo : "•");
         return L.divIcon({
-            className: "",
-            html: `<div style="width:18px;height:18px;border-radius:50%;background:${STATUS_COLOR[status] || "#708189"};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`,
-            iconSize: [ 18, 18 ],
-            iconAnchor: [ 9, 9 ]
+            className: "pino-preco-ancora",
+            html: `<span class="pino-preco" style="--cor:${STATUS_COLOR[c.status] || "#708189"}">${h(texto)}</span>`,
+            iconSize: [ 0, 0 ],
+            iconAnchor: [ 0, 0 ]
         });
+    }
+    function cartaoDoPino(c) {
+        const specs = specsResumo(c);
+        return `<div class="pino-card">
+          <div class="pino-foto" data-pino-foto="${h(c.id)}">${(c.fotos || []).length ? "" : `<span>Sem foto</span>`}</div>
+          <div class="pino-corpo">
+            <small>${h([ c.codigo ? "Cód. " + c.codigo : "", finalidadeTexto(c) ].filter(Boolean).join(" · "))}</small>
+            <strong>${h(c.nome)}</strong>
+            <span>${h([ c.bairro, c.cidade ].filter(Boolean).join(" · "))}</span>
+            ${specs ? `<span class="pino-specs">${specs}</span>` : ""}
+            <span class="pino-valor">${precoCard(c)}</span>
+            <button type="button" class="primary-button" data-pino-abrir="${h(c.id)}">Abrir ficha</button>
+          </div></div>`;
     }
 
     function renderMapMarkers(rows) {
         if (!map) return;
+        const comLocal = rows.filter(c => c.latitude != null && c.longitude != null);
+        const semLocal = rows.length - comLocal.length;
+        $("mapSemLocal").hidden = !semLocal;
+        $("mapSemLocal").textContent = semLocal === 1 ? "1 imóvel da busca sem localização (só na lista)" : `${semLocal} imóveis da busca sem localização (só na lista)`;
+        // mesma busca e mesma finalidade: não redesenha nem muda o enquadramento (senão arrastar o mapa voltaria ao início)
+        const chave = finalidadeFiltro + "|" + rows.map(c => c.id + ":" + c.status).join(",");
+        if (chave === mapaChaveAtual) return;
+        mapaChaveAtual = chave;
         markersById.forEach(marker => map.removeLayer(marker));
         markersById.clear();
         perimetrosNoMapa.forEach(camada => map.removeLayer(camada));
@@ -1710,13 +1780,20 @@
         rows.forEach(c => {
             if (c.perimetro && window.SKLRural) perimetrosNoMapa.push(window.SKLRural.camada(L, c.perimetro, { weight: 2 }).addTo(map));
             if (c.latitude == null || c.longitude == null) return;
-            const marker = L.marker([ c.latitude, c.longitude ], { icon: statusDivIcon(c.status) }).addTo(map);
-            marker.bindTooltip(c.nome);
-            marker.on("click", () => openConstrucaoDialog(c));
+            const marker = L.marker([ c.latitude, c.longitude ], { icon: precoDivIcon(c), riseOnHover: true }).addTo(map);
+            marker.bindPopup(() => cartaoDoPino(c), { maxWidth: 280, minWidth: 240, className: "pino-popup" });
+            marker.on("popupopen", ev => {
+                const el = ev.popup.getElement();
+                el.querySelector("[data-pino-abrir]")?.addEventListener("click", () => { map.closePopup(); openConstrucaoDialog(construcoes.get(c.id) || c); });
+                fotosCapa([ c ]).then(m => {
+                    const url = m.get(c.id), foto = el.querySelector("[data-pino-foto]");
+                    if (url && foto) { foto.style.backgroundImage = `url("${url}")`; foto.textContent = ""; }
+                });
+            });
             markersById.set(c.id, marker);
             pontos.push([ c.latitude, c.longitude ]);
         });
-        if (pontos.length) map.fitBounds(pontos, { padding: [ 30, 30 ], maxZoom: 15 });
+        if (pontos.length && !soAreaDoMapa) map.fitBounds(pontos, { padding: [ 40, 40 ], maxZoom: 15 });
     }
 
     // ===== Diálogo do imóvel =====

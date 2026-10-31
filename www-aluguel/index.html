@@ -219,12 +219,12 @@
             <span id="buscaResultado" class="muted-text">—</span>
             <button id="recentesButton" type="button" class="secondary-button recentes-button" aria-pressed="false" title="Mostra primeiro os imóveis cadastrados por último">🆕 Adicionados recentemente</button>
             <button id="limparFiltrosButton" type="button" class="text-button">Limpar filtros</button>
-            <button id="toggleConstrucaoViewButton" class="secondary-button">Alternar mapa/lista</button>
+            <button id="toggleConstrucaoViewButton" class="secondary-button">🗺️ Ver no mapa</button>
             <button id="newConstrucaoButton" class="primary-button">Novo imóvel</button>
           </div>
         </div>
         <datalist id="bairrosLista"></datalist>
-        <div id="construcaoMapPanel" class="map-panel" hidden><div id="construcaoMap"></div><div id="mapLegend" class="map-legend"></div></div>
+        <div id="construcaoMapPanel" class="map-panel" hidden><div id="construcaoMap"></div><div id="mapLegend" class="map-legend"></div><div id="mapSemLocal" class="map-sem-local" hidden></div></div>
         <div id="construcaoGrid" class="construcao-grid"></div>
         <div id="construcaoGridEmpty" class="empty-state" hidden>Nenhum imóvel encontrado com esses filtros.</div>
       </section>
@@ -426,6 +426,7 @@
           <button type="button" class="fin-aba" data-fin-aba="contratos">Contratos</button>
           <button type="button" class="fin-aba" data-fin-aba="repasses">Repasses</button>
           <button type="button" class="fin-aba" data-fin-aba="extrato" data-fin-gerir hidden>🏦 Extrato do banco</button>
+          <button type="button" class="fin-aba" data-fin-aba="contabil" data-fin-gerir hidden>📒 Contabilidade</button>
           <button type="button" class="fin-aba" data-fin-aba="regua">Régua de cobrança <b id="finReguaBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="encargos">Encargos <b id="finEncBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="chamados">Manutenção <b id="finChBadge" class="nav-badge" hidden>0</b></button>
@@ -446,6 +447,7 @@
         <div id="finLista" class="panel table-panel" hidden></div>
         <div id="finExtra" hidden></div>
         <div id="finConciliacao" class="conc" hidden></div>
+        <div id="finContabil" class="ctb" hidden></div>
         <div id="finFiscal" class="fiscal-no-financeiro" hidden>
           <div class="fin-abas fiscal-subabas" role="tablist">
             <button type="button" class="fin-aba ativa" data-fiscal-aba="resumo">Resumo</button>
@@ -1499,6 +1501,8 @@
   <script src="fiscal.js"></script>
   <script src="conciliacao.js"></script>
   <script src="portal-cliente.js"></script>
+  <script src="contabil.js"></script>
+  <script src="agenda-celular.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

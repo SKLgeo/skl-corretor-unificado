@@ -179,3 +179,18 @@ dialog.foto-lightbox{overflow:hidden}
 .portal-cli-validade{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px}
 .portal-cli-validade select{width:auto}
 .doc-no-portal{border-color:#1f9d55!important;color:#1f9d55!important}
+
+/* Agenda no celular (agenda-celular.js) */
+.agcel-dialog .dialog-card{max-width:560px}
+.agcel-link{border:1px solid #cfe3ee;background:#f3f9fd;border-radius:14px;padding:12px 14px;margin:10px 0;display:grid;gap:10px}
+.agcel-botoes{display:flex;flex-wrap:wrap;gap:8px}
+.agcel-botoes a{text-decoration:none}
+.agcel-passos{margin:0;padding-left:18px;font-size:13px;display:grid;gap:6px}
+.agcel-aviso{margin:0;font-size:13px;color:#7a5a00;background:#fff4d6;border-radius:10px;padding:8px 10px}
+.agcel-situacao{background:#eef8f1;border-radius:10px;padding:8px 10px}
+.agcel-escopo{border:1px solid #e3e9ec;border-radius:12px;padding:8px 12px;margin:10px 0;display:grid;gap:6px}
+.agcel-escopo legend{font-size:12px;font-weight:800;color:var(--muted);padding:0 4px}
+.agcel-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:6px}
+.ext-int-portais{grid-column:1/-1}
+.ext-int-passos{margin:6px 0 10px;padding-left:20px;display:grid;gap:4px;font-size:14px}
+.ext-int-portais .ext-int-acoes select{width:auto;flex:0 0 auto}
