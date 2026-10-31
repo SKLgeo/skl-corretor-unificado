@@ -82,7 +82,7 @@
             catch { window.prompt("Copie o link do portal:", link); }
         } else {
             const nome = (c.apelido || c.nome || "").split(" ")[0];
-            const texto = `Olá${nome ? ", " + nome : ""}! Este é o seu portal na ${ctx.carteiraNome()}: cobranças com PIX, recibos, repasses e chamados de manutenção, tudo num lugar só. O link é pessoal, não compartilhe:\n${link}`;
+            const texto = `Olá${nome ? ", " + nome : ""}! Este é o seu portal na ${ctx.carteiraNome()}: cobranças com PIX, recibos, repasses e chamados de manutenção, tudo num lugar só. O link é pessoal, não compartilhe:\n${link}\n\nDica: ao abrir, toque em "Instalar o app" para ter o ícone Meu Portal na tela do celular.`;
             const fone = String(c.telefone_digitos || c.telefone || "").replace(/\D/g, "");
             const numero = fone ? (fone.length <= 11 ? "55" + fone : fone) : "";
             window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");

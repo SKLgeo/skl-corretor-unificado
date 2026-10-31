@@ -1,0 +1,19 @@
+{
+  "id": "./portal.html?app",
+  "name": "Meu Portal",
+  "short_name": "Meu Portal",
+  "description": "Portal do cliente da imobiliária: aluguel com PIX, recibos, repasses, informe de rendimentos e chamados de manutenção.",
+  "lang": "pt-BR",
+  "start_url": "./portal.html?app=1",
+  "scope": "./portal",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a2a66",
+  "theme_color": "#0a2a66",
+  "categories": ["finance", "lifestyle", "utilities"],
+  "icons": [
+    { "src": "portal-icones/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "portal-icones/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "portal-icones/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

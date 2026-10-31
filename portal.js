@@ -11,7 +11,16 @@
     const dinheiro = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const data = d => d ? new Date(String(d).length === 10 ? d + "T12:00:00" : d).toLocaleDateString("pt-BR") : "—";
     const mesAno = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "—";
-    const token = (new URLSearchParams(location.hash.slice(1)).get("t") || new URLSearchParams(location.search).get("t") || "").trim();
+    // o link traz o token (#t=); o app instalado abre sem ele, então o último token válido fica guardado neste aparelho
+    const CHAVE_TOKEN = (CFG.prefixo || "sklu_") + "portal_token";
+    const guardado = { ler() { try { return localStorage.getItem(CHAVE_TOKEN) || ""; } catch { return ""; } },
+        gravar(t) { try { localStorage.setItem(CHAVE_TOKEN, t); } catch {} }, apagar() { try { localStorage.removeItem(CHAVE_TOKEN); } catch {} } };
+    const tokenDoLink = (new URLSearchParams(location.hash.slice(1)).get("t") || new URLSearchParams(location.search).get("t") || "").trim();
+    const token = tokenDoLink || guardado.ler();
+    const ehApp = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    const ua = navigator.userAgent;
+    const ehIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const dentroDeOutroApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|Snapchat|; wv\)/i.test(ua);
     const INDICE = { IPCA: "IPCA", IGPM: "IGP-M", INPC: "INPC", IVAR: "IVAR", nenhum: "sem reajuste" };
     const GARANTIA = { nenhuma: "Sem garantia", caucao: "Caução", fiador: "Fiador", seguro_fianca: "Seguro fiança", titulo_capitalizacao: "Título de capitalização" };
     const CH_STATUS = { aberto: "Aberto", em_andamento: "Em andamento", aguardando: "Aguardando", concluido: "Concluído" };
@@ -46,12 +55,18 @@
 
     // ------------------------------------------------------------------ carregar
     async function carregar() {
-        if (!/^[0-9a-f]{48}$/.test(token)) return falha("Link incompleto. Abra o link exatamente como a imobiliária enviou.");
+        if (!/^[0-9a-f]{48}$/.test(token)) return falha(ehApp ? "Abra uma vez o link que a imobiliária enviou para você (pelo WhatsApp ou e-mail). Depois o app abre sozinho."
+            : "Link incompleto. Abra o link exatamente como a imobiliária enviou.");
         try { D = await rpc("portal_dados", { p_token: token }); }
-        catch (e) { return falha(e.message); }
+        catch (e) {
+            if (!tokenDoLink && /não vale mais/i.test(e.message)) { guardado.apagar(); return falha("Seu acesso foi trocado pela imobiliária. Abra o link mais recente que ela enviou para você."); }
+            return falha(e.message);
+        }
+        if (!D.previa) guardado.gravar(token);
+        $("instalarBtn").hidden = ehApp || !!D.previa;
         const nomeImob = (D.carteira && D.carteira.nome) || "Imobiliária";
         $("imobNome").textContent = nomeImob;
-        document.title = `Portal do cliente — ${nomeImob}`;
+        document.title = `Meu Portal — ${nomeImob}`;
         $("faixaPrevia").hidden = !D.previa;
         const nome = (D.cliente && (D.cliente.apelido || D.cliente.nome)) || "";
         $("ola").textContent = nome ? `Olá, ${nome.split(" ")[0]}` : "Olá";
@@ -62,7 +77,7 @@
         $("abas").hidden = !(temInq && temProp);
         $("abas").innerHTML = `<button type="button" data-aba="inquilino">🏠 Meu aluguel</button><button type="button" data-aba="proprietario">🔑 Meus imóveis</button>`;
         $("abas").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { aba = b.dataset.aba; desenhar(); }));
-        $("rodape").innerHTML = `Este link é pessoal: não compartilhe.${D.expira_em ? " Vale até " + data(D.expira_em) + "." : ""}<br>Desenvolvido por SKL Geo Soluções`;
+        $("rodape").innerHTML = `${ehApp ? "Este acesso é pessoal" : "Este link é pessoal"}: não compartilhe.${D.expira_em ? " Vale até " + data(D.expira_em) + "." : ""}<br>Desenvolvido por SKL Geo Soluções`;
         $("carregando").hidden = true;
         $("conteudo").hidden = false;
         desenhar();
@@ -349,6 +364,36 @@
             catch (e) { if (janela) janela.close(); toast(e.message); }
         }));
     }
+
+    // ------------------------------------------------------------------ app "Meu Portal" (instalar na tela do celular)
+    // Android/Chrome: instalador do navegador (manifesto portal.webmanifest; o app abre portal.html?app=1 e usa o token guardado).
+    // iPhone: sem manifesto (o Safari guarda o endereço da página ao "Adicionar à Tela de Início"), então o token vai no endereço.
+    if (!ehIOS) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "portal.webmanifest"; document.head.appendChild(l); }
+    let pedidoInstalar = null;
+    window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); pedidoInstalar = ev; });
+    window.addEventListener("appinstalled", () => { $("instalarBtn").hidden = true; toast("Pronto! O app Meu Portal está na tela do seu celular."); });
+    function passosInstalar() {
+        if (dentroDeOutroApp) return `<p class="alerta">Você abriu o link dentro do ${/WhatsApp/i.test(ua) ? "WhatsApp" : "outro aplicativo"}. Para instalar, abra no
+            <b>${ehIOS ? "Safari" : "Chrome"}</b>: toque nos três pontinhos (ou em Compartilhar) e escolha <b>"Abrir no navegador"</b>. Depois toque de novo em "Instalar o app".</p>`;
+        if (ehIOS) return `<ol><li>Toque em <b>Compartilhar</b> (o quadrado com a seta para cima, embaixo da tela).</li>
+            <li>Role e toque em <b>"Adicionar à Tela de Início"</b>.</li><li>Toque em <b>Adicionar</b>. O ícone <b>Meu Portal</b> aparece junto dos seus apps.</li></ol>
+            <p class="muted pequeno">Se estiver no Chrome do iPhone, abra este mesmo link no Safari.</p>`;
+        return `<ol><li>Toque nos <b>três pontinhos ⋮</b> do navegador (no alto, à direita).</li>
+            <li>Escolha <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>.</li><li>Confirme. O ícone <b>Meu Portal</b> aparece junto dos seus apps.</li></ol>`;
+    }
+    $("instalarBtn").addEventListener("click", async () => {
+        if (pedidoInstalar) {
+            pedidoInstalar.prompt();
+            try { await pedidoInstalar.userChoice; } catch {}
+            pedidoInstalar = null;
+            return;
+        }
+        // no iPhone o ícone guarda o endereço atual: garante o token nele (sem ele o app abriria vazio)
+        if (ehIOS && /^[0-9a-f]{48}$/.test(token)) history.replaceState(history.state, "", location.pathname + "?t=" + token);
+        $("instalarPassos").innerHTML = passosInstalar();
+        abrir($("instalarDialog"));
+    });
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
 
     carregar();
 })();

@@ -6,14 +6,24 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://xigwlofqkmiibzbongkn.supabase.co; connect-src https://xigwlofqkmiibzbongkn.supabase.co;" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="referrer" content="no-referrer" />
-  <title>Portal do cliente</title>
+  <title>Meu Portal</title>
+  <meta name="theme-color" content="#0a2a66" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Meu Portal" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="portal-icones/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="portal-icones/icon-192.png" />
   <link rel="stylesheet" href="portal.css" />
 </head>
 <body>
   <header class="topo">
     <div class="topo-in">
-      <span class="eyebrow">PORTAL DO CLIENTE</span>
-      <strong id="imobNome">Carregando…</strong>
+      <div class="topo-marca">
+        <span class="eyebrow">PORTAL DO CLIENTE</span>
+        <strong id="imobNome">Carregando…</strong>
+      </div>
+      <button id="instalarBtn" class="instalar" type="button" hidden><img src="portal-icones/icon-192.png" alt="" /> Instalar o app</button>
     </div>
   </header>
   <div id="faixaPrevia" class="faixa-previa" hidden>👁 Pré-visualização da Central: é assim que o cliente vê. Abrir chamado fica desligado aqui.</div>
@@ -87,6 +97,15 @@
       <button class="fechar" type="button" data-fechar aria-label="Fechar">×</button>
       <div id="docConteudo" class="documento"></div>
       <button id="docImprimir" class="botao" type="button">🖨 Imprimir / salvar PDF</button>
+    </div>
+  </dialog>
+  <!-- instalar o app "Meu Portal" -->
+  <dialog id="instalarDialog" class="janela">
+    <div class="janela-in">
+      <button class="fechar" type="button" data-fechar aria-label="Fechar">×</button>
+      <div class="instalar-cab"><img src="portal-icones/icon-192.png" alt="" /><div><span class="eyebrow">APLICATIVO</span><h2>Meu Portal</h2></div></div>
+      <p>Com o app na tela do celular você abre o seu portal com um toque, sem procurar o link.</p>
+      <div id="instalarPassos" class="instalar-passos"></div>
     </div>
   </dialog>
   <div id="toast" class="toast" hidden></div>

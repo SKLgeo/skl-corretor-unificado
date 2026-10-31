@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a2a66"/><stop offset="1" stop-color="#1e8fd6"/></linearGradient>
+    <filter id="sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity=".28"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <g transform="translate(20.47999999999999 20.47999999999999) scale(0.92)" filter="url(#sombra)">
+    <path d="M256 104 L426 246 L392 246 L392 400 Q392 412 380 412 L132 412 Q120 412 120 400 L120 246 L86 246 Z" fill="#ffffff"/>
+    <path d="M70 252 L256 96 L442 252" fill="none" stroke="#c9962c" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="320" y="128" width="40" height="70" rx="6" fill="#c9962c"/>
+    <rect x="218" y="296" width="76" height="116" rx="14" fill="#c9962c"/>
+    <circle cx="279" cy="356" r="6" fill="#ffffff"/>
+    <rect x="148" y="280" width="50" height="50" rx="8" fill="#1e8fd6" opacity=".9"/>
+    <rect x="314" y="280" width="50" height="50" rx="8" fill="#1e8fd6" opacity=".9"/>
+  </g>
+</svg>
