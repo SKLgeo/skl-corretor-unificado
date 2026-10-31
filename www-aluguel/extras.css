@@ -180,6 +180,12 @@ dialog.foto-lightbox{overflow:hidden}
 .portal-cli-validade select{width:auto}
 .doc-no-portal{border-color:#1f9d55!important;color:#1f9d55!important}
 
+/* Funções da imobiliária (funcoes-carteira.js) */
+.func-linha{display:flex;gap:10px;align-items:flex-start;border:1px solid #e3e9ec;border-radius:12px;padding:10px 12px;cursor:pointer}
+.func-linha input{margin-top:3px;width:18px;height:18px;flex:none}
+.func-linha span{display:grid;gap:3px}
+.func-linha small{color:var(--muted);font-size:13px;line-height:1.4;font-weight:400}
+
 /* Agenda no celular (agenda-celular.js) */
 .agcel-dialog .dialog-card{max-width:560px}
 .agcel-link{border:1px solid #cfe3ee;background:#f3f9fd;border-radius:14px;padding:12px 14px;margin:10px 0;display:grid;gap:10px}

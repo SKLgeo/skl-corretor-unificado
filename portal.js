@@ -299,6 +299,9 @@
     // ------------------------------------------------------------------ chamados
     function desenharChamados() {
         const ativos = [ ...D.inquilino, ...D.proprietario ].filter(c => c.status === "ativo");
+        // imobiliária que não administra os imóveis desliga a manutenção: o portal não mostra chamados
+        $("boxChamados").hidden = D.manutencao === false;
+        if (D.manutencao === false) return;
         const lista = D.chamados || [];
         $("boxChamados").innerHTML = `<h2>Manutenção</h2>
             ${lista.length ? `<div class="lista">${lista.map(ch => `<div class="item"><div><strong>Nº ${h(ch.numero)} · ${h(ch.titulo)}</strong>

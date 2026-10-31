@@ -110,7 +110,9 @@
     }
 
     // ------------------------------------------------------------------ abas (chamadas pelo financeiro.js)
-    function temAba(a) { return ABAS.includes(a); }
+    // Manutenção some quando a imobiliária desliga a função (Configurações → Funções da imobiliária, funcoes-carteira.js)
+    const manutencao = () => !window.SKLFuncoes || window.SKLFuncoes.ativa("manutencao");
+    function temAba(a) { return ABAS.includes(a) && (a !== "chamados" || manutencao()); }
     function render(aba) {
         const box = $("finExtra");
         if (!box) return;
@@ -468,11 +470,11 @@
         if (!ctx || !veTudo()) return "";
         const hoje = hojeIso();
         const enc = encargos.filter(e => e.status === "pendente" && e.vencimento <= somaDias(hoje, 7)).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-        const ch = chamados.filter(c => emAberto(c) && ([ "alta", "urgente" ].includes(c.prioridade) || (c.prazo && c.prazo < hoje)));
+        const ch = manutencao() ? chamados.filter(c => emAberto(c) && ([ "alta", "urgente" ].includes(c.prioridade) || (c.prazo && c.prazo < hoje))) : [];
         const avisar = linhasRegua().filter(l => l.avisar);
         return aviso("Régua de cobrança: avisar hoje", avisar.length, avisar.slice(0, 6).map(l => `<li><button type="button" class="text-button" data-fin-ir="regua:avisar">${h(nomeCli(l.c.inquilino_id, l.c.inquilino_nome))}</button><small>${h(ETAPAS[l.etapa])} · ${h(dinheiro(l.valor.total))} · vence ${h(dataBr(l.b.vencimento))}</small></li>`).join(""), "Ninguém para avisar hoje.", "regua:avisar")
             + aviso("Encargos vencendo (7 dias) ou vencidos", enc.length, enc.slice(0, 8).map(e => `<li><button type="button" class="text-button" data-fx-abrir-enc="${h(e.id)}">${h(nomeEnc(e))}</button><small>${h(nomeImovel(e.construcao_id))} · ${h(RESP[e.responsavel])} paga · ${e.vencimento < hoje ? "venceu" : "vence"} ${h(dataBr(e.vencimento))}${e.valor ? " · " + h(dinheiro(e.valor)) : ""}</small></li>`).join(""), "Nenhum encargo vencendo.", "encargos:pendentes")
-            + aviso("Manutenção urgente ou com prazo vencido", ch.length, ch.slice(0, 8).map(c => `<li><button type="button" class="text-button" data-fx-abrir-ch="${h(c.id)}">Nº ${h(c.numero)} · ${h(c.titulo)}</button><small>${h(PRIOR[c.prioridade])} · ${h(nomeImovel(c.construcao_id))}${c.prazo ? " · prazo " + h(dataBr(c.prazo)) : ""}</small></li>`).join(""), "Nenhum chamado urgente.", "chamados:abertos");
+            + (!manutencao() ? "" : aviso("Manutenção urgente ou com prazo vencido", ch.length, ch.slice(0, 8).map(c => `<li><button type="button" class="text-button" data-fx-abrir-ch="${h(c.id)}">Nº ${h(c.numero)} · ${h(c.titulo)}</button><small>${h(PRIOR[c.prioridade])} · ${h(nomeImovel(c.construcao_id))}${c.prazo ? " · prazo " + h(dataBr(c.prazo)) : ""}</small></li>`).join(""), "Nenhum chamado urgente.", "chamados:abertos"));
     }
     function ligar(box) {
         if (!box) return;
@@ -520,11 +522,11 @@
                 <span class="ext-item-acoes">${situacaoEnc(e)}${podeGerir() ? `<button type="button" class="text-button" data-fx-ct-enc="${h(e.id)}">Editar</button>` : ""}</span></div>`).join("")
               : `<p class="muted-text">Nenhum encargo lançado.</p>`}</div>
             ${podeGerir() && c.status === "ativo" ? `<button type="button" class="secondary-button fin-mini" data-fx-ct-novo-enc>+ Encargo</button>` : ""}</div>
-          <div class="ext-sub"><span class="crm-rotulo">Manutenção</span>
+          ${!manutencao() ? "" : `<div class="ext-sub"><span class="crm-rotulo">Manutenção</span>
             <div class="ext-lista">${chs.length ? chs.map(x => `<div class="ext-item"><span><strong>Nº ${h(x.numero)} · ${h(x.titulo)}</strong><small>${h(PRIOR[x.prioridade])} · aberto em ${h(dataBr(x.created_at))}</small></span>
                 <span class="ext-item-acoes">${situacaoCh(x)}<button type="button" class="text-button" data-fx-ct-ch="${h(x.id)}">Abrir</button></span></div>`).join("")
               : `<p class="muted-text">Nenhum chamado.</p>`}</div>
-            <button type="button" class="secondary-button fin-mini" data-fx-ct-novo-ch>+ Chamado</button></div>`;
+            <button type="button" class="secondary-button fin-mini" data-fx-ct-novo-ch>+ Chamado</button></div>`}`;
         const t = box.querySelector("[data-fx-termo]"); if (t) t.addEventListener("click", () => termoRescisao(c, c.rescisao));
         box.querySelectorAll("[data-fx-ct-enc]").forEach(b => b.addEventListener("click", () => abrirEncargo(encargos.find(e => e.id === b.dataset.fxCtEnc))));
         box.querySelectorAll("[data-fx-ct-novo-enc]").forEach(b => b.addEventListener("click", () => abrirEncargo(null, { contrato_id: c.id, construcao_id: c.construcao_id })));

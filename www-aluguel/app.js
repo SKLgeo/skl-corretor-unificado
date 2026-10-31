@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.16.0";
+    const APP_VERSION = "0.16.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1010,6 +1010,7 @@
         await loadComissoesAluguel();
         connectRealtime();
         if (window.SKLCRM) await seguro("CRM", () => window.SKLCRM.iniciar(contextoCrm()));
+        if (window.SKLFuncoes) await seguro("funções da imobiliária", () => window.SKLFuncoes.iniciar(contextoExtras()));
         if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
         if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
