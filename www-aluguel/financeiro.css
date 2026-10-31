@@ -148,3 +148,25 @@
   .fin-pg-linha label:nth-of-type(2),.fin-pg-linha label:nth-of-type(3){grid-column:2/3}
   .fin-pg-del{grid-column:3;grid-row:1}
 }
+
+/* Financeiro → Extrato do banco (conciliacao.js) */
+.conc{display:flex;flex-direction:column;gap:14px}
+.conc-topo p{margin:4px 0 10px}
+.conc-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.conc-escolher{cursor:pointer}
+.conc-resumo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
+.conc-chip{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.conc-chip.ok{background:#e3f5ea;color:#1f8a4c}.conc-chip.esc{background:#fff4d6;color:#9a6a00}.conc-chip.sem{background:#eef2f5;color:#5b6675}.conc-chip.usado{background:#e8f3fb;color:#1583b7}
+.conc-lista{display:flex;flex-direction:column;gap:8px}
+.conc-item{border:1px solid #dfe6eb;border-radius:12px;padding:10px 12px;background:#fff}
+.conc-item.conc-encontrada{border-left:4px solid #1f8a4c}.conc-item.conc-escolher{border-left:4px solid #e0a800}.conc-item.conc-usado,.conc-item.conc-ignorar{opacity:.72}
+.conc-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.conc-banco{display:flex;flex-direction:column;min-width:110px}.conc-banco strong{font-size:16px}.conc-banco small{color:#6b7c85}
+.conc-desc{flex:1;min-width:160px;font-size:13px;word-break:break-word}.conc-desc small{display:block;color:#6b7c85}
+.conc-escolha{margin-top:8px}
+.conc-marcar{display:flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap}
+.conc-sel{flex:1;min-width:220px;max-width:100%}
+.conc-motivo{margin:6px 0 0;font-size:12px;color:#1f8a4c}
+.conc-aviso{margin:4px 0 0;font-size:12px;color:#9a6a00}
+.conc-rodape{display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;position:sticky;bottom:0;background:#fff;padding:10px 0 2px}
+.conc-hist h3{margin:0 0 10px}

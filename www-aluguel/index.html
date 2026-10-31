@@ -425,6 +425,7 @@
           <button type="button" class="fin-aba" data-fin-aba="cobrancas">Cobranças <b id="finAtrasoBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="contratos">Contratos</button>
           <button type="button" class="fin-aba" data-fin-aba="repasses">Repasses</button>
+          <button type="button" class="fin-aba" data-fin-aba="extrato" data-fin-gerir hidden>🏦 Extrato do banco</button>
           <button type="button" class="fin-aba" data-fin-aba="regua">Régua de cobrança <b id="finReguaBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="encargos">Encargos <b id="finEncBadge" class="nav-badge" hidden>0</b></button>
           <button type="button" class="fin-aba" data-fin-aba="chamados">Manutenção <b id="finChBadge" class="nav-badge" hidden>0</b></button>
@@ -444,6 +445,7 @@
         <div id="finResumo"></div>
         <div id="finLista" class="panel table-panel" hidden></div>
         <div id="finExtra" hidden></div>
+        <div id="finConciliacao" class="conc" hidden></div>
         <div id="finFiscal" class="fiscal-no-financeiro" hidden>
           <div class="fin-abas fiscal-subabas" role="tablist">
             <button type="button" class="fin-aba ativa" data-fiscal-aba="resumo">Resumo</button>
@@ -1495,6 +1497,7 @@
   <script src="dimob-motor.js"></script>
   <script src="dimob-leiaute.js"></script>
   <script src="fiscal.js"></script>
+  <script src="conciliacao.js"></script>
   <script src="portal-cliente.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>

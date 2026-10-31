@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.15.0";
+    const APP_VERSION = "0.15.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1012,6 +1012,7 @@
         if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
         if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
+        if (window.SKLConciliacao) await seguro("extrato do banco", () => window.SKLConciliacao.iniciar(contextoFinanceiro()));
         const ctxExtras = contextoExtras();
         if (window.SKLAvisos) await seguro("avisos", () => window.SKLAvisos.iniciar({ ...ctxExtras, irPara: showPage,
             abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está mais na lista (pode ter sido vendido ou alugado)."); } }));
@@ -1031,6 +1032,7 @@
         if (window.SKLMetas) window.SKLMetas.sair();
         if (window.SKLPainel) window.SKLPainel.sair();
         if (window.SKLFiscal) window.SKLFiscal.sair();
+        if (window.SKLConciliacao) window.SKLConciliacao.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         if (window.SKLAvisos) window.SKLAvisos.sair();
         // "scope: local": sai só deste aparelho; o celular e o computador da mesma pessoa continuam conectados
