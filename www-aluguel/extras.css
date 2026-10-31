@@ -171,3 +171,11 @@ dialog.foto-lightbox{overflow:hidden}
 .painel-captacao-topo h3{margin:0}
 .painel-captacao-topo input{max-width:260px;flex:1 1 180px}
 .painel-captacao-pos{font-size:16px;font-weight:800}
+
+/* portal do cliente (ficha do cliente) */
+.portal-cli-box{border:1px solid #cfe6f3;background:#f4fafd;border-radius:12px;padding:12px}
+.portal-cli-estado{margin:6px 0 8px}
+.portal-cli-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.portal-cli-validade{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px}
+.portal-cli-validade select{width:auto}
+.doc-no-portal{border-color:#1f9d55!important;color:#1f9d55!important}

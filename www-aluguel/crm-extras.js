@@ -154,6 +154,7 @@
         if (!c) return;
         box.innerHTML = `<span class="crm-rotulo">Documentos do cliente</span><div id="extCliAnexosLista"></div>`;
         if (window.SKLDocumentos) window.SKLDocumentos.anexos($("extCliAnexosLista"), "cliente", c.id, { podeEnviar: papel() !== "financeiro" });
+        if (window.SKLPortalCliente) window.SKLPortalCliente.aoAbrirCliente(c);
     }
 
     // ------------------------------------------------------------------ imóvel: chaves, enviar ao cliente, anexos (Central)

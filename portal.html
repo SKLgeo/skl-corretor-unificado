@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://xigwlofqkmiibzbongkn.supabase.co; connect-src https://xigwlofqkmiibzbongkn.supabase.co;" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Portal do cliente</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-in">
+      <span class="eyebrow">PORTAL DO CLIENTE</span>
+      <strong id="imobNome">Carregando…</strong>
+    </div>
+  </header>
+  <div id="faixaPrevia" class="faixa-previa" hidden>👁 Pré-visualização da Central: é assim que o cliente vê. Abrir chamado fica desligado aqui.</div>
+  <main>
+    <p id="carregando" class="aviso">Carregando seus dados…</p>
+    <div id="conteudo" hidden>
+      <section class="ola">
+        <h1 id="ola">Olá</h1>
+        <p id="olaSub" class="muted"></p>
+      </section>
+      <nav id="abas" class="abas" hidden></nav>
+      <div id="paginaInquilino" hidden></div>
+      <div id="paginaProprietario" hidden></div>
+      <section class="cartao" id="boxChamados"></section>
+      <section class="cartao" id="boxDocumentos" hidden></section>
+      <p class="rodape" id="rodape"></p>
+    </div>
+  </main>
+
+  <!-- PIX -->
+  <dialog id="pixDialog" class="janela">
+    <div class="janela-in">
+      <button class="fechar" type="button" data-fechar aria-label="Fechar">×</button>
+      <span class="eyebrow">PAGAR COM PIX</span>
+      <h2 id="pixTitulo">Aluguel</h2>
+      <p class="valor-grande" id="pixValor"></p>
+      <p id="pixAtraso" class="alerta" hidden></p>
+      <div id="pixQr" class="qr"></div>
+      <label class="rotulo">PIX copia e cola</label>
+      <textarea id="pixCodigo" readonly rows="3"></textarea>
+      <button id="pixCopiar" class="botao" type="button">Copiar código</button>
+      <p class="muted pequeno">Abra o app do seu banco, escolha <b>PIX → Pagar com QR Code</b> ou <b>Copia e cola</b>. Confira o nome do recebedor: <b id="pixRecebedor"></b>. A imobiliária confirma o pagamento e o recibo aparece aqui.</p>
+    </div>
+  </dialog>
+
+  <!-- abrir chamado -->
+  <dialog id="chamadoDialog" class="janela">
+    <form id="chamadoForm" class="janela-in" method="dialog">
+      <button class="fechar" type="button" data-fechar aria-label="Fechar">×</button>
+      <span class="eyebrow">MANUTENÇÃO</span>
+      <h2>Abrir chamado</h2>
+      <label class="rotulo" for="chImovel">Imóvel</label>
+      <select id="chImovel" required></select>
+      <label class="rotulo" for="chCategoria">Tipo do problema</label>
+      <select id="chCategoria">
+        <option value="hidraulica">Hidráulica (vazamento, torneira, descarga)</option>
+        <option value="eletrica">Elétrica (tomada, disjuntor, iluminação)</option>
+        <option value="estrutura">Estrutura (rachadura, piso, porta)</option>
+        <option value="telhado">Telhado ou infiltração</option>
+        <option value="pintura">Pintura</option>
+        <option value="equipamento">Equipamento (aquecedor, portão, interfone)</option>
+        <option value="chaveiro">Chaveiro / fechadura</option>
+        <option value="limpeza">Limpeza</option>
+        <option value="outro" selected>Outro</option>
+      </select>
+      <label class="rotulo" for="chTitulo">O que aconteceu? (curto)</label>
+      <input id="chTitulo" maxlength="160" required placeholder="Ex.: Torneira da cozinha pingando" />
+      <label class="rotulo" for="chDescricao">Detalhes (opcional)</label>
+      <textarea id="chDescricao" rows="4" maxlength="2000" placeholder="Desde quando, onde fica, melhor horário para a visita…"></textarea>
+      <label class="rotulo">Fotos (até 3, opcional)</label>
+      <div id="chFotos" class="fotos-escolhidas"></div>
+      <label class="botao secundario">📷 Adicionar foto<input id="chFotoInput" type="file" accept="image/*" hidden /></label>
+      <p id="chErro" class="alerta" hidden></p>
+      <button id="chEnviar" class="botao" type="submit">Enviar chamado</button>
+    </form>
+  </dialog>
+
+  <!-- documento para imprimir (recibo, demonstrativo, informe) -->
+  <dialog id="docDialog" class="janela larga">
+    <div class="janela-in">
+      <button class="fechar" type="button" data-fechar aria-label="Fechar">×</button>
+      <div id="docConteudo" class="documento"></div>
+      <button id="docImprimir" class="botao" type="button">🖨 Imprimir / salvar PDF</button>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" hidden></div>
+  <div id="impressao" class="impressao"></div>
+
+  <script src="qrcode.js"></script>
+  <script src="pix.js"></script>
+  <script src="portal.js"></script>
+</body>
+</html>

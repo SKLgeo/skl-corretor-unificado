@@ -491,6 +491,7 @@ Testemunhas:
         box.innerHTML = `<div class="ext-lista">${lista.length ? lista.map(d => `<div class="ext-item"><span><strong>${h(d.nome)}</strong>
             <small>${h(d.categoria || "")}${d.categoria ? " · " : ""}${h(new Date(d.created_at).toLocaleDateString("pt-BR"))}${d.tamanho ? " · " + Math.max(1, Math.round(d.tamanho / 1024)) + " KB" : ""}</small></span>
             <span class="ext-item-acoes"><button type="button" class="secondary-button fin-mini" data-abrir="${h(d.id)}">Abrir</button>
+            ${podeGerir() && [ "contrato", "imovel", "cliente" ].includes(entidade) ? `<button type="button" class="secondary-button fin-mini${d.portal_visivel ? " doc-no-portal" : ""}" data-portal="${h(d.id)}" title="Mostrar este arquivo no portal do cliente">${d.portal_visivel ? "🌐 No portal ✓" : "🌐 Mostrar no portal"}</button>` : ""}
             ${d.enviado_por === eu || ctx.gestao() || podeGerir() ? `<button type="button" class="text-button" data-apagar="${h(d.id)}">Excluir</button>` : ""}</span></div>`).join("")
             : `<p class="muted-text">Nenhum documento anexado.</p>`}</div>
           ${op.podeEnviar === false ? "" : `<div class="ext-anexar"><select data-cat>${(op.categorias || [ "Documento pessoal", "Comprovante de renda", "Comprovante de endereço", "Outro" ]).map(c => `<option>${h(c)}</option>`).join("")}</select>
@@ -500,6 +501,13 @@ Testemunhas:
             const { data: u, error: e2 } = await ctx.sb.storage.from("documentos-aluguel").createSignedUrl(d.path, 600);
             if (e2 || !u) { ctx.toast("Não foi possível abrir o arquivo."); return; }
             window.open(u.signedUrl, "_blank", "noopener");
+        }));
+        box.querySelectorAll("[data-portal]").forEach(b => b.addEventListener("click", async () => {
+            const d = lista.find(x => x.id === b.dataset.portal);
+            const { error } = await ctx.sb.rpc("documento_definir_portal", { p_id: d.id, p_visivel: !d.portal_visivel });
+            if (error) { ctx.toast(erro(error)); return; }
+            ctx.toast(d.portal_visivel ? "O arquivo saiu do portal do cliente." : "O cliente já vê este arquivo no portal.");
+            anexos(box, entidade, id, op);
         }));
         box.querySelectorAll("[data-apagar]").forEach(b => b.addEventListener("click", async () => {
             const d = lista.find(x => x.id === b.dataset.apagar);

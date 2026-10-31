@@ -1,0 +1,78 @@
+:root{--azul:#1583B7;--escuro:#061B2E;--texto:#1d2b33;--muted:#6b7c85;--linha:#e2e8eb;--fundo:#eef3f6;--verde:#1f9d55;--vermelho:#c0392b;--amarelo:#b7791f}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fundo);color:var(--texto);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:15px;overflow-x:hidden}
+[hidden]{display:none!important}
+.topo{background:linear-gradient(135deg,var(--escuro),#0d3b5c);color:#fff;padding:18px 16px 22px}
+.topo-in{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:4px}
+.topo strong{font-size:19px}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--azul)}
+.topo .eyebrow{color:#8fd3f2}
+.faixa-previa{background:#fff4d6;color:#7a5a00;text-align:center;padding:9px 14px;font-size:13px;font-weight:600}
+main{max-width:860px;margin:0 auto;padding:0 0 40px}
+.aviso{margin:40px 16px;text-align:center;color:var(--muted)}
+.ola{padding:16px 16px 4px}
+.ola h1{margin:0;font-size:22px;color:var(--escuro)}
+.muted{color:var(--muted)}.pequeno{font-size:13px}
+.abas{display:flex;gap:8px;padding:10px 16px 0}
+.abas button{flex:1;border:1px solid var(--linha);background:#fff;border-radius:12px;padding:11px;font-weight:700;color:var(--muted);cursor:pointer;font-size:14px}
+.abas button.ativa{background:var(--escuro);color:#fff;border-color:var(--escuro)}
+.cartao{background:#fff;margin:12px;border-radius:16px;padding:16px 18px;box-shadow:0 6px 20px rgba(6,27,46,.06)}
+.cartao h2{margin:2px 0 10px;font-size:17px;color:var(--escuro)}
+.cartao h3{margin:14px 0 8px;font-size:14px;color:var(--escuro)}
+.imovel-nome{font-weight:800;font-size:16px;color:var(--escuro);margin:2px 0}
+.linha-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px}
+.linha-info div{background:#f5f8fa;border-radius:10px;padding:8px 10px}
+.linha-info span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.linha-info strong{font-size:15px}
+.destaque{border:2px solid var(--azul);border-radius:14px;padding:14px;margin-top:12px;background:#f2f9fd}
+.destaque.atraso{border-color:var(--vermelho);background:#fdf3f2}
+.destaque .valor-grande{margin:4px 0}
+.valor-grande{font-size:26px;font-weight:800;color:var(--escuro);margin:6px 0}
+.selo{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}
+.selo.ok{background:#e3f5ea;color:var(--verde)}.selo.aberta{background:#e8f3fb;color:var(--azul)}.selo.atraso{background:#fbe6e3;color:var(--vermelho)}.selo.pendente{background:#fff4d6;color:var(--amarelo)}
+.lista{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--linha);border-radius:12px;padding:10px 12px}
+.item > div:first-child{min-width:0}
+.item strong{display:block}
+.item small{color:var(--muted)}
+.item .direita{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.botao{display:inline-block;border:0;background:var(--azul);color:#fff;font-weight:800;border-radius:12px;padding:13px 16px;font-size:15px;cursor:pointer;text-align:center;width:100%;margin-top:10px}
+.botao.secundario{background:#fff;color:var(--escuro);border:1px solid var(--linha)}
+.botao.pix{background:#32BCAD}
+.mini{display:inline-block;border:1px solid var(--linha);background:#fff;color:var(--escuro);border-radius:9px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer}
+.mini.pix{background:#32BCAD;border-color:#32BCAD;color:#fff}
+.alerta{background:#fdf3f2;color:var(--vermelho);border-radius:10px;padding:8px 10px;font-size:13px}
+.rodape{text-align:center;color:var(--muted);font-size:12px;margin-top:14px;padding:0 16px}
+.vazio{color:var(--muted);font-size:14px;margin:4px 0}
+.andamento{margin:6px 0 0;padding-left:16px;font-size:13px;color:var(--muted)}
+details.mais summary{cursor:pointer;color:var(--azul);font-weight:700;font-size:14px;margin-top:8px}
+/* janelas: display só no [open] (um <dialog> fechado some pela regra do navegador) */
+dialog.janela{border:0;padding:0;border-radius:18px;width:min(460px,calc(100vw - 24px));max-height:calc(100vh - 24px);background:#fff;color:var(--texto);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog.janela.larga{width:min(720px,calc(100vw - 24px))}
+dialog.janela::backdrop{background:rgba(6,27,46,.55)}
+.janela-in{position:relative;padding:20px 18px 18px;display:flex;flex-direction:column;gap:4px}
+.janela-in h2{margin:2px 0 4px;color:var(--escuro)}
+.fechar{position:absolute;top:10px;right:10px;border:0;background:#eef3f6;width:36px;height:36px;border-radius:50%;font-size:22px;cursor:pointer;color:var(--escuro)}
+.rotulo{font-size:12px;font-weight:700;color:var(--muted);margin-top:8px}
+input,select,textarea{font:inherit;font-size:16px;border:1px solid var(--linha);border-radius:10px;padding:10px;width:100%;background:#fff;color:var(--texto)}
+textarea{resize:vertical}
+.qr{display:flex;justify-content:center;margin:8px 0}
+.qr svg{width:220px;height:220px}
+.fotos-escolhidas{display:flex;gap:8px;flex-wrap:wrap}
+.fotos-escolhidas img{width:72px;height:72px;object-fit:cover;border-radius:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--escuro);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50;max-width:calc(100vw - 32px)}
+/* documentos (recibo, demonstrativo, informe) */
+.documento{font-size:14px;line-height:1.5}
+.documento h2{font-size:18px;margin:0 0 4px}
+.documento table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+.documento th,.documento td{border-bottom:1px solid var(--linha);padding:6px 4px;text-align:left}
+.documento td.n,.documento th.n{text-align:right;white-space:nowrap}
+.documento .tot td{font-weight:800}
+.documento .ass{margin-top:28px;border-top:1px solid #999;padding-top:6px;width:260px;text-align:center;font-size:12px}
+.tabela-rola{overflow-x:auto}
+.impressao{display:none}
+@media print{
+  body > *:not(.impressao){display:none!important}
+  .impressao{display:block!important;padding:0;color:#000}
+  .impressao .documento{font-size:12px}
+}
