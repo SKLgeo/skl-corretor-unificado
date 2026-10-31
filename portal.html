@@ -29,7 +29,20 @@
   <div id="faixaPrevia" class="faixa-previa" hidden>👁 Pré-visualização da Central: é assim que o cliente vê. Abrir chamado fica desligado aqui.</div>
   <main>
     <p id="carregando" class="aviso">Carregando seus dados…</p>
+    <!-- PIN do portal: tela de criar/digitar o PIN (só quando a imobiliária usa PIN) -->
+    <section id="pinTela" class="cartao pin-tela" hidden>
+      <div class="pin-icone" aria-hidden="true">🔒</div>
+      <h2 id="pinTitulo">Digite o seu PIN</h2>
+      <p id="pinTexto" class="muted"></p>
+      <input id="pinCampo" class="pin-campo" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="••••" aria-label="PIN" />
+      <input id="pinConfirma" class="pin-campo" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="Repita o PIN" aria-label="Repita o PIN" hidden />
+      <p id="pinErro" class="alerta" hidden></p>
+      <button id="pinOk" class="botao" type="button">Entrar</button>
+      <button id="pinAgoraNao" class="botao secundario" type="button" hidden>Agora não</button>
+      <p id="pinAjuda" class="muted pequeno">Esqueceu o PIN? Peça à imobiliária para apagar o seu PIN ou enviar um link novo.</p>
+    </section>
     <div id="conteudo" hidden>
+      <div id="pinConvite" class="pin-convite" hidden><span>🔒 Proteja o seu portal com um PIN de 4 a 6 números.</span><button id="pinConviteBtn" class="mini" type="button">Criar PIN</button></div>
       <section class="ola">
         <h1 id="ola">Olá</h1>
         <p id="olaSub" class="muted"></p>

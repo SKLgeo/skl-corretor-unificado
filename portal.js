@@ -17,6 +17,10 @@
         gravar(t) { try { localStorage.setItem(CHAVE_TOKEN, t); } catch {} }, apagar() { try { localStorage.removeItem(CHAVE_TOKEN); } catch {} } };
     const tokenDoLink = (new URLSearchParams(location.hash.slice(1)).get("t") || new URLSearchParams(location.search).get("t") || "").trim();
     const token = tokenDoLink || guardado.ler();
+    // PIN do portal: depois do PIN certo o aparelho recebe uma chave (vale 180 dias) e não pede o PIN de novo; presa a este link
+    const CHAVE_APARELHO = (CFG.prefixo || "sklu_") + "portal_aparelho";
+    const aparelho = { ler() { try { const x = JSON.parse(localStorage.getItem(CHAVE_APARELHO) || "null"); return x && x.t === token.slice(0, 12) ? x.a : ""; } catch { return ""; } },
+        gravar(a) { try { localStorage.setItem(CHAVE_APARELHO, JSON.stringify({ t: token.slice(0, 12), a })); } catch {} } };
     const ehApp = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
     const ua = navigator.userAgent;
     const ehIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -30,12 +34,19 @@
         const r = await fetch(`${SUPA}/rest/v1/rpc/${nome}`, { method: "POST",
             headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
         const j = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(textoErro(j && j.message));
+        if (!r.ok) { const e = new Error(textoErro(j && j.message)); e.codigo = j && j.code; throw e; }
         return j;
+    }
+    // manda a chave do aparelho; se o banco ainda for o antigo (sem PIN), repete sem ela
+    async function rpcComAparelho(nome, corpo) {
+        const a = aparelho.ler();
+        if (!a) return rpc(nome, corpo);
+        try { return await rpc(nome, { ...corpo, p_aparelho: a }); }
+        catch (e) { if (e.codigo === "PGRST202") return rpc(nome, corpo); throw e; }
     }
     async function funcao(corpo) {
         const r = await fetch(`${SUPA}/functions/v1/portal-cliente`, { method: "POST",
-            headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" }, body: JSON.stringify({ token, ...corpo }) });
+            headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" }, body: JSON.stringify({ token, aparelho: aparelho.ler(), ...corpo }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.ok) throw new Error(j.erro || "Não foi possível concluir agora.");
         return j;
@@ -57,13 +68,16 @@
     async function carregar() {
         if (!/^[0-9a-f]{48}$/.test(token)) return falha(ehApp ? "Abra uma vez o link que a imobiliária enviou para você (pelo WhatsApp ou e-mail). Depois o app abre sozinho."
             : "Link incompleto. Abra o link exatamente como a imobiliária enviou.");
-        try { D = await rpc("portal_dados", { p_token: token }); }
+        try { D = await rpcComAparelho("portal_dados", { p_token: token }); }
         catch (e) {
             if (!tokenDoLink && /não vale mais/i.test(e.message)) { guardado.apagar(); return falha("Seu acesso foi trocado pela imobiliária. Abra o link mais recente que ela enviou para você."); }
             return falha(e.message);
         }
         if (!D.previa) guardado.gravar(token);
         $("instalarBtn").hidden = ehApp || !!D.previa;
+        if (D.pin === "criar" || D.pin === "pedir") { $("imobNome").textContent = (D.carteira && D.carteira.nome) || "Imobiliária"; return mostrarPin(D.pin); }
+        $("pinTela").hidden = true;
+        $("pinConvite").hidden = D.pin !== "pode_criar";
         const nomeImob = (D.carteira && D.carteira.nome) || "Imobiliária";
         $("imobNome").textContent = nomeImob;
         document.title = `Meu Portal — ${nomeImob}`;
@@ -336,7 +350,7 @@
         bt.disabled = true; bt.textContent = "Enviando…";
         $("chErro").hidden = true;
         try {
-            const ch = await rpc("portal_abrir_chamado", { p_token: token, p_dados: { contrato_id: $("chImovel").value, categoria: $("chCategoria").value,
+            const ch = await rpcComAparelho("portal_abrir_chamado", { p_token: token, p_dados: { contrato_id: $("chImovel").value, categoria: $("chCategoria").value,
                 titulo: $("chTitulo").value, descricao: $("chDescricao").value } });
             let falhas = 0;
             for (const f of fotosChamado) {
@@ -345,7 +359,7 @@
             }
             if (history.state && history.state.janela === "chamadoDialog") history.back(); else fechar($("chamadoDialog"));
             toast(`Chamado nº ${ch.numero} enviado. A imobiliária já foi avisada.${falhas ? ` (${falhas} foto(s) não foram)` : ""}`);
-            D = await rpc("portal_dados", { p_token: token });
+            D = await rpcComAparelho("portal_dados", { p_token: token });
             desenhar();
         } catch (e) {
             $("chErro").textContent = e.message; $("chErro").hidden = false;
@@ -364,6 +378,59 @@
             catch (e) { if (janela) janela.close(); toast(e.message); }
         }));
     }
+
+    // ------------------------------------------------------------------ PIN do portal (só quando a imobiliária usa PIN)
+    let pinModo = null;
+    const hora = iso => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    function avisoPin(t) { $("pinErro").textContent = t || ""; $("pinErro").hidden = !t; }
+    function mostrarPin(modo, opcional) {
+        pinModo = modo;
+        const criar = modo === "criar";
+        $("carregando").hidden = true;
+        $("conteudo").hidden = true;
+        $("pinTela").hidden = false;
+        $("pinTitulo").textContent = criar ? "Crie o seu PIN" : "Digite o seu PIN";
+        $("pinTexto").textContent = criar ? "Escolha de 4 a 6 números. Com o PIN, quem pegar o seu link não consegue entrar."
+            : "Por segurança, o seu portal pede o PIN neste aparelho.";
+        $("pinConfirma").hidden = !criar;
+        $("pinOk").textContent = criar ? "Criar PIN e entrar" : "Entrar";
+        $("pinAgoraNao").hidden = !opcional;
+        $("pinAjuda").hidden = criar;
+        $("pinCampo").value = ""; $("pinConfirma").value = "";
+        avisoPin(D && D.bloqueado_ate ? `Muitas tentativas erradas. Tente de novo às ${hora(D.bloqueado_ate)}.` : "");
+        setTimeout(() => $("pinCampo").focus(), 60);
+    }
+    async function confirmarPin() {
+        const pin = $("pinCampo").value.trim();
+        if (!/^\d{4,6}$/.test(pin)) return avisoPin("O PIN tem de 4 a 6 números.");
+        if (pinModo === "criar" && pin !== $("pinConfirma").value.trim()) return avisoPin("Os dois PINs não estão iguais.");
+        const bt = $("pinOk");
+        bt.disabled = true;
+        try {
+            if (pinModo === "criar") {
+                const r = await rpc("portal_pin_criar", { p_token: token, p_pin: pin });
+                aparelho.gravar(r.aparelho);
+                toast("PIN criado. Ele será pedido se você abrir o portal em outro aparelho.");
+            } else {
+                const r = await rpc("portal_pin_entrar", { p_token: token, p_pin: pin });
+                if (!r.ok) {
+                    $("pinCampo").value = "";
+                    return avisoPin(r.motivo === "bloqueado" ? `Muitas tentativas erradas. Tente de novo às ${hora(r.bloqueado_ate)}.`
+                        : r.motivo === "sem_pin" ? "Este acesso não tem mais PIN. Toque em Entrar para criar outro." : `PIN errado. Restam ${r.restantes} tentativa(s).`);
+                }
+                aparelho.gravar(r.aparelho);
+            }
+            $("pinTela").hidden = true;
+            $("carregando").textContent = "Carregando seus dados…";
+            $("carregando").hidden = false;
+            await carregar();
+        } catch (e) { avisoPin(e.message); }
+        finally { bt.disabled = false; }
+    }
+    $("pinOk").addEventListener("click", confirmarPin);
+    [ "pinCampo", "pinConfirma" ].forEach(id => $(id).addEventListener("keydown", ev => { if (ev.key === "Enter") confirmarPin(); }));
+    $("pinAgoraNao").addEventListener("click", () => { $("pinTela").hidden = true; $("conteudo").hidden = false; });
+    $("pinConviteBtn").addEventListener("click", () => mostrarPin("criar", true));
 
     // ------------------------------------------------------------------ app "Meu Portal" (instalar na tela do celular)
     // Android/Chrome: instalador do navegador (manifesto portal.webmanifest; o app abre portal.html?app=1 e usa o token guardado).

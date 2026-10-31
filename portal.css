@@ -77,6 +77,13 @@ textarea{resize:vertical}
   .impressao .documento{font-size:12px}
 }
 
+/* PIN do portal */
+.pin-tela{max-width:420px;margin:28px auto;text-align:center;display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.pin-tela .pin-icone{font-size:40px}
+.pin-tela h2{margin:4px 0}
+.pin-campo{font-size:28px;letter-spacing:.5em;text-align:center;padding:12px;margin-top:6px}
+.pin-campo::placeholder{letter-spacing:.2em;font-size:18px}
+.pin-convite{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px;padding:10px 14px;border-radius:12px;background:#fff8e6;border:1px solid #f0dca6;font-size:14px}
 /* app "Meu Portal" */
 .topo-in{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .topo-marca{display:flex;flex-direction:column;gap:4px;min-width:0}

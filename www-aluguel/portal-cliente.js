@@ -38,11 +38,15 @@
             ? `Link ativo desde ${h(quando(s.criado_em))}${s.expira_em ? ` · vale até ${h(new Date(s.expira_em).toLocaleDateString("pt-BR"))}` : ""} ·
                ${s.ultimo_acesso_em ? `último acesso ${h(quando(s.ultimo_acesso_em))} (${s.acessos}×)` : "ainda não abriu"}`
             : "O cliente ainda não tem link. Ele vê cobranças com PIX, recibos, repasses, informe de rendimentos e abre chamados, sem precisar de senha."}</p>
+          ${s.ativo && s.pin_modo && s.pin_modo !== "nao" ? `<p class="muted-text portal-cli-pin">${s.tem_pin
+            ? `🔒 O cliente criou um PIN${s.pin_bloqueado_ate ? ` · <b>bloqueado</b> até ${h(quando(s.pin_bloqueado_ate))} por tentativas erradas` : ""}`
+            : (s.pin_modo === "obrigatorio" ? "🔒 O cliente vai criar o PIN no primeiro acesso" : "🔓 O cliente ainda não criou PIN (é opcional)")}</p>` : ""}
           <div class="portal-cli-acoes">
             <button type="button" class="primary-button" data-portal="whats">${s.ativo ? "Enviar novo link pelo WhatsApp" : "Enviar link pelo WhatsApp"}</button>
             <button type="button" class="secondary-button" data-portal="copiar">Gerar e copiar link</button>
             <button type="button" class="secondary-button" data-portal="ver">👁 Ver como o cliente vê</button>
             ${s.ativo ? `<button type="button" class="text-button" data-portal="cancelar">Cancelar link</button>` : ""}
+            ${s.tem_pin ? `<button type="button" class="text-button" data-portal="apagarpin">Apagar PIN</button>` : ""}
           </div>
           <label class="portal-cli-validade"><span>Validade do link</span><select data-portal-dias>
             <option value="">Sem prazo (recomendado)</option><option value="365">1 ano</option><option value="180">6 meses</option><option value="30">30 dias</option>
@@ -65,6 +69,15 @@
             if (error) { if (janela) janela.close(); ctx.toast(erro(error)); return; }
             const url = `${PAGINA()}#t=${data}`;
             if (janela) janela.location = url; else window.open(url, "_blank");
+            return;
+        }
+        // PIN do portal: cliente esqueceu ou bloqueou → apaga; no próximo acesso ele cria outro
+        if (qual === "apagarpin") {
+            if (!window.confirm("Apagar o PIN do cliente? No próximo acesso ele cria um PIN novo.")) return;
+            const { error } = await ctx.sb.rpc("portal_pin_apagar", { p_cliente: c.id });
+            if (error) { ctx.toast(erro(error)); return; }
+            ctx.toast("PIN apagado.");
+            aoAbrirCliente(c);
             return;
         }
         if (qual === "cancelar") {
@@ -104,7 +117,8 @@
         }
         p.hidden = !ctx.podeGerir();
         if (p.hidden) return;
-        const { data } = await ctx.sb.from("carteiras_aluguel").select("pix").eq("id", ctx.carteiraId()).maybeSingle();
+        const { data } = await ctx.sb.from("carteiras_aluguel").select("*").eq("id", ctx.carteiraId()).maybeSingle();
+        painelPin(grade, data);
         const pix = (data && data.pix) || {};
         p.innerHTML = `<span class="eyebrow">PORTAL DO CLIENTE</span><h2>PIX para receber os aluguéis</h2>
           <p>O inquilino paga pelo portal com QR Code ou "copia e cola", direto na conta da imobiliária, sem tarifa. A baixa continua sendo feita no Financeiro.</p>
@@ -121,6 +135,35 @@
             if (error) { ctx.toast(erro(error)); return; }
             ctx.toast("PIX salvo.");
             painelPix();
+        };
+    }
+
+    // ------------------------------------------------------------------ Configurações → PIN do portal (só aparece com o banco novo)
+    function painelPin(grade, carteira) {
+        let p = $("portalPinPanel");
+        if (!p) {
+            p = document.createElement("form");
+            p.id = "portalPinPanel";
+            p.className = "panel form-panel";
+            grade.appendChild(p);
+        }
+        p.hidden = !carteira || !("portal_pin_modo" in carteira);
+        if (p.hidden) return;
+        p.innerHTML = `<span class="eyebrow">PORTAL DO CLIENTE</span><h2>Segurança do portal</h2>
+          <p>Escolha se o cliente entra só com o link ou se também precisa de um PIN de 4 a 6 números. Com o PIN, quem pegar o link não entra.
+            O PIN é pedido uma vez em cada aparelho. Esqueceu: apague o PIN na ficha do cliente.</p>
+          <label><span>PIN do cliente</span><select id="portalPinModo">
+            <option value="nao">Só o link (sem PIN)</option>
+            <option value="opcional">O cliente pode criar um PIN</option>
+            <option value="obrigatorio">PIN obrigatório no primeiro acesso</option>
+          </select></label>
+          <button class="primary-button" type="submit">Salvar segurança</button>`;
+        $("portalPinModo").value = carteira.portal_pin_modo || "nao";
+        p.onsubmit = async ev => {
+            ev.preventDefault();
+            const { error } = await ctx.sb.rpc("configurar_portal_pin", { p_carteira: ctx.carteiraId(), p_modo: $("portalPinModo").value });
+            if (error) { ctx.toast(erro(error)); return; }
+            ctx.toast("Segurança do portal salva.");
         };
     }
 

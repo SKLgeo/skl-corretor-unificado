@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.15.3";
+    const APP_VERSION = "0.15.4";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
