@@ -45,7 +45,7 @@
             ${s.ativo ? `<button type="button" class="text-button" data-portal="cancelar">Cancelar link</button>` : ""}
           </div>
           <label class="portal-cli-validade"><span>Validade do link</span><select data-portal-dias>
-            <option value="180">6 meses</option><option value="365">1 ano</option><option value="730">2 anos</option><option value="30">30 dias</option><option value="">Sem prazo</option>
+            <option value="">Sem prazo (recomendado)</option><option value="365">1 ano</option><option value="180">6 meses</option><option value="30">30 dias</option>
           </select></label>`;
         box.querySelectorAll("[data-portal]").forEach(b => b.addEventListener("click", () => acao(b.dataset.portal, c, s, box)));
     }
