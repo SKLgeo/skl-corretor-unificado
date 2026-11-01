@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.16.1";
+    const APP_VERSION = "0.16.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1682,7 +1682,7 @@
 
     // ===== Mapa (lista) =====
 
-    // Busca no mapa: cada imóvel é uma etiqueta com o preço (na cor da situação); tocar abre um cartão com foto e "Abrir ficha".
+    // Busca no mapa: cada imóvel é uma bolinha na cor da situação (com o nome ao passar o mouse); tocar abre um cartão com foto e "Abrir ficha".
     // "Só os imóveis desta área" faz a lista mostrar apenas o que está visível no mapa (muda ao arrastar ou ampliar).
     // Em tela larga o mapa fica ao lado da lista (classe .com-mapa na página).
     function toggleConstrucaoView() {
@@ -1728,25 +1728,12 @@
         return !!map && c.latitude != null && c.longitude != null && map.getBounds().contains([ c.latitude, c.longitude ]);
     }
 
-    // "R$ 2,5 mil", "R$ 450 mil", "R$ 1,2 mi"
-    function valorNoMapa(v) {
-        const n = Number(v);
-        if (!n) return "";
-        const f = x => x.toLocaleString("pt-BR", { maximumFractionDigits: x < 10 ? 1 : 0 });
-        if (n >= 1e6) return `R$ ${f(n / 1e6)} mi`;
-        if (n >= 1e3) return `R$ ${f(n / 1e3)} mil`;
-        return `R$ ${f(n)}`;
-    }
-    function precoDivIcon(c) {
-        const v = finalidadeFiltro === "venda" ? c.valor_venda
-            : finalidadeFiltro === "aluguel" ? c.valor_aluguel
-            : (c.para_aluguel !== false && Number(c.valor_aluguel) ? c.valor_aluguel : c.valor_venda);
-        const texto = valorNoMapa(v) || (c.codigo ? "Cód. " + c.codigo : "•");
+    function statusDivIcon(status) {
         return L.divIcon({
-            className: "pino-preco-ancora",
-            html: `<span class="pino-preco" style="--cor:${STATUS_COLOR[c.status] || "#708189"}">${h(texto)}</span>`,
-            iconSize: [ 0, 0 ],
-            iconAnchor: [ 0, 0 ]
+            className: "",
+            html: `<div style="width:18px;height:18px;border-radius:50%;background:${STATUS_COLOR[status] || "#708189"};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`,
+            iconSize: [ 18, 18 ],
+            iconAnchor: [ 9, 9 ]
         });
     }
     function cartaoDoPino(c) {
@@ -1781,7 +1768,8 @@
         rows.forEach(c => {
             if (c.perimetro && window.SKLRural) perimetrosNoMapa.push(window.SKLRural.camada(L, c.perimetro, { weight: 2 }).addTo(map));
             if (c.latitude == null || c.longitude == null) return;
-            const marker = L.marker([ c.latitude, c.longitude ], { icon: precoDivIcon(c), riseOnHover: true }).addTo(map);
+            const marker = L.marker([ c.latitude, c.longitude ], { icon: statusDivIcon(c.status), riseOnHover: true }).addTo(map);
+            marker.bindTooltip(c.nome);
             marker.bindPopup(() => cartaoDoPino(c), { maxWidth: 280, minWidth: 240, className: "pino-popup" });
             marker.on("popupopen", ev => {
                 const el = ev.popup.getElement();

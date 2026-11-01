@@ -356,11 +356,7 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .area-ver-em-rotulo{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--muted);white-space:nowrap}
 .area-ver-em{font:inherit;font-size:12px;padding:3px 6px;border:1px solid #cfdde6;border-radius:8px;background:#fff;color:var(--navy-deep);min-width:0}
 
-/* Busca no mapa: etiquetas de preço, cartão do imóvel e mapa ao lado da lista */
-.pino-preco-ancora{background:none;border:0}
-.pino-preco{position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:inline-block;white-space:nowrap;background:#fff;color:#0f2733;border:2px solid var(--cor,#708189);border-radius:999px;padding:3px 9px;font-size:12px;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.25);cursor:pointer}
-.pino-preco::after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--cor,#708189);border-bottom:0}
-.leaflet-marker-icon:hover .pino-preco{background:var(--cor,#708189);color:#fff}
+/* Busca no mapa: cartão do imóvel e mapa ao lado da lista */
 .pino-popup .leaflet-popup-content{margin:0;width:260px!important}
 .pino-popup .leaflet-popup-content-wrapper{padding:0;overflow:hidden;border-radius:14px}
 .pino-card{display:grid}
