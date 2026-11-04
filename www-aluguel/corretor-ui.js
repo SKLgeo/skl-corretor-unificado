@@ -11,7 +11,8 @@
     const ABA = {
         hoje: "hoje", dashboard: "hoje", agenda: "hoje",
         construcoes: "construcoes", clientes: "clientes", negociacoes: "negociacoes",
-        conta: "conta", cadastros: "conta", settings: "conta", indicadores: "conta", comissoes: "conta"
+        conta: "conta", cadastros: "conta", settings: "conta", indicadores: "conta", comissoes: "conta",
+        financeiro: "conta", corretores: "conta", interesses: "conta"
     };
     const OCULTOS_CORRETOR = [ "alugado", "vendido", "indisponivel" ];
     let ctx = null;
@@ -294,7 +295,7 @@
         $("contaAvatar").innerHTML = ctx.fotoHtml(eu.id, 72);
         $("contaNome").textContent = eu.display_name;
         $("contaPapel").textContent = `${ctx.papelTexto()} · ${ctx.carteiraNome()}`;
-        $("contaCadastrosTexto").textContent = ctx.central() ? "Cadastros dos corretores" : "Meus cadastros de imóveis";
+        $("contaCadastrosTexto").textContent = ctx.central() || (ctx.pode && ctx.pode("aprovar_cadastros")) ? "Cadastros dos corretores" : "Meus cadastros de imóveis";
         const cad = $("navCadastrosBadge");
         const n = cad && !cad.hidden ? Number(cad.textContent) || 0 : 0;
         $("contaCadastrosBadge").hidden = !n;

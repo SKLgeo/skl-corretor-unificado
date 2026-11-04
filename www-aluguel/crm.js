@@ -1492,6 +1492,7 @@
     }
     function abrirNegociacao(id, padrao) {
         negAberta = id;
+        compatAberto = false;
         const n = id ? negs.get(id) : null;
         if (id && !n) { ctx.toast("Negociação não encontrada."); return; }
         const base = n || { funil_id: funilAtual === TODOS ? null : funilAtual, ...(padrao || {}) };
@@ -1701,6 +1702,8 @@
         ];
         return linhas.filter((l, i) => l !== "" || i === 1 || i === linhas.length - 2).join("\n");
     }
+    // a lista começa recolhida (só o título e a quantidade); a setinha abre e fecha. A escolha vale até fechar a negociação.
+    let compatAberto = false;
     function renderCompativeis() {
         const box = $("crmCompat");
         if (!box || !ctx) return;
@@ -1719,7 +1722,9 @@
         const atual = $("crmNegImovel").value;
         const cli = clientes.get($("crmNegCliente").value);
         const temFone = cli && digitos(cli.telefone).length >= 10;
-        box.innerHTML = `<span class="eyebrow">IMÓVEIS QUE COMBINAM <em>${lista.length ? lista.length : "nenhum"}</em></span>`
+        box.innerHTML = `<button type="button" class="crm-compat-topo" aria-expanded="${compatAberto ? "true" : "false"}">
+              <span class="eyebrow">IMÓVEIS QUE COMBINAM <em>${lista.length ? lista.length : "nenhum"}</em></span>
+              <span class="crm-compat-seta">${compatAberto ? "Esconder ▲" : "Ver lista ▼"}</span></button><div class="crm-compat-corpo">`
             + (lista.length ? `<p class="crm-compat-aviso">A % mostra o quanto cada imóvel combina com o que o cliente procura. Para uma % mais precisa, preencha melhor o que o cliente procura (bairros, tipo, valor, quartos e vagas).</p>` : "")
             + (lista.length ? lista.map(({ i, r }) => `<div class="crm-compat-item${i.id === atual ? " escolhido" : ""}">
                 <span class="crm-compat-foto" data-foto-id="${h(i.id)}"><span class="sem-foto">sem foto</span><span class="crm-compat-pct ${r.pct === 100 ? "total" : ""}">${r.pct}%</span></span>
@@ -1735,7 +1740,8 @@
                   <button type="button" class="crm-btn-contato whats" data-whats="${h(i.id)}" ${temFone ? "" : "disabled title=\"Cliente sem celular\""}>WhatsApp</button>
                 </div>
               </div>`).join("")
-            : `<p class="muted-text">Nenhum imóvel disponível combina com esse perfil. Esse pedido entra na "demanda sem estoque" do painel.</p>`);
+            : `<p class="muted-text">Nenhum imóvel disponível combina com esse perfil. Esse pedido entra na "demanda sem estoque" do painel.</p>`) + `</div>`;
+        box.querySelector(".crm-compat-topo").addEventListener("click", () => { compatAberto = !compatAberto; renderCompativeis(); });
         preencherFotos(box, lista.map(x => x.i));
         box.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.ver)));
         box.querySelectorAll("[data-usar]").forEach(b => b.addEventListener("click", () => {

@@ -213,10 +213,10 @@
                 <div><span>Vigência</span><strong>${data(c.inicio)} a ${data(c.fim)}</strong></div>
                 <div><span>Situação do aluguel</span><strong>${c.status !== "ativo" ? "Contrato encerrado" : c.aluguel_em_atraso ? `<span class="selo atraso">Em atraso</span>` : `<span class="selo ok">Em dia</span>`}</strong></div>
               </div>
-              <h3>Repasses</h3>
+              ${D.repasses === false ? "" : `<h3>Repasses</h3>
               ${c.repasses.length ? `<div class="lista">${c.repasses.slice(0, 6).map(r => itemRepasse(c, r)).join("")}</div>
                 ${c.repasses.length > 6 ? `<details class="mais"><summary>Ver todos (${c.repasses.length})</summary><div class="lista" style="margin-top:8px">${c.repasses.slice(6).map(r => itemRepasse(c, r)).join("")}</div></details>` : ""}`
-                : `<p class="vazio">Nenhum repasse ainda.</p>`}
+                : `<p class="vazio">Nenhum repasse ainda.</p>`}`}
             </section>`;
         }).join("")
         + (D.imoveis.length ? `<section class="cartao"><h2>Meus imóveis na imobiliária</h2><div class="lista">${D.imoveis.map(i => `<div class="item"><div><strong>${h(i.nome)}</strong><small>cód. ${h(i.codigo || "—")} · ${h([ i.bairro, i.cidade ].filter(Boolean).join(", "))}</small></div><div class="direita"><span class="selo ${i.status === "alugado" || i.status === "vendido" ? "ok" : "aberta"}">${h(rotuloImovel(i.status))}</span></div></div>`).join("")}</div></section>` : "")

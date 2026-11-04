@@ -369,19 +369,34 @@
         linhas.push(``, `Posso agendar uma visita? — ${eu.apelido || eu.display_name || ""}, ${ctx.carteiraNome()}`);
         return linhas.join("\n");
     }
+    // Enquanto a mensagem é montada (busca o link do imóvel), os botões ficam travados: antes dava para enviar "Montando…" ao cliente.
+    // Leva menos de 1 segundo com internet boa; se passar de 8 s, a mensagem sai sem o link (com a ficha em PDF como alternativa).
+    function preparandoEnvio(sim) {
+        [ "extEnvWhats", "extEnvCopiar" ].forEach(id => { const b = $(id); if (b) b.disabled = sim; });
+        const t = $("extEnvTexto");
+        t.readOnly = sim;
+        if (sim) { t.value = ""; t.placeholder = "Preparando a mensagem com o link do imóvel… aguarde um instante."; }
+        else t.placeholder = "";
+    }
+    const comLimite = (promessa, ms) => Promise.race([ promessa, new Promise(ok => setTimeout(() => ok(null), ms)) ]);
     async function abrirEnviar(c) {
         $("extEnvTitulo").textContent = `${c.codigo ? c.codigo + " · " : ""}${c.nome}`;
         $("extEnvTel").value = "";
-        $("extEnvTexto").value = "Montando…";
+        preparandoEnvio(true);
         $("extEnviarDialog").showModal();
         let link = null;
-        try { link = window.SKLIntegracoes ? await window.SKLIntegracoes.linkPublico(c.publicar_site ? c.codigo : null) : null; } catch { link = null; }
-        if (link) {
-            // o botão "Falar no WhatsApp" da página pública chama quem enviou o link
-            const { data: eu } = await ctx.sb.from("perfis").select("telefone").eq("id", (ctx.usuario() || {}).id).maybeSingle();
-            const tel = String((eu && eu.telefone) || "").replace(/\D/g, "");
-            if (tel.length >= 10) link += "&w=" + tel;
-        }
+        try {
+            link = await comLimite((async () => {
+                let l = window.SKLIntegracoes ? await window.SKLIntegracoes.linkPublico(c.publicar_site ? c.codigo : null) : null;
+                if (l) {
+                    // o botão "Falar no WhatsApp" da página pública chama quem enviou o link
+                    const { data: eu } = await ctx.sb.from("perfis").select("telefone").eq("id", (ctx.usuario() || {}).id).maybeSingle();
+                    const tel = String((eu && eu.telefone) || "").replace(/\D/g, "");
+                    if (tel.length >= 10) l += "&w=" + tel;
+                }
+                return l;
+            })(), 8000);
+        } catch { link = null; }
         envioAtual = { c, link, chave: null };
         const temLocal = (c.latitude != null && c.longitude != null) || !!(c.logradouro || "").trim();
         $("extEnvLocal").checked = false;
@@ -390,6 +405,7 @@
             ? "Desmarcado, o cliente recebe só as fotos e as informações, com o bairro e a cidade (sem endereço nem mapa)."
             : "Este imóvel não tem endereço nem localização no cadastro.";
         $("extEnvTexto").value = textoImovel(c, link, false);
+        preparandoEnvio(false);
         $("extEnvAviso").textContent = link ? "O link abre uma página com as fotos e a descrição, sem dados do proprietário."
             : (c.publicar_site ? "Sem link: a vitrine de imóveis está desligada (Configurações → Site e portais). Use a ficha em PDF." : "Sem link: este imóvel não está marcado \"Publicar no site\". Use a ficha em PDF.");
     }
@@ -402,15 +418,18 @@
         let link = e.link;
         if (com && link) {
             if (!e.chave) {
+                preparandoEnvio(true);
                 const { data, error } = await ctx.sb.rpc("imovel_link_envio", { p_construcao: e.c.id, p_localizacao: true });
-                if (error) { ctx.toast(ctx.traduzErro(error.message)); $("extEnvLocal").checked = false; return; }
+                if (error) { ctx.toast(ctx.traduzErro(error.message)); $("extEnvLocal").checked = false; $("extEnvTexto").value = textoImovel(e.c, e.link, false); preparandoEnvio(false); return; }
                 e.chave = data;
             }
             link += "&e=" + encodeURIComponent(e.chave);
         }
         $("extEnvTexto").value = textoImovel(e.c, link, com);
+        preparandoEnvio(false);
     }
     function abrirWhats() {
+        if (!$("extEnvTexto").value.trim()) { ctx.toast("Aguarde a mensagem ficar pronta."); return; }
         const d = $("extEnvTel").value.replace(/\D/g, "");
         const texto = encodeURIComponent($("extEnvTexto").value);
         const url = d.length >= 10 ? `https://wa.me/55${d}?text=${texto}` : `https://wa.me/?text=${texto}`;

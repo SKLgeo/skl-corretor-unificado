@@ -67,6 +67,7 @@
         $("avisosAtivar").addEventListener("click", ativar);
         $("avisosAntecedencia").addEventListener("change", trocarAntecedencia);
         $("avisosDesativar").addEventListener("click", desativar);
+        $("avisosTestar").addEventListener("click", testar);
         document.addEventListener("visibilitychange", () => { if (!document.hidden && ctx) { carregar(); carregarProcurados(); } });
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.tipo === "aviso-aberto") abrirItem(e.data.aviso); });
@@ -160,6 +161,7 @@
         $("avisosAntecedencia").value = [ ...$("avisosAntecedencia").options ].some(o => o.value === valor) ? valor : "30";
         $("avisosDialog").showModal();
         desenhar();
+        carregarEquipe();
         await carregar();
         const ids = lista.filter(n => !n.lida_em).map(n => n.id);
         if (ids.length) {
@@ -180,6 +182,35 @@
         if (n.tipo === "procura") return mostrarProcurados();
         if (d.negociacao_id && window.SKLCRM) return window.SKLCRM.abrirNegociacao(d.negociacao_id);
         if (d.cliente_id && window.SKLCRM) return window.SKLCRM.abrirCliente(d.cliente_id);
+    }
+
+    // teste: o banco cria um aviso para a própria pessoa e ele vai pelo mesmo caminho dos avisos de verdade (em até 1 minuto)
+    async function testar() {
+        const b = $("avisosTestar"), info = $("avisosTesteInfo");
+        b.disabled = true;
+        const { data, error } = await ctx.sb.rpc("avisos_testar", { p_carteira: ctx.carteiraId() });
+        b.disabled = false;
+        if (error) { ctx.toast(ctx.traduzErro(error.message)); return; }
+        const n = (data && data.aparelhos) || 0;
+        info.textContent = n
+            ? `Aviso de teste enviado para ${n} aparelho${n === 1 ? "" : "s"} seu${n === 1 ? "" : "s"}. Chega em até 1 minuto: feche o app ou bloqueie a tela para conferir.`
+            : "Nenhum aparelho seu está com os avisos ligados. Toque em \"Ativar avisos neste aparelho\" primeiro. O teste aparece só aqui no sino.";
+    }
+    // Central: quem da equipe já ligou os avisos em algum aparelho (quem não ligou não recebe nada com o app fechado)
+    async function carregarEquipe() {
+        const box = $("avisosEquipe");
+        const central = [ "administrador", "central_vendas" ].includes(ctx.papel && ctx.papel());
+        box.hidden = !central;
+        if (!central) return;
+        const { data, error } = await ctx.sb.rpc("avisos_equipe", { p_carteira: ctx.carteiraId() });
+        if (error || !data) { box.hidden = true; return; }
+        const equipe = ctx.equipe ? ctx.equipe() : [];
+        const nome = id => (equipe.find(u => u.id === id) || {}).display_name || "Pessoa da equipe";
+        const com = data.filter(x => x.aparelhos > 0), sem = data.filter(x => !x.aparelhos);
+        box.innerHTML = `<h3>Avisos da equipe</h3>
+          <p class="muted-text"><b>${com.length} de ${data.length}</b> pessoas ligaram os avisos em algum aparelho. Quem não ligou não recebe nada com o app fechado: peça para abrir o 🔔 e tocar em "Ativar avisos neste aparelho".</p>
+          ${sem.length ? `<p class="avisos-equipe-sem"><span>Sem avisos:</span> ${sem.map(x => `<em>${h(nome(x.usuario_id))}</em>`).join("")}</p>` : ""}
+          ${com.length ? `<p class="avisos-equipe-com"><span>Com avisos:</span> ${com.map(x => `<em>${h(nome(x.usuario_id))} · ${x.aparelhos} aparelho${x.aparelhos === 1 ? "" : "s"}</em>`).join("")}</p>` : ""}`;
     }
 
     // ------------------------------------------------------------------ ativar neste aparelho

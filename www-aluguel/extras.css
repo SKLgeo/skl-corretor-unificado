@@ -200,3 +200,72 @@ dialog.foto-lightbox{overflow:hidden}
 .ext-int-portais{grid-column:1/-1}
 .ext-int-passos{margin:6px 0 10px;padding-left:20px;display:grid;gap:4px;font-size:14px}
 .ext-int-portais .ext-int-acoes select{width:auto;flex:0 0 auto}
+
+/* Funções desligadas em Configurações → Funções da imobiliária (funcoes-carteira.js põe "sem-<chave>" no body) */
+body.sem-repasses [data-fin-aba="repasses"],
+body.sem-portal #portalCliBox, body.sem-portal #portalPixPanel, body.sem-portal #portalPinPanel, body.sem-portal [data-portal],
+body.sem-extrato [data-fin-aba="extrato"],
+body.sem-contabil [data-fin-aba="contabil"],
+body.sem-agenda_celular #agendaCelularBtn, body.sem-agenda_celular #contaAgendaCelular,
+body.sem-portais .ext-int-portais{display:none!important}
+
+/* Configurações → "O que cada tipo de acesso pode fazer" (permissoes.js) */
+.perm-panel{grid-column:1/-1}
+.perm-tabela-caixa{overflow-x:auto;margin:6px 0}
+.perm-tabela{width:100%;border-collapse:collapse;min-width:0!important;font-size:14px}
+.perm-tabela th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#5b6675;text-align:center;padding:8px 6px;border-bottom:2px solid #dde6ea}
+.perm-tabela th:first-child{text-align:left}
+.perm-tabela td{padding:9px 6px;border-bottom:1px solid #eef2f3;text-align:center;vertical-align:middle}
+.perm-tabela td:first-child{text-align:left}
+.perm-tabela td strong{display:block;font-size:14px}
+.perm-tabela td small{display:block;color:#6b7785;font-size:12px;line-height:1.35;margin-top:2px}
+.perm-tabela .perm-grupo td{background:#f3f7f9;font-weight:700;color:#061B2E;font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px}
+.perm-tabela .perm-fixo{color:#93a1ad;font-weight:700}
+.perm-chave{display:inline-flex;position:relative;width:42px;height:24px;cursor:pointer}
+.perm-chave input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.perm-chave span{width:42px;height:24px;border-radius:12px;background:#cfd8de;transition:background .15s;position:relative}
+.perm-chave span::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.perm-chave input:checked+span{background:#1f9d55}
+.perm-chave input:checked+span::after{left:21px}
+.perm-chave input:disabled+span{opacity:.55}
+.perm-chave input:focus-visible+span{outline:3px solid rgba(41,171,226,.45)}
+.perm-nota{font-size:12.5px}
+
+/* foto grande do imóvel: "Usar como capa" e "Tirar esta foto" */
+.hero-foto-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 2px}
+.hero-foto-acoes[hidden]{display:none}
+.hero-foto-acoes small{color:#6b7785}
+.hero-foto-acoes button{min-height:38px}
+@media (pointer:coarse){.foto-remove-button{width:26px;height:26px;font-size:15px;top:3px;right:3px}}
+
+/* imóveis que combinam: lista recolhível */
+.crm-compat-topo{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;font:inherit;cursor:pointer;text-align:left;color:inherit}
+.crm-compat-topo .crm-compat-seta{margin-left:auto;font-size:13px;font-weight:700;color:#0B6E99;white-space:nowrap}
+.crm-compat-topo[aria-expanded="false"]+.crm-compat-corpo{display:none}
+
+/* tela travada em pé: aviso quando o aparelho está deitado (celular.js) */
+.gire-aviso{position:fixed;inset:0;z-index:2147483000;background:#061B2E;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+.gire-aviso[hidden]{display:none}
+.gire-aviso b{font-size:46px;line-height:1}
+.gire-aviso strong{font-size:20px}
+.gire-aviso small{font-size:14px;opacity:.8;max-width:340px}
+
+/* avisos: teste, dicas e situação da equipe */
+.avisos-teste{display:grid;gap:6px;margin:0 0 10px}
+.avisos-teste button{justify-self:start}
+.avisos-dicas{margin:0 0 12px;border:1px solid #e2e8eb;border-radius:10px;padding:8px 12px;background:#fff}
+.avisos-dicas summary{cursor:pointer;font-weight:700;font-size:14px}
+.avisos-dicas ol{margin:8px 0 2px;padding-left:20px;display:grid;gap:6px;font-size:13.5px;line-height:1.45}
+.avisos-equipe{border:1px solid #e2e8eb;border-radius:12px;padding:10px 12px;margin:0 0 12px;background:#f6f9fb}
+.avisos-equipe h3{margin:0 0 4px;font-size:15px}
+.avisos-equipe p{margin:6px 0 0;font-size:13px}
+.avisos-equipe-sem,.avisos-equipe-com{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.avisos-equipe-sem span,.avisos-equipe-com span{font-weight:700;margin-right:2px}
+.avisos-equipe em{font-style:normal;border-radius:999px;padding:2px 9px;font-size:12.5px}
+.avisos-equipe-sem em{background:#fde8e6;color:#9b2c1f}
+.avisos-equipe-com em{background:#e3f4ea;color:#1b6b3c}
+
+/* corretor: "+ Cadastrar imóvel" flutuante na tela Imóveis (sempre à vista, acima das abas de baixo) */
+@media(max-width:899px){
+  body.modo-corretor #page-construcoes.active-page #newConstrucaoButton:not([hidden]){position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:40;border-radius:999px;padding:14px 20px;box-shadow:0 8px 22px rgba(0,30,50,.28)}
+}

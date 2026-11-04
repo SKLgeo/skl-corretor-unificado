@@ -28,7 +28,7 @@
     const PERIODOS = [ [ "semana", "Semana" ], [ "mes", "Mês" ], [ "trimestre", "Trim." ], [ "ano", "Ano" ], [ "12m", "12 m" ], [ "tudo", "Tudo" ] ];
     const PERIODOS_SEG = [ [ "12m", "12 meses" ], [ "24m", "24 meses" ], [ "tudo", "Tudo" ], [ "mesames", "Mês a mês" ] ];
 
-    const pode = () => !!ctx && ctx.veTudo();
+    const pode = () => !!ctx && (ctx.pode ? ctx.pode("tela_painel") : ctx.veTudo());
     const dinheiro = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     function curto(v) {
         const n = Number(v || 0), a = Math.abs(n);
@@ -48,7 +48,7 @@
         const b = $("painelAbrir");
         if (b) b.hidden = !pode();
         const w = $("instaladorWindows");
-        if (w) w.hidden = !(pode() && podeBaixarWindows());
+        if (w) w.hidden = !(ctx.veTudo() && podeBaixarWindows());
         if (!pode()) fechar();
     }
     // botão "Baixar programa para Windows": só para a Central, no navegador de um computador Windows

@@ -159,6 +159,10 @@
           <button type="button" id="contaAvisos"><span>🔔</span><em>Avisos neste aparelho</em><i>›</i></button>
           <button type="button" id="contaPerfilAtuacao"><span>★</span><em>Meu perfil de atuação</em><span id="contaPerfilChips" class="conta-perfil-chips"></span><i>›</i></button>
           <button type="button" data-go="indicadores"><span>▥</span><em>Indicadores</em><i>›</i></button>
+          <button type="button" id="contaIrPainel" hidden><span>📊</span><em>Painel da imobiliária</em><i>›</i></button>
+          <button type="button" id="contaIrFinanceiro" data-go="financeiro" hidden><span>$</span><em>Financeiro</em><i>›</i></button>
+          <button type="button" id="contaIrEquipe" data-go="corretores" hidden><span>◔</span><em>Equipe</em><i>›</i></button>
+          <button type="button" id="contaIrInteresses" data-go="interesses" hidden><span>☎</span><em>Interesses</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
           <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
           <button type="button" id="contaVoltarCentral" hidden><span>↩</span><em>Voltar para a tela da Central</em><i>›</i></button>
@@ -339,6 +343,7 @@
               <option value="pendente">Aguardando aprovação</option>
               <option value="recusado">Recusados</option>
               <option value="aprovado">Aprovados (enviados por corretores)</option>
+              <option value="meus" id="cadastrosFiltroMeus">Meus cadastros</option>
             </select>
             <button id="novoCadastroButton" type="button" class="primary-button" hidden>Cadastrar imóvel</button>
           </div>
@@ -1148,6 +1153,21 @@
         <button id="avisosAtivar" type="button" class="primary-button" hidden>Ativar avisos neste aparelho</button>
         <button id="avisosDesativar" type="button" class="text-button" hidden>Desligar neste aparelho</button>
       </div>
+      <div class="avisos-teste">
+        <button id="avisosTestar" type="button" class="secondary-button">🔔 Enviar um aviso de teste</button>
+        <small id="avisosTesteInfo" class="muted-text">Chega em até 1 minuto. Feche o app ou bloqueie a tela para ver se aparece.</small>
+      </div>
+      <details class="avisos-dicas">
+        <summary>O aviso não apareceu ou não tocou? Veja o que conferir</summary>
+        <ol>
+          <li>Neste aparelho, toque em <b>Ativar avisos neste aparelho</b> e aceite a pergunta do navegador. É preciso fazer isso <b>em cada aparelho</b> (celular, tablet, computador).</li>
+          <li><b>Android:</b> em Configurações do celular → Apps → Chrome (ou o app instalado) → Notificações, deixe ligado, com <b>som</b> e <b>na tela de bloqueio</b>.</li>
+          <li><b>iPhone:</b> o aviso só chega com o sistema <b>instalado na tela de início</b> (Safari → Compartilhar → Adicionar à Tela de Início). Depois, em Ajustes → Notificações → o app, ligue <b>Sons</b> e <b>Tela Bloqueada</b>.</li>
+          <li>O aviso toca com o <b>som de notificação do aparelho</b> (não é um alarme). Se o celular estiver no silencioso ou no "Não perturbe", ele só aparece na tela.</li>
+          <li>Os compromissos da agenda ficam na tela até a pessoa tocar. Escolha acima com quanto tempo de antecedência quer ser avisado.</li>
+        </ol>
+      </details>
+      <div id="avisosEquipe" class="avisos-equipe" hidden></div>
       <label class="avisos-antecedencia"><span>Avisar dos compromissos da agenda</span>
         <select id="avisosAntecedencia">
           <option value="0">Na hora do compromisso</option>
@@ -1489,6 +1509,7 @@
   <script src="financeiro.js"></script>
   <script src="financeiro-extra.js"></script>
   <script src="fin-gestao.js"></script>
+  <script src="permissoes.js"></script>
   <script src="periodo-fatias.js"></script>
   <script src="painel.js"></script>
   <script src="integracoes.js"></script>

@@ -81,5 +81,35 @@
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
 
-    window.SKLCelular = { menuAberto, fecharMenu: () => abrirMenu(false), escalaBase: () => escalaBase, reaplicarViewport: () => aplicarViewport(true) };
+    // "Travar a tela em pé" (Configurações → Funções da imobiliária): no celular e no tablet, deitado mostra um aviso para virar.
+    // O navegador só trava de verdade no app instalado (screen.orientation.lock); no resto, o aviso cobre a tela.
+    // A escolha fica guardada no aparelho para valer já na tela de entrada.
+    const CHAVE_TRAVA = "sklu_alug_travar_tela";
+    let travada = false;
+    try { travada = localStorage.getItem(CHAVE_TRAVA) === "1"; } catch {}
+    const aparelhoDeToque = () => !!(window.matchMedia && matchMedia("(pointer: coarse)").matches) && Math.min(screen.width || 0, screen.height || 0) < 1100;
+    const deitado = () => !!(window.matchMedia && matchMedia("(orientation: landscape)").matches);
+    function conferirGiro() {
+        let aviso = document.getElementById("gireAviso");
+        const mostrar = travada && aparelhoDeToque() && deitado();
+        if (mostrar && !aviso && document.body) {
+            aviso = document.createElement("div");
+            aviso.id = "gireAviso"; aviso.className = "gire-aviso"; aviso.setAttribute("role", "alert");
+            aviso.innerHTML = "<b>📱</b><strong>Vire o aparelho para a posição em pé</strong><small>O sistema foi ajustado para ser usado na vertical. A imobiliária pode mudar isso em Configurações → Funções da imobiliária.</small>";
+            document.body.appendChild(aviso);
+        }
+        if (aviso) aviso.hidden = !mostrar;
+    }
+    function travarTela(ligar) {
+        travada = !!ligar;
+        try { travada ? localStorage.setItem(CHAVE_TRAVA, "1") : localStorage.removeItem(CHAVE_TRAVA); } catch {}
+        if (travada && aparelhoDeToque() && screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(() => {});
+        if (!travada && screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch {} }
+        conferirGiro();
+    }
+    if (window.matchMedia) matchMedia("(orientation: landscape)").addEventListener("change", conferirGiro);
+    window.addEventListener("orientationchange", () => setTimeout(conferirGiro, 150));
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => travarTela(travada)); else travarTela(travada);
+
+    window.SKLCelular = { menuAberto, fecharMenu: () => abrirMenu(false), escalaBase: () => escalaBase, reaplicarViewport: () => aplicarViewport(true), travarTela };
 })();

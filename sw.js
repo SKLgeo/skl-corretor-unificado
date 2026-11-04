@@ -4,7 +4,7 @@
 // ("skl-unificado-") e a limpeza só apaga caches com esse prefixo — nunca mexe
 // nos caches de outros sites da mesma conta (que usam outros nomes).
 const CACHE_PREFIX = "skl-unificado-";
-const CACHE_NAME = CACHE_PREFIX + "v55";
+const CACHE_NAME = CACHE_PREFIX + "v56";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -83,7 +83,9 @@ self.addEventListener("push", (event) => {
   try { d = event.data ? event.data.json() : {}; } catch (e) { d = { titulo: "Aviso", corpo: event.data ? event.data.text() : "" }; }
   const icone = new URL("./assets/icons/icon-192.png", self.registration.scope).href;
   event.waitUntil(self.registration.showNotification(d.titulo || "Aviso", {
-    body: d.corpo || "", tag: d.id || undefined, renotify: !!d.id, icon: icone, badge: icone, data: { aviso: d }
+    body: d.corpo || "", tag: d.id || undefined, renotify: !!d.id, icon: icone, badge: icone, data: { aviso: d },
+    // compromisso, lembrete, contato novo e teste: ficam na tela até a pessoa tocar e vibram mais forte
+    requireInteraction: [ "agenda", "lembrete", "lead", "teste" ].includes(d.tipo), vibrate: [ 300, 120, 300, 120, 500 ], silent: false
   }));
 });
 self.addEventListener("notificationclick", (event) => {
