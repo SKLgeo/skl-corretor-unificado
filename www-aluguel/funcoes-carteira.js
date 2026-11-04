@@ -7,6 +7,8 @@
     const FUNCOES = [
         { chave: "travar_tela", nome: "Travar a tela em pé (celular e tablet)",
           texto: "No celular e no tablet o sistema fica sempre na vertical: se a pessoa deitar o aparelho, aparece um aviso para virar de volta. No computador nada muda." },
+        { chave: "travar_tela_deitada", nome: "Travar a tela deitada (celular e tablet)",
+          texto: "No celular e no tablet o sistema fica sempre na horizontal: se a pessoa colocar o aparelho em pé, aparece um aviso para virar de volta. Ligar este desliga o \"em pé\" (e vice-versa). No computador nada muda." },
         { chave: "repasses", nome: "Repasses aos proprietários",
           texto: "A aba Repasses do Financeiro e o valor \"A repassar\" no Resumo. Ligue se a imobiliária recebe o aluguel e repassa ao proprietário." },
         { chave: "manutencao", nome: "Manutenção e chamados de defeito",
@@ -22,7 +24,9 @@
         { chave: "portais", nome: "Contatos do ZAP, Viva Real e OLX",
           texto: "Quadro em Configurações → Site e portais para os contatos dos portais entrarem sozinhos no CRM." }
     ];
-    const PADRAO_DESLIGADO = [ "travar_tela" ];
+    const PADRAO_DESLIGADO = [ "travar_tela", "travar_tela_deitada" ];
+    // as duas travas não valem juntas: ligar uma desliga a outra
+    const OPOSTA = { travar_tela: "travar_tela_deitada", travar_tela_deitada: "travar_tela" };
     let ctx = null, funcoes = {};
     const $ = id => document.getElementById(id);
     const h = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -42,7 +46,7 @@
         const aba = document.querySelector('[data-fin-aba="chamados"]');
         if (aba) aba.hidden = !ativa("manutencao");
         FUNCOES.forEach(f => document.body.classList.toggle("sem-" + f.chave, !ativa(f.chave)));
-        if (window.SKLCelular && window.SKLCelular.travarTela) window.SKLCelular.travarTela(ativa("travar_tela"));
+        if (window.SKLCelular && window.SKLCelular.travarTela) window.SKLCelular.travarTela(ativa("travar_tela") ? "retrato" : ativa("travar_tela_deitada") ? "paisagem" : null);
     }
 
     function painel() {
@@ -68,11 +72,14 @@
     async function salvar(cb) {
         const chave = cb.dataset.funcao, ligar = cb.checked;
         cb.disabled = true;
-        const { data, error } = await ctx.sb.rpc("configurar_funcoes_carteira", { p_carteira: ctx.carteiraId(), p_funcoes: { [chave]: ligar } });
+        const pedido = { [chave]: ligar };
+        if (ligar && OPOSTA[chave] && ativa(OPOSTA[chave])) pedido[OPOSTA[chave]] = false;
+        const { data, error } = await ctx.sb.rpc("configurar_funcoes_carteira", { p_carteira: ctx.carteiraId(), p_funcoes: pedido });
         cb.disabled = false;
         if (error) { cb.checked = !ligar; ctx.toast(ctx.traduzErro(error.message || String(error))); return; }
-        funcoes = data || { ...funcoes, [chave]: ligar };
+        funcoes = data || { ...funcoes, ...pedido };
         aplicar();
+        if (Object.keys(pedido).length > 1) painel();
         const fin = window.SKLFinanceiro;
         const abaAtiva = document.querySelector(".fin-aba.ativa");
         if (fin && !ligar && abaAtiva && (abaAtiva.hidden || getComputedStyle(abaAtiva).display === "none")) fin.mostrarAba("resumo");
