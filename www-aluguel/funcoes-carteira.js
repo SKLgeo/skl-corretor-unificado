@@ -9,6 +9,8 @@
           texto: "No celular e no tablet o sistema fica sempre na vertical: se a pessoa deitar o aparelho, aparece um aviso para virar de volta. No computador nada muda." },
         { chave: "travar_tela_deitada", nome: "Travar a tela deitada (celular e tablet)",
           texto: "No celular e no tablet o sistema fica sempre na horizontal: se a pessoa colocar o aparelho em pé, aparece um aviso para virar de volta. Ligar este desliga o \"em pé\" (e vice-versa). No computador nada muda." },
+        { chave: "propostas", nome: "Proposta de negócios (estudo de mercado)",
+          texto: "Menu \"Proposta de negócios\": compara o imóvel com outros parecidos, calcula o valor do m² e gera o PDF com a proposta de valor e a marca da imobiliária." },
         { chave: "repasses", nome: "Repasses aos proprietários",
           texto: "A aba Repasses do Financeiro e o valor \"A repassar\" no Resumo. Ligue se a imobiliária recebe o aluguel e repassa ao proprietário." },
         { chave: "manutencao", nome: "Manutenção e chamados de defeito",

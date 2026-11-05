@@ -12,7 +12,7 @@
         hoje: "hoje", dashboard: "hoje", agenda: "hoje",
         construcoes: "construcoes", clientes: "clientes", negociacoes: "negociacoes",
         conta: "conta", cadastros: "conta", settings: "conta", indicadores: "conta", comissoes: "conta",
-        financeiro: "conta", corretores: "conta", interesses: "conta"
+        financeiro: "conta", corretores: "conta", interesses: "conta", propostas: "conta"
     };
     const OCULTOS_CORRETOR = [ "alugado", "vendido", "indisponivel" ];
     let ctx = null;

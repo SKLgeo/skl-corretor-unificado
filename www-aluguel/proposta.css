@@ -1,0 +1,91 @@
+/* Proposta de negócios (proposta.js) */
+.prop-aviso{margin:0 0 12px;font-size:13px;color:var(--muted)}
+.prop-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.prop-cartao{display:grid;gap:4px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px rgba(15,43,57,.05)}
+.prop-cartao:hover{border-color:var(--navy)}
+.prop-cartao strong{color:var(--navy-deep);font-size:15px}
+.prop-cartao span{font-size:13px;color:var(--ink)}
+.prop-cartao small{font-size:12px;color:var(--muted)}
+.prop-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.prop-topo-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.prop-bloco{margin-bottom:14px}
+.prop-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 14px}
+.prop-grade label{display:grid;gap:4px;min-width:0}
+.prop-grade label span{font-size:12.5px;color:var(--muted);font-weight:600}
+.prop-grade .prop-largo{grid-column:1/-1}
+.prop-botoes{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.prop-foto{width:96px;height:72px;border-radius:10px;background:#e3e9ec center/cover no-repeat;flex:0 0 auto}
+.prop-foto.sem{background-image:none!important}
+.prop-alvo{display:grid;gap:10px}
+.prop-alvo > .prop-foto{width:160px;height:110px}
+.prop-alvo{grid-template-columns:auto 1fr}
+.prop-alvo-campos,.prop-alvo-acoes,.prop-alvo .prop-dica{grid-column:1/-1}
+.prop-alvo-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.prop-alvo-campos label{display:grid;gap:4px}
+.prop-alvo-campos span{font-size:12.5px;color:var(--muted);font-weight:600}
+.prop-alvo-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.prop-im-info{display:grid;gap:2px;min-width:0}
+.prop-im-info strong{color:var(--navy-deep);font-size:14px}
+.prop-im-info span{font-size:12.5px;color:var(--muted)}
+.prop-origem{font-weight:700}
+.prop-origem.cadastro{color:var(--success)!important}
+.prop-origem.fora{color:var(--warning)!important}
+.prop-dica{background:#fff7ec;border-left:3px solid var(--warning);padding:8px 10px;font-size:13px;margin:0;border-radius:6px}
+.prop-amostras{display:grid;gap:8px}
+.prop-amostra{display:grid;grid-template-columns:auto minmax(220px,1.4fr) minmax(260px,1.3fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff}
+.prop-amostra.fora,.prop-amostra.longe{background:#f7f9fa}
+.prop-amostra.fora .prop-amostra-im,.prop-amostra.longe .prop-amostra-im{opacity:.6}
+.prop-usar{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:13px;color:var(--navy-deep)}
+.prop-amostra-im{display:flex;gap:10px;align-items:center;min-width:0}
+.prop-amostra-num{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:13px}
+.prop-amostra-num span{display:grid;gap:2px;white-space:nowrap}
+.prop-amostra-num small{font-size:11px;color:var(--muted)}
+.prop-m2{font-weight:800;color:var(--navy-deep)}
+.prop-amostra-acoes{display:flex;flex-direction:column;gap:5px;align-items:stretch;min-width:150px}
+.prop-amostra-acoes button{padding:6px 10px;font-size:12.5px}
+.prop-motivo{font-style:normal;font-size:12px;color:#9a5a1d;font-weight:600}
+.prop-motivo.leve{color:var(--muted);font-weight:500}
+.prop-ajustes{margin-bottom:12px}
+.prop-estat{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:8px 0 12px}
+.prop-estat div{background:#f4f7f8;border-radius:10px;padding:10px;display:grid;gap:2px}
+.prop-estat small{font-size:11.5px;color:var(--muted)}
+.prop-estat strong{color:var(--navy-deep);font-size:15px}
+.prop-valores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.prop-valores div{border:1.5px solid var(--navy);border-radius:14px;padding:12px;display:grid;gap:3px;text-align:center}
+.prop-valores .mercado{background:var(--navy);color:#fff}
+.prop-valores small{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.prop-valores strong{font-size:20px}
+.prop-valores span{font-size:12px;opacity:.8}
+.prop-leitura{margin:12px 0 0;padding:10px 12px;border-radius:10px;font-size:13.5px;background:#eef6f0;border-left:4px solid var(--success)}
+.prop-leitura.acima{background:#fdf1ee;border-left-color:var(--danger)}
+.prop-leitura.abaixo{background:#fff7ec;border-left-color:var(--warning)}
+.prop-busca-topo{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:8px;margin:8px 0}
+.prop-busca-lista{display:grid;gap:6px;max-height:55vh;overflow:auto;padding:2px}
+.prop-busca-item{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer}
+.prop-busca-item:has(input:checked){border-color:var(--navy);background:#f1f7fb}
+.prop-busca-item.usado{opacity:.5;cursor:default}
+.prop-busca-item .prop-foto{width:72px;height:54px}
+.prop-busca-txt{display:grid;gap:1px;min-width:0}
+.prop-busca-txt strong{font-size:13.5px;color:var(--navy-deep)}
+.prop-busca-txt small{font-size:12px;color:var(--muted)}
+.prop-im-fotos{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 4px}
+.prop-im-fotos-lista{display:flex;gap:8px;flex-wrap:wrap}
+.prop-im-foto{position:relative;width:86px;height:64px;border-radius:8px;background:#e3e9ec center/cover no-repeat}
+.prop-im-foto em{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.6);color:#fff;font-style:normal;font-size:10px;padding:1px 5px;border-radius:4px}
+.prop-im-foto button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--danger);color:#fff;font-weight:800;line-height:1}
+.prop-foto-botao{cursor:pointer}
+@media(max-width:1100px){
+  .prop-amostra{grid-template-columns:auto 1fr}
+  .prop-amostra-num,.prop-amostra-acoes{grid-column:1/-1}
+  .prop-amostra-acoes{flex-direction:row;flex-wrap:wrap}
+  .prop-estat{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:780px){
+  .prop-valores{grid-template-columns:1fr}
+  .prop-busca-topo{grid-template-columns:1fr}
+  .prop-amostra-num{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .prop-alvo{grid-template-columns:1fr}
+  .prop-alvo > .prop-foto{width:100%;height:170px}
+}
+.prop-busca-item input,.prop-usar input{width:auto!important;flex:0 0 auto;margin:0;min-height:0}
+.prop-busca-txt{flex:1 1 auto;text-align:left}

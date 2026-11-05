@@ -269,3 +269,5 @@ body.sem-portais .ext-int-portais{display:none!important}
 @media(max-width:899px){
   body.modo-corretor #page-construcoes.active-page #newConstrucaoButton:not([hidden]){position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:40;border-radius:999px;padding:14px 20px;box-shadow:0 8px 22px rgba(0,30,50,.28)}
 }
+/* Proposta de negócios desligada em Funções da imobiliária */
+body.sem-propostas #navPropostas,body.sem-propostas #contaIrPropostas,body.sem-propostas #page-propostas{display:none!important}

@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.17.1";
+    const APP_VERSION = "0.17.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -191,6 +191,7 @@
         });
         $("construcaoSearchInput").addEventListener("input", renderConstrucoes);
         $("construcaoStatusFilter").addEventListener("change", renderConstrucoes);
+        $("construcaoCorretorFilter").addEventListener("change", renderConstrucoes);
         // bairro: digita e escolhe na lista curta (em vez da lista enorme do navegador)
         autocompletarBairro($("bairroFiltroInput"), nome => { $("bairroFiltroInput").value = nome; adicionarBairroFiltro(); }, adicionarBairroFiltro);
         autocompletarBairro($("bairroInput"), nome => { $("bairroInput").value = nome; $("bairroInput").dispatchEvent(new Event("input", { bubbles: true })); });
@@ -991,13 +992,14 @@
         $("newConstrucaoButton").textContent = gerencia ? "Novo imóvel" : "+ Cadastrar imóvel";
         // o que aparece no menu segue as permissões do tipo de acesso (padrão: como sempre foi)
         $("navInteresses").hidden = !pode("tela_interesses");
+        $("navPropostas").hidden = !pode("tela_propostas");
         $("navCorretores").hidden = !pode("tela_equipe");
         $("navComissoes").hidden = !pode("tela_comissoes");
         const aprovador = pode("aprovar_cadastros");
         $("navCadastros").hidden = !(aprovador || gerencia || currentUser.papel === "corretor");
         [ "negociacoes", "agenda", "clientes" ].forEach(p => { document.querySelector(`#mainNav [data-page="${p}"]`).hidden = !pode("tela_crm"); });
         document.querySelector('#mainNav [data-page="indicadores"]').hidden = !pode("tela_indicadores");
-        [ [ "contaIrFinanceiro", "ver_financeiro" ], [ "contaIrEquipe", "tela_equipe" ], [ "contaIrInteresses", "tela_interesses" ], [ "contaIrPainel", "tela_painel" ] ]
+        [ [ "contaIrFinanceiro", "ver_financeiro" ], [ "contaIrEquipe", "tela_equipe" ], [ "contaIrInteresses", "tela_interesses" ], [ "contaIrPainel", "tela_painel" ], [ "contaIrPropostas", "tela_propostas" ] ]
             .forEach(([ id, chave ]) => { const b = $(id); if (b) b.hidden = !pode(chave); });
         const bInd = document.querySelector('#page-conta [data-go="indicadores"]');
         if (bInd) bInd.hidden = !pode("tela_indicadores");
@@ -1047,11 +1049,15 @@
         if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
         if (window.SKLPortalCliente) await seguro("portal do cliente", () => window.SKLPortalCliente.iniciar(ctxExtras));
         if (window.SKLAgendaCelular) await seguro("agenda no celular", () => window.SKLAgendaCelular.iniciar(ctxExtras));
+        if (window.SKLPropostas && pode("tela_propostas")) await seguro("proposta de negócios", () => window.SKLPropostas.iniciar({ ...ctxExtras,
+            fotosCapa, fotoUrl: resolveFotoUrl, novoImovel: novoImovelPreenchido,
+            imprimir: html => window.SKLFinanceiro && window.SKLFinanceiro.imprimir(html) }));
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
     function logout() {
         if (window.SKLCRM) window.SKLCRM.sair();
+        if (window.SKLPropostas) window.SKLPropostas.sair();
         if (window.SKLFinanceiro) window.SKLFinanceiro.sair();
         if (window.SKLDivisao) window.SKLDivisao.sair();
         if (window.SKLMetas) window.SKLMetas.sair();
@@ -1095,12 +1101,13 @@
         $(`page-${page}`).classList.add("active-page");
         const titles = {
             hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Equipe", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
-            settings: "Configurações", financeiro: "Financeiro", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
+            settings: "Configurações", financeiro: "Financeiro", propostas: "Proposta de negócios", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
         if (window.SKLCRM) window.SKLCRM.aoMostrar(page);
         if (page === "financeiro" && window.SKLFinanceiro) window.SKLFinanceiro.aoMostrar();
+        if (page === "propostas" && window.SKLPropostas) window.SKLPropostas.aoMostrar();
         if (window.SKLModoCorretor) window.SKLModoCorretor.aoMostrar(page);
     }
 
@@ -1482,6 +1489,7 @@
         $("recentesButton").setAttribute("aria-pressed", "false");
         $("construcaoSearchInput").value = "";
         $("bairroFiltroInput").value = "";
+        $("construcaoCorretorFilter").value = "";
         definirFinalidadeFiltro("todos");
         renderConstrucoes();
     }
@@ -1489,12 +1497,14 @@
     function filteredConstrucoes() {
         const termo = normalizar($("construcaoSearchInput").value);
         const status = $("construcaoStatusFilter").value;
+        const corretor = $("construcaoCorretorFilter").value;
         const bairros = bairrosFiltro.map(normalizar);
         const porFinalidade = baseBusca().filter(passaFinalidade);
         atualizarFaixaValor(porFinalidade);
         const usarFaixa = faixaAtiva();
         const filtrados = porFinalidade.filter(c => {
             if (status && c.status !== status) return false;
+            if (corretor && (captadorDe(c) || SEM_CORRETOR) !== corretor) return false;
             if (bairros.length && !bairros.includes(normalizar(c.bairro))) return false;
             if (usarFaixa) {
                 const v = valorNaFinalidade(c);
@@ -1575,8 +1585,32 @@
         });
     }
 
+    // Filtro "Cadastrado por": só os corretores que têm imóvel na busca, com a quantidade de cada um.
+    // Vale quem captou (captador definido pela Central ou, sem ele, quem cadastrou). Imóvel importado sem ninguém = "Sem corretor informado".
+    const SEM_CORRETOR = "__sem";
+    let filtroCorretorChave = "";
+    function montarFiltroCorretor() {
+        const sel = $("construcaoCorretorFilter");
+        const contagem = new Map();
+        baseBusca().filter(passaFinalidade).forEach(c => { const id = captadorDe(c) || SEM_CORRETOR; contagem.set(id, (contagem.get(id) || 0) + 1); });
+        equipeDaCarteira().then(equipe => {
+            const nome = id => id === SEM_CORRETOR ? "Sem corretor informado"
+                : (corretores.find(u => u.id === id)?.display_name || equipe.find(p => p.id === id)?.nome || "Pessoa que não está mais na equipe");
+            const itens = [ ...contagem.entries() ].map(([ id, qtd ]) => ({ id, qtd, nome: nome(id) }))
+                .sort((a, b) => (a.id === SEM_CORRETOR) - (b.id === SEM_CORRETOR) || a.nome.localeCompare(b.nome, "pt-BR"));
+            const chave = itens.map(i => i.id + ":" + i.qtd + ":" + i.nome).join("|");
+            if (chave === filtroCorretorChave) return;
+            filtroCorretorChave = chave;
+            const atual = sel.value;
+            sel.innerHTML = `<option value="">Cadastrado por: todos</option>` + itens.map(i => `<option value="${h(i.id)}">${h(i.nome)} (${i.qtd})</option>`).join("");
+            sel.value = itens.some(i => i.id === atual) ? atual : "";
+            if (atual && sel.value !== atual) renderConstrucoes();
+        });
+    }
+
     function renderConstrucoes() {
         if (!$("construcaoStatusFilter").options.length) montarOpcoesStatusFiltro();
+        montarFiltroCorretor();
         renderChipsBairro();
         const rurais = baseBusca().filter(c => c.rural).length;
         $("zonaRuralQtd").textContent = rurais ? ` (${rurais})` : "";
@@ -1829,6 +1863,31 @@
     // cadastro enquanto não foi aprovado) e "leitura" (corretor vendo um imóvel aprovado: ficha + interesse).
     // A Central abre um imóvel já cadastrado em "leitura" (travado, para não alterar nada sem querer) e só edita
     // depois de tocar em "Destravar edição". Imóvel novo e cadastro aguardando aprovação já abrem para editar.
+
+    // "Proposta de negócios" → "Cadastrar na Central": abre o cadastro de imóvel novo já preenchido com os dados e as fotos da proposta
+    function novoImovelPreenchido(d, arquivos) {
+        openConstrucaoDialog(null);
+        const venda = d.finalidade !== "aluguel";
+        $("construcaoNomeInput").value = d.nome || "";
+        $("finalidadeVendaInput").checked = venda;
+        $("finalidadeAluguelInput").checked = !venda;
+        if (d.tipo_imovel && ![ ...$("construcaoTipoInput").options ].some(o => o.value === d.tipo_imovel)) {
+            $("construcaoTipoInput").insertAdjacentHTML("beforeend", `<option value="${h(d.tipo_imovel)}">${h(d.tipo_imovel)}</option>`);
+        }
+        if (d.tipo_imovel) $("construcaoTipoInput").value = d.tipo_imovel;
+        if (d.valor) $(venda ? "construcaoValorVendaInput" : "construcaoValorInput").value = formatMoney(d.valor);
+        if (d.area) $("areaInput").value = String(d.area).replace(".", ",");
+        lembrarAreaDigitada();
+        [ [ "quartosInput", d.quartos ], [ "suitesInput", d.suites ], [ "banheirosInput", d.banheiros ], [ "vagasInput", d.vagas ],
+          [ "logradouroInput", d.logradouro ], [ "numeroInput", d.numero ], [ "bairroInput", d.bairro ], [ "cidadeInput", d.cidade ], [ "ufInput", d.uf ],
+          [ "construcaoDescricaoInput", d.descricao ] ].forEach(([ id, v ]) => { if (v != null && v !== "") $(id).value = v; });
+        if (d.valor_condominio) { $("condominioTipoInput").value = "valor"; $("condominioValorInput").value = formatMoney(d.valor_condominio); }
+        atualizarCamposCaracteristicas();
+        atualizarCamposFinalidade();
+        atualizarCamposCusto();
+        (arquivos || []).forEach(file => fotosNovas.push({ file, previewUrl: URL.createObjectURL(file) }));
+        renderGaleria();
+    }
 
     function openConstrucaoDialog(construcao, opcoes = {}) {
         editandoId = construcao ? construcao.id : null;
@@ -2731,6 +2790,7 @@
             fotosNovas = [];
             fotosRemovidas = [];
             salvo = true;
+            document.dispatchEvent(new CustomEvent("skl-imovel-salvo", { detail: imovel }));
             let avisoDocs = "";
             if (docsPendentes && docsPendentes.quantidade()) {
                 const falhas = await docsPendentes.enviar("imovel", imovel.id);

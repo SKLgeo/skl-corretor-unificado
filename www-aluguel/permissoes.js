@@ -10,6 +10,7 @@
         { grupo: "Imóveis" },
         { chave: "aprovar_cadastros", nome: "Aprovar cadastros de imóveis", texto: "Aprovar ou recusar os imóveis que os corretores cadastram (menu Cadastros).", padrao: [ "central_vendas" ], muda: TODOS },
         { chave: "editar_imoveis", nome: "Editar imóveis aprovados", texto: "Destravar e alterar um imóvel que já está no ar.", padrao: [ "central_vendas" ], muda: [ "central_vendas" ] },
+        { chave: "tela_propostas", nome: "Proposta de negócios", texto: "Montar estudos de mercado com proposta de valor e gerar o PDF com a marca da imobiliária.", padrao: [ "central_vendas", "gestor" ], muda: TODOS },
         { grupo: "Equipe e clientes" },
         { chave: "ver_equipe_toda", nome: "Ver clientes e negócios de toda a equipe", texto: "Desligado, a pessoa vê só os próprios clientes, negócios e agenda.", padrao: [ "central_vendas", "gestor", "financeiro" ], muda: TODOS },
         { chave: "tela_crm", nome: "Negociações, Agenda e Clientes", texto: "As telas do dia a dia do corretor.", padrao: [ "corretor", "central_vendas", "gestor" ], muda: TODOS },

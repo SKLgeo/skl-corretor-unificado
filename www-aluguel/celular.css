@@ -71,4 +71,4 @@
   .connection-area .secondary-button{min-height:42px;padding:8px 12px;font-size:14.5px;white-space:nowrap}
 }
 @media(max-width:780px){.panel,.form-panel{grid-template-columns:minmax(0,1fr)}select{min-width:0;width:100%}}
-@media(max-width:780px){.busca-linha{flex-wrap:wrap}.busca-linha #construcaoSearchInput,.busca-linha #construcaoStatusFilter{flex:1 1 100%;width:100%;min-width:0}}
+@media(max-width:780px){.busca-linha{flex-wrap:wrap}.busca-linha #construcaoSearchInput,.busca-linha #construcaoStatusFilter,.busca-linha #construcaoCorretorFilter{flex:1 1 100%;width:100%;min-width:0}}

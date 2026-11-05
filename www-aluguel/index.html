@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="extras.css" />
   <link rel="stylesheet" href="gestao.css" />
   <link rel="stylesheet" href="fiscal.css" />
+  <link rel="stylesheet" href="proposta.css" />
   <link rel="stylesheet" href="celular.css" />
 </head>
 <body>
@@ -91,6 +92,7 @@
         <button class="nav-button" data-page="clientes"><span>☺</span> <em class="nav-texto">Clientes</em><b id="navClientesBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
         <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
+        <button class="nav-button" id="navPropostas" data-page="propostas" hidden><span>✎</span> Proposta de negócios</button>
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
         <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Equipe</button>
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
@@ -163,6 +165,7 @@
           <button type="button" id="contaIrFinanceiro" data-go="financeiro" hidden><span>$</span><em>Financeiro</em><i>›</i></button>
           <button type="button" id="contaIrEquipe" data-go="corretores" hidden><span>◔</span><em>Equipe</em><i>›</i></button>
           <button type="button" id="contaIrInteresses" data-go="interesses" hidden><span>☎</span><em>Interesses</em><i>›</i></button>
+          <button type="button" id="contaIrPropostas" data-go="propostas" hidden><span>✎</span><em>Proposta de negócios</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
           <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
           <button type="button" id="contaVoltarCentral" hidden><span>↩</span><em>Voltar para a tela da Central</em><i>›</i></button>
@@ -199,6 +202,7 @@
             </div>
             <input id="construcaoSearchInput" type="search" placeholder="Nome, código, endereço ou edifício" />
             <select id="construcaoStatusFilter"></select>
+            <select id="construcaoCorretorFilter" aria-label="Corretor que cadastrou"><option value="">Cadastrado por: todos</option></select>
           </div>
           <div class="busca-linha">
             <div class="bairro-filtro">
@@ -351,6 +355,8 @@
         <div id="cadastrosLista" class="cadastros-lista"></div>
         <div id="cadastrosVazio" class="empty-state" hidden>—</div>
       </section>
+
+      <section id="page-propostas" class="page"><div id="propostasConteudo"></div></section>
 
       <section id="page-interesses" class="page">
         <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel e de compra registrados pelos corretores, com a ficha de contato do cliente.</p>
@@ -1525,6 +1531,7 @@
   <script src="contabil.js"></script>
   <script src="agenda-celular.js"></script>
   <script src="funcoes-carteira.js"></script>
+  <script src="proposta.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>
