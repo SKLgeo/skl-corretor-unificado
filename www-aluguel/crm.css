@@ -342,3 +342,7 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
   .crm-compat-foto{width:78px;height:60px}
   .crm-compat-acoes{grid-column:1/-1}
 }
+
+/* 05/11/2026: resumo da negociação em caixa de texto (antes era uma linha só e cortava no celular) */
+.crm-resumo-campo{display:grid;gap:4px;margin:0 0 10px}
+.crm-resumo-campo textarea{width:100%;min-height:84px;max-height:260px;resize:vertical;field-sizing:content;line-height:1.45}

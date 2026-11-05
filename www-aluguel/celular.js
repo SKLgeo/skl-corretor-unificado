@@ -71,9 +71,38 @@
         });
     }
 
+    // Menu no celular (Configurações → Minha conta → Aparência no celular): "gaveta" (☰, padrão) ou "topo"
+    // (logo, telas em botões que deslizam para o lado e o nome da pessoa logo abaixo). Vale só neste aparelho.
+    const CHAVE_MENU = "sklu_alug_menu_celular";
+    let menuModo = "gaveta";
+    try { menuModo = localStorage.getItem(CHAVE_MENU) === "topo" ? "topo" : "gaveta"; } catch {}
+    function aplicarMenu(modo, guardar) {
+        menuModo = modo === "topo" ? "topo" : "gaveta";
+        if (guardar) { try { localStorage.setItem(CHAVE_MENU, menuModo); } catch {} }
+        document.body.classList.toggle("menu-topo", menuModo === "topo");
+        if (menuModo === "topo") abrirMenu(false);
+        document.querySelectorAll('input[name="menuCelular"]').forEach(r => { r.checked = r.value === menuModo; });
+        centralizarAtivo();
+    }
+    // no menu do topo, o botão da tela aberta fica à vista (a faixa rola sozinha até ele)
+    function centralizarAtivo() {
+        if (menuModo !== "topo" || !telaPequena()) return;
+        const nav = document.getElementById("mainNav"), ativo = nav && nav.querySelector(".nav-button.active");
+        if (ativo) nav.scrollTo({ left: Math.max(0, ativo.offsetLeft - (nav.clientWidth - ativo.offsetWidth) / 2), behavior: "smooth" });
+    }
+    function ligarAparencia() {
+        document.querySelectorAll('input[name="menuCelular"]').forEach(r => r.addEventListener("change", () => {
+            if (r.checked) aplicarMenu(r.value, true);
+        }));
+        const nav = document.getElementById("mainNav");
+        if (nav) new MutationObserver(() => setTimeout(centralizarAtivo, 50)).observe(nav, { subtree: true, attributes: true, attributeFilter: [ "class" ] });
+        aplicarMenu(menuModo, false);
+    }
+
     let espera = null;
     function iniciar() {
         montarGaveta();
+        ligarAparencia();
         rotularTabelas();
         new MutationObserver(() => { clearTimeout(espera); espera = setTimeout(rotularTabelas, 120); })
             .observe(document.body, { childList: true, subtree: true });
@@ -114,5 +143,5 @@
     window.addEventListener("orientationchange", () => setTimeout(conferirGiro, 150));
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => travarTela(travada)); else travarTela(travada);
 
-    window.SKLCelular = { menuAberto, fecharMenu: () => abrirMenu(false), escalaBase: () => escalaBase, reaplicarViewport: () => aplicarViewport(true), travarTela };
+    window.SKLCelular = { menuAberto, fecharMenu: () => abrirMenu(false), menuModo: () => menuModo, aplicarMenu, escalaBase: () => escalaBase, reaplicarViewport: () => aplicarViewport(true), travarTela };
 })();

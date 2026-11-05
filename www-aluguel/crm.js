@@ -24,7 +24,8 @@
     const COR_FUNIL = { venda: "#ffffff", locacao: "#e0f2fe", captacao: "#ffedd5" };
     // Negociações em forma de funil (etapas uma embaixo da outra, como no papel da imobiliária) ou em colunas (quadro)
     const CHAVE_VISAO = "sklu_alug_crm_visao";
-    let visao = (() => { try { return localStorage.getItem(CHAVE_VISAO) === "quadro" ? "quadro" : "funil"; } catch (e) { return "funil"; } })();
+    // 05/11/2026: Negócios sempre abre no Quadro (colunas); o Funil fica no botão "Funil" e vale até sair da tela
+    let visao = "quadro";
     const faixasAbertas = new Map();   // chave da etapa → aberta/fechada (só nesta sessão)
     let conversao = null, conversaoChave = "";
     const clientes = new Map();
@@ -386,7 +387,7 @@
         conectar();
     }
     function aoMostrar(pagina) {
-        if (pagina === "negociacoes") renderQuadro();
+        if (pagina === "negociacoes") { visao = "quadro"; renderQuadro(); }
         if (pagina === "agenda") renderAgenda();
         if (pagina === "clientes") renderClientes();
         if (pagina === "settings" && central()) renderConfig();
@@ -412,7 +413,6 @@
         $("crmBuscaNeg").addEventListener("input", renderQuadro);
         document.querySelectorAll("#crmVisao [data-vis]").forEach(b => b.addEventListener("click", () => {
             visao = b.dataset.vis;
-            try { localStorage.setItem(CHAVE_VISAO, visao); } catch (e) { /* só lembra no aparelho */ }
             renderQuadro();
         }));
         $("crmCorretorFiltro").addEventListener("change", renderQuadro);

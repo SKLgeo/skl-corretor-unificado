@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.18.0";
+    const APP_VERSION = "0.18.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1000,7 +1000,7 @@
         $("navCadastros").hidden = !(aprovador || gerencia || currentUser.papel === "corretor");
         [ "negociacoes", "agenda", "clientes" ].forEach(p => { document.querySelector(`#mainNav [data-page="${p}"]`).hidden = !pode("tela_crm"); });
         document.querySelector('#mainNav [data-page="indicadores"]').hidden = !pode("tela_indicadores");
-        [ [ "contaIrFinanceiro", "ver_financeiro" ], [ "contaIrEquipe", "tela_equipe" ], [ "contaIrInteresses", "tela_interesses" ], [ "contaIrPainel", "tela_painel" ], [ "contaIrPropostas", "tela_propostas" ], [ "contaEuCorretor", "tela_propostas" ] ]
+        [ [ "contaIrFinanceiro", "ver_financeiro" ], [ "contaIrEquipe", "tela_equipe" ], [ "contaIrInteresses", "tela_interesses" ], [ "contaIrPainel", "tela_painel" ], [ "contaIrPropostas", "tela_propostas" ], [ "contaEuCorretor", "tela_propostas" ], [ "ctTabPropostas", "tela_propostas" ] ]
             .forEach(([ id, chave ]) => { const b = $(id); if (b) b.hidden = !pode(chave); });
         const bInd = document.querySelector('#page-conta [data-go="indicadores"]');
         if (bInd) bInd.hidden = !pode("tela_indicadores");

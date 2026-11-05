@@ -271,3 +271,16 @@ body.sem-portais .ext-int-portais{display:none!important}
 }
 /* Proposta de negócios desligada em Funções da imobiliária */
 body.sem-propostas #navPropostas,body.sem-propostas #contaIrPropostas,body.sem-propostas #contaEuCorretor,body.sem-propostas #page-propostas{display:none!important}
+
+/* Configurações em abas (config-abas.js) */
+#page-settings .settings-grid>[data-cfg-fora]{display:none!important}
+.cfg-abas{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px;position:sticky;top:0;z-index:20;background:#eef2f3;padding:8px 0}
+.cfg-abas button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:9px 15px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap}
+.cfg-abas button small{background:#eef3f6;color:var(--muted);border-radius:99px;padding:1px 8px;font-size:12px}
+.cfg-abas button.ativo{background:var(--navy);border-color:var(--navy);color:#fff}
+.cfg-abas button.ativo small{background:rgba(255,255,255,.22);color:#fff}
+@media(max-width:780px){
+  .cfg-abas{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -12px 14px;padding:8px 12px}
+  .cfg-abas::-webkit-scrollbar{display:none}
+  .cfg-abas button{flex:none;min-height:44px;font-size:15px}
+}

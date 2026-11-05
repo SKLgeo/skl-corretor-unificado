@@ -118,6 +118,7 @@
         <button type="button" data-ct-page="construcoes"><span class="ct-ico">⌂</span><em>Imóveis</em></button>
         <button type="button" data-ct-page="clientes"><span class="ct-ico">☺</span><em>Clientes</em></button>
         <button type="button" data-ct-page="negociacoes"><span class="ct-ico">▤</span><em>Negócios</em></button>
+        <button type="button" data-ct-page="propostas" id="ctTabPropostas" hidden><span class="ct-ico">✎</span><em>Propostas</em></button>
         <button type="button" data-ct-page="conta"><span class="ct-ico">◉</span><em>Conta</em><b id="ctBadgeConta" class="ct-badge" hidden>0</b></button>
       </nav>
 
@@ -242,8 +243,8 @@
         <div class="crm-toolbar">
           <div id="crmFunilTabs" class="segmentado"></div>
           <div id="crmVisao" class="segmentado crm-visao" role="group" aria-label="Como ver as negociações">
-            <button type="button" data-vis="funil" title="Etapas uma embaixo da outra, em forma de funil">▽ Funil</button>
             <button type="button" data-vis="quadro" title="Etapas em colunas, lado a lado">▥ Quadro</button>
+            <button type="button" data-vis="funil" title="Etapas uma embaixo da outra, em forma de funil">▽ Funil</button>
           </div>
           <input id="crmBuscaNeg" type="search" placeholder="Buscar cliente, imóvel ou telefone" autocomplete="off" />
           <select id="crmCorretorFiltro" data-so-central><option value="">Todos os corretores</option></select>
@@ -564,6 +565,12 @@
             <p id="crmRoletaProximo" class="muted-text"></p>
             <button id="crmSalvarRoleta" type="button" class="primary-button">Salvar roleta</button>
           </div>
+          <div id="aparenciaPanel" class="panel form-panel"><span class="eyebrow">APARÊNCIA NO CELULAR</span><h2>Menu da tela</h2>
+            <p class="muted-text">Escolha como o menu aparece no celular. Vale só neste aparelho.</p>
+            <div class="aparencia-opcoes">
+              <label class="aparencia-opcao"><input type="radio" name="menuCelular" value="gaveta" /> <span><b>Menu escondido (☰)</b><small>O menu abre por um botão no canto, e a tela fica livre.</small></span></label>
+              <label class="aparencia-opcao"><input type="radio" name="menuCelular" value="topo" /> <span><b>Menu no topo</b><small>Logo, telas em botões que deslizam para o lado e seu nome logo abaixo.</small></span></label>
+            </div></div>
           <div class="panel form-panel"><span class="eyebrow">SOBRE</span><h2>Versão instalada</h2><p id="appVersionText">—</p></div>
         </div>
       </section>
@@ -914,10 +921,8 @@
           <label><span>Observação</span><input id="crmProcObs" maxlength="500" placeholder="ex.: precisa aceitar financiamento" autocomplete="off" /></label>
         </div>
       </div>
-      <div class="form-row">
-        <label><span>Resumo</span><input id="crmNegTituloInput" placeholder="ex.: casa 3 quartos perto da escola" autocomplete="off" /></label>
-        <label id="crmNegCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmNegCorretor"></select></label>
-      </div>
+      <label class="crm-resumo-campo"><span>Resumo</span><textarea id="crmNegTituloInput" rows="3" maxlength="600" placeholder="ex.: casa 3 quartos perto da escola"></textarea></label>
+      <label id="crmNegCorretorLabel" data-so-central><span>Corretor responsável</span><select id="crmNegCorretor"></select></label>
       <label id="crmNegPrazoLabel" class="crm-prazo" hidden><span>Prazo do contrato de locação (meses)</span><input id="crmNegPrazo" type="number" min="1" max="120" placeholder="30" /></label>
       <details class="crm-perfil">
         <summary>O que o cliente procura</summary>
@@ -1533,6 +1538,7 @@
   <script src="agenda-celular.js"></script>
   <script src="funcoes-carteira.js"></script>
   <script src="proposta.js"></script>
+  <script src="config-abas.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

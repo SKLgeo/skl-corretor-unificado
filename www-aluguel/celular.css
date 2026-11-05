@@ -72,3 +72,28 @@
 }
 @media(max-width:780px){.panel,.form-panel{grid-template-columns:minmax(0,1fr)}select{min-width:0;width:100%}}
 @media(max-width:780px){.busca-linha{flex-wrap:wrap}.busca-linha #construcaoSearchInput,.busca-linha #construcaoStatusFilter,.busca-linha #construcaoCorretorFilter{flex:1 1 100%;width:100%;min-width:0}}
+
+/* Menu no topo (Configurações → Aparência no celular): o menu volta a ficar no alto da tela, com o logo, as telas em
+   botões que deslizam para o lado e o nome da pessoa logo abaixo. Escolha guardada no aparelho (celular.js). */
+.aparencia-opcoes{display:grid;gap:10px}
+.aparencia-opcao{display:flex!important;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;background:#fff}
+.aparencia-opcao input{width:auto;margin-top:3px;flex:none}
+.aparencia-opcao b{display:block;color:var(--navy-deep)}
+.aparencia-opcao small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.aparencia-opcao:has(input:checked){border-color:var(--navy);box-shadow:0 0 0 2px var(--navy) inset}
+@media(max-width:780px){
+  body.menu-topo:not(.modo-corretor) .sidebar{position:static;transform:none;width:auto;box-shadow:none;overflow:visible;padding:16px 14px 12px;border-right:0;border-bottom:4px solid var(--navy-deep);transition:none}
+  body.menu-topo:not(.modo-corretor) .menu-gaveta-botao,body.menu-topo .menu-gaveta-fundo{display:none!important}
+  body.menu-topo .sidebar-brand{padding-bottom:12px;margin-bottom:12px}
+  body.menu-topo .sidebar-brand img{width:150px;max-height:84px}
+  body.menu-topo #mainNav{display:flex!important;flex-wrap:nowrap;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 0 12px;border-bottom:1px solid rgba(255,255,255,.14);scrollbar-width:none}
+  body.menu-topo #mainNav::-webkit-scrollbar{display:none}
+  body.menu-topo #mainNav .nav-button{flex:none;white-space:nowrap;background:rgba(255,255,255,.1);padding:11px 16px;scroll-snap-align:start}
+  body.menu-topo #mainNav .nav-button[hidden]{display:none}
+  body.menu-topo #mainNav .nav-button.active{background:rgba(255,255,255,.26);box-shadow:inset 0 -3px 0 var(--gold)}
+  body.menu-topo .sidebar-user{margin-top:12px;padding:12px 4px 0;border-top:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;align-items:center}
+  body.menu-topo .sidebar-user .sidebar-avatar{grid-row:1/3}
+  body.menu-topo .sidebar-user strong{font-size:16px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body.menu-topo .sidebar-user #currentUserRole{grid-column:2}
+  body.menu-topo .sidebar-user button{grid-column:3;grid-row:1/3;justify-self:end;font-size:15px}
+}

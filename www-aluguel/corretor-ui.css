@@ -11,7 +11,7 @@ body.modo-corretor #modoCorretorButton{padding:8px 11px;font-size:12.5px;white-s
 body.modo-corretor .toast{left:16px;right:16px;max-width:none;bottom:calc(86px + env(safe-area-inset-bottom))}
 
 /* abas — celular */
-.corretor-tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(6,27,46,.08);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.corretor-tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(6,27,46,.08);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 .corretor-tabs button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:7px 2px 6px;color:var(--muted);border-radius:12px;min-width:0}
 .corretor-tabs .ct-ico{font-size:21px;line-height:1}
 .corretor-tabs em{font-style:normal;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -122,3 +122,13 @@ body.modo-corretor .toast{left:16px;right:16px;max-width:none;bottom:calc(86px +
 .ct-foco small{color:var(--muted);font-size:12px}
 .ct-foco.com-foco{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 25%,transparent)}
 @media(max-width:600px){.ct-foco label{flex-wrap:wrap}.ct-foco select{min-width:0;width:100%}}
+
+/* aba escondida (ex.: Propostas sem permissão) não ocupa lugar */
+.corretor-tabs button[hidden]{display:none!important}
+/* 05/11/2026: 6 abas embaixo (com Propostas) e título comprido ("Proposta de negócios") sem passar por cima do sino */
+@media(max-width:780px){
+  .corretor-tabs em{font-size:10.5px;letter-spacing:-.01em}
+  body.modo-corretor .topbar{flex-wrap:wrap!important}
+  body.modo-corretor .topbar>div:not(.connection-area){flex:1 1 auto;min-width:fit-content!important}
+  body.modo-corretor .connection-area{width:auto!important;order:0!important;flex:0 0 auto;margin-left:auto}
+}
