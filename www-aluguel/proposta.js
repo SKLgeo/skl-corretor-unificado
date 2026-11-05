@@ -17,14 +17,53 @@
         : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
     const TIPOS = [ "Casa", "Casa de condomínio", "Sobrado", "Apartamento", "Cobertura", "Kitnet/Studio", "Sala comercial", "Ponto comercial", "Galpão", "Terreno", "Chácara/Sítio", "Fazenda", "Sítio", "Chácara rural", "Área rural", "Outro" ];
     const SO_TERRENO = [ "Terreno", "Terreno rural", "Área rural" ];
-    const PADRAO_AJUSTES = { base: "auto", faixa: 30, rapido: 8, otimista: 10 };
+    // Configuração da imobiliária (carteiras_aluguel.proposta_config, gravada pela Central em "⚙ Configuração da proposta").
+    // Toda proposta nova começa com estes valores; o que o corretor muda vale só na proposta dele.
+    const CFG_PADRAO = {
+        faixa: 30, min_corte: 3, min_amostras: 3, calculo: "media", oferta: 0, arredondar: 0,
+        oportunidade: 10, competitivo: 5, otimista: 10, ajuste_max: 15, sugerido: "competitivo", validade: 30,
+        corretor_altera: true, mostrar_estatisticas: true, mostrar_pedido_pdf: false, texto_pdf: "",
+        exclusividade_ligada: true, ex_prazo: 90, ex_comissao: 6, ex_autorizacao: true,
+        ex_texto: "Trabalhamos para vender o seu imóvel pelo melhor valor possível, no menor tempo, com segurança na documentação e acompanhamento em cada etapa. Com a exclusividade, concentramos o esforço de toda a equipe no seu imóvel e você tem um único responsável por cuidar de tudo.",
+        ex_plano: "Fotos e descrição caprichadas do imóvel\nAnúncio no site da imobiliária e nos principais portais\nDivulgação para a nossa carteira de clientes e corretores parceiros\nPlaca no imóvel, com a sua autorização\nVisitas sempre acompanhadas por um corretor\nRetorno ao proprietário a cada 15 dias, com visitas e propostas recebidas",
+        ex_compromissos: "Atender os interessados com agilidade\nConferir o perfil dos interessados antes das visitas\nApresentar por escrito todas as propostas recebidas\nAcompanhar a documentação até a assinatura da escritura"
+    };
+    let cfg = { ...CFG_PADRAO };
+    const FAIXAS = [ [ "oportunidade", "Valor de oportunidade" ], [ "competitivo", "Valor competitivo" ], [ "mercado", "Valor de mercado" ], [ "otimista", "Valor otimista" ] ];
+    const NOME_FAIXA = Object.fromEntries(FAIXAS);
+    const CURTO = { oportunidade: "Oportunidade", competitivo: "Competitivo", mercado: "Mercado", otimista: "Otimista" };
+    const ehCentral = () => !!ctx && [ "administrador", "central_vendas" ].includes(ctx.papel && ctx.papel());
+    const travado = () => !ehCentral() && cfg.corretor_altera === false;
+    function ajustesPadrao() {
+        return { base: "auto", faixa: cfg.faixa, min_corte: cfg.min_corte, calculo: cfg.calculo, oferta: cfg.oferta,
+            oportunidade: cfg.oportunidade, competitivo: cfg.competitivo, otimista: cfg.otimista, ajuste: 0, ajuste_motivo: "", sugerido: cfg.sugerido };
+    }
+    // propostas antigas (antes de 05/11/2026) tinham "rapido" e destacavam o valor de mercado
+    function normalizar(p) {
+        const aj = p.ajustes || {};
+        if (aj.oportunidade == null) {
+            p.ajustes = { ...ajustesPadrao(), base: aj.base || "auto", faixa: aj.faixa ?? 30, min_corte: 3, calculo: "media", oferta: 0,
+                oportunidade: aj.rapido ?? 8, competitivo: cfg.competitivo, otimista: aj.otimista ?? 10, sugerido: "mercado" };
+        } else p.ajustes = { ...ajustesPadrao(), ...aj };
+        if (!p.tipo) p.tipo = "estudo";
+        if (p.incluir_corretor == null) p.incluir_corretor = p.tipo === "exclusividade";
+        if (p.mostrar_pedido == null) p.mostrar_pedido = !!cfg.mostrar_pedido_pdf;
+        if (!p.exclusividade) p.exclusividade = { prazo_dias: cfg.ex_prazo, comissao_pct: cfg.ex_comissao, autorizacao: !!cfg.ex_autorizacao };
+        return p;
+    }
 
     // ---------- guardar: tabela imobiliaria_propostas (RPC proposta_salvar / proposta_excluir) ----------
     // Fotos dos imóveis de fora: enquanto não salva ficam no aparelho (data:...); ao salvar vão para o Storage
     // em <carteira>/propostas/<proposta>/<arquivo> e no item fica só o caminho.
     const BUCKET = "fotos-construcoes";
     const ehDataUrl = f => typeof f === "string" && f.startsWith("data:");
-    const doRegistro = r => ({ ...(r.dados || {}), id: r.id, titulo: r.titulo || (r.dados && r.dados.titulo) || "", criado_por: r.criado_por, atualizado_em: r.atualizado_em });
+    const doRegistro = r => normalizar({ ...(r.dados || {}), id: r.id, titulo: r.titulo || (r.dados && r.dados.titulo) || "", criado_por: r.criado_por, atualizado_em: r.atualizado_em });
+    async function carregarConfig() {
+        try {
+            const { data, error } = await ctx.sb.rpc("proposta_config", { p_carteira: ctx.carteiraId() });
+            cfg = { ...CFG_PADRAO, ...((!error && data) || {}) };
+        } catch { cfg = { ...CFG_PADRAO }; }
+    }
     async function carregar() {
         const { data, error } = await ctx.sb.from("imobiliaria_propostas").select("id, titulo, dados, criado_por, criado_em, atualizado_em")
             .eq("carteira_id", ctx.carteiraId()).order("atualizado_em", { ascending: false });
@@ -40,6 +79,7 @@
     async function iniciar(contexto) {
         ctx = contexto;
         propostas = [];
+        await carregarConfig();
         await carregar();
         atual = null;
         montarDialogos();
@@ -47,7 +87,7 @@
         render();
     }
     function sair() { atual = null; propostas = []; document.removeEventListener("skl-imovel-salvo", aoSalvarImovel); }
-    async function aoMostrar() { if (!atual) await carregar(); render(); }
+    async function aoMostrar() { if (!atual) { await carregarConfig(); await carregar(); } render(); }
 
     // ---------- áreas: o cadastro tem um campo só (area_m2); a descrição costuma dizer "X m² de área construída em terreno de Y m²" ----------
     function lerNumero(s) { const v = Number(String(s).replace(/\./g, "").replace(",", ".")); return v >= 10 && v <= 10000000 ? v : null; }
@@ -92,21 +132,27 @@
     }
     const areaBase = (d, base) => Number(base === "terreno" ? d.area_terreno : d.area_construida) || 0;
     const mediana = v => { const s = [ ...v ].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-    function arredondar(v) { if (!v) return v; const passo = v >= 100000 ? 1000 : v >= 10000 ? 100 : 10; return Math.round(v / passo) * passo; }
+    function arredondar(v) {
+        if (!v) return v;
+        const passo = Number(cfg.arredondar) > 0 && v >= 100000 ? Number(cfg.arredondar) : v >= 100000 ? 1000 : v >= 10000 ? 100 : 10;
+        return Math.round(v / passo) * passo;
+    }
 
     function calcular(p) {
         const base = baseEfetiva(p), aj = p.ajustes;
+        const oferta = Math.min(50, Math.max(0, Number(aj.oferta) || 0)) / 100;
         const linhas = p.amostras.map((a, i) => {
             const area = areaBase(a.dados, base), valor = Number(a.dados.valor) || 0;
             let situacao = "ok", motivo = "";
             if (!a.usar) { situacao = "fora"; motivo = "Desmarcada"; }
             else if (!valor) { situacao = "fora"; motivo = "Sem valor"; }
             else if (!area) { situacao = "fora"; motivo = base === "terreno" ? "Sem área do terreno" : "Sem área construída"; }
-            return { i, a, area, valor, m2: area && valor ? valor / area : null, situacao, motivo };
+            // desconto de negociação: o anúncio costuma fechar abaixo do pedido
+            return { i, a, area, valor, m2: area && valor ? valor * (1 - oferta) / area : null, situacao, motivo };
         });
         const validas = linhas.filter(l => l.situacao === "ok");
         let med = validas.length ? mediana(validas.map(l => l.m2)) : null;
-        if (validas.length >= 3 && aj.faixa > 0) {
+        if (validas.length >= Math.max(2, Number(aj.min_corte) || 3) && aj.faixa > 0) {
             validas.forEach(l => {
                 const desvio = (l.m2 / med - 1) * 100;
                 if (Math.abs(desvio) > aj.faixa) { l.situacao = "longe"; l.motivo = `${pct(desvio)} da mediana`; }
@@ -121,16 +167,25 @@
         const areaAlvo = alvo ? areaBase(alvo, base) : 0;
         const r = { base, linhas, usadas: usadas.length, media, mediana: med, min: m2s.length ? Math.min(...m2s) : null, max: m2s.length ? Math.max(...m2s) : null,
             cv: media ? desvio / media * 100 : null, areaAlvo, pedido: alvo ? Number(alvo.valor) || null : null };
-        if (media && areaAlvo) {
-            r.mercado = arredondar(media * areaAlvo);
-            r.rapido = arredondar(media * areaAlvo * (1 - aj.rapido / 100));
-            r.otimista = arredondar(media * areaAlvo * (1 + aj.otimista / 100));
+        // m² de partida (média ou mediana) e o ajuste por diferenciais do imóvel avaliado
+        r.m2Partida = aj.calculo === "mediana" ? med : media;
+        r.m2 = r.m2Partida ? r.m2Partida * (1 + (Number(aj.ajuste) || 0) / 100) : null;
+        if (r.m2 && areaAlvo) {
+            const m = r.m2 * areaAlvo;
+            r.mercado = arredondar(m);
+            r.oportunidade = arredondar(m * (1 - (Number(aj.oportunidade) || 0) / 100));
+            r.competitivo = arredondar(m * (1 - (Number(aj.competitivo) || 0) / 100));
+            r.otimista = arredondar(m * (1 + (Number(aj.otimista) || 0) / 100));
+            r.rapido = r.oportunidade;
+            r.m2Faixa = { oportunidade: r.m2 * (1 - (Number(aj.oportunidade) || 0) / 100), competitivo: r.m2 * (1 - (Number(aj.competitivo) || 0) / 100),
+                mercado: r.m2, otimista: r.m2 * (1 + (Number(aj.otimista) || 0) / 100) };
+            r.sugerido = r[aj.sugerido] || r.mercado;
             r.faixaMin = arredondar(r.min * areaAlvo);
             r.faixaMax = arredondar(r.max * areaAlvo);
             if (r.pedido) {
                 r.pedidoM2 = r.pedido / areaAlvo;
                 r.difPedido = (r.pedido / r.mercado - 1) * 100;
-                r.leitura = r.pedido > r.otimista ? "acima" : r.pedido < r.rapido ? "abaixo" : "dentro";
+                r.leitura = r.pedido > r.otimista ? "acima" : r.pedido < r.oportunidade ? "abaixo" : "dentro";
             }
         }
         r.confianca = !r.usadas ? "" : r.usadas < 3 ? "baixa" : r.cv != null && r.cv > 25 ? "media" : r.usadas >= 5 ? "alta" : "media";
@@ -141,7 +196,7 @@
     function leituraTexto(r) {
         if (!r.leitura) return "";
         if (r.leitura === "acima") return `O valor pedido está ${pct(r.difPedido)} em relação ao valor de mercado, acima até da faixa otimista. Tende a ficar mais tempo anunciado e a receber propostas abaixo do pedido.`;
-        if (r.leitura === "abaixo") return `O valor pedido está ${pct(r.difPedido)} em relação ao valor de mercado, abaixo da faixa de venda rápida. Vale conferir se não há espaço para pedir mais.`;
+        if (r.leitura === "abaixo") return `O valor pedido está ${pct(r.difPedido)} em relação ao valor de mercado, abaixo até do valor de oportunidade. Vale conferir se não há espaço para pedir mais.`;
         return `O valor pedido está ${pct(r.difPedido)} em relação ao valor de mercado, dentro da faixa praticada na região.`;
     }
 
@@ -157,7 +212,10 @@
         const ordenadas = [ ...propostas ].sort((a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em)));
         box.innerHTML = `<div class="page-actions"><p>Monte um estudo de mercado com proposta de valor para o proprietário: escolha o imóvel, os imóveis parecidos para comparar
             (do cadastro ou de fora) e gere o PDF com a marca da imobiliária.</p>
-            <button id="propNova" type="button" class="primary-button">+ Nova proposta</button></div>
+            <div class="prop-lista-acoes">
+              <button id="propEuCorretor" type="button" class="secondary-button">👤 Eu corretor</button>
+              ${ehCentral() ? `<button id="propConfig" type="button" class="secondary-button">⚙ Configuração da proposta</button>` : ""}
+              <button id="propNova" type="button" class="primary-button">+ Nova proposta</button></div></div>
           <p class="prop-aviso">${ctx.pode && ctx.pode("ver_equipe_toda") ? "Aqui aparecem as propostas de toda a equipe." : "Aqui aparecem as propostas que você criou."}</p>
           ${ordenadas.length ? `<div class="prop-lista">${ordenadas.map(p => {
                 const r = calcular(p);
@@ -168,13 +226,16 @@
                   <small>${h(p.cliente || "")}${p.cliente ? " · " : ""}${new Date(p.atualizado_em).toLocaleDateString("pt-BR")}</small></button>`;
             }).join("")}</div>` : `<div class="empty-state">Nenhuma proposta ainda. Toque em "+ Nova proposta".</div>`}`;
         $("propNova").addEventListener("click", nova);
-        box.querySelectorAll("[data-abrir]").forEach(b => b.addEventListener("click", () => { atual = JSON.parse(JSON.stringify(propostas.find(p => p.id === b.dataset.abrir))); render(); }));
+        $("propEuCorretor").addEventListener("click", () => abrirEuCorretor());
+        if ($("propConfig")) $("propConfig").addEventListener("click", abrirConfig);
+        box.querySelectorAll("[data-abrir]").forEach(b => b.addEventListener("click", () => { atual = normalizar(JSON.parse(JSON.stringify(propostas.find(p => p.id === b.dataset.abrir)))); render(); }));
     }
 
     function nova() {
         const u = ctx.usuario() || {};
-        atual = { id: novoId(), titulo: "", finalidade: "venda", cliente: "", corretor: u.display_name || "", validade_dias: 30,
-            observacoes: "", alvo: null, amostras: [], ajustes: { ...PADRAO_AJUSTES }, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() };
+        atual = normalizar({ id: novoId(), titulo: "", finalidade: "venda", cliente: "", corretor: u.display_name || "", corretor_id: u.id || null,
+            validade_dias: Number(cfg.validade) || 30, observacoes: "", alvo: null, amostras: [], ajustes: ajustesPadrao(), tipo: "estudo",
+            criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() });
         render();
     }
 
@@ -257,25 +318,56 @@
             }).join("")}</div>` : `<p class="muted-text">Ainda nenhum. Use "Sugerir do mesmo bairro" ou adicione um por um. O ideal é de 4 a 8 imóveis parecidos.</p>`}
         </section>
         <section class="panel form-panel prop-bloco">
-          <span class="eyebrow">4 · CÁLCULO</span>
-          <div class="prop-grade prop-ajustes">
-            <label><span>Comparar pelo valor do m² da</span><select id="propBase">
-              <option value="auto"${p.ajustes.base === "auto" ? " selected" : ""}>Automático (${BASE_TXT[base]})</option>
-              <option value="construida"${p.ajustes.base === "construida" ? " selected" : ""}>Área construída</option>
-              <option value="terreno"${p.ajustes.base === "terreno" ? " selected" : ""}>Área do terreno</option></select></label>
-            <label><span>Deixar de fora quem passa de (% da mediana)</span><input id="propFaixa" type="number" min="0" max="200" value="${p.ajustes.faixa}" /></label>
-            <label><span>Venda rápida (% abaixo do mercado)</span><input id="propRapido" type="number" min="0" max="50" step="0.5" value="${p.ajustes.rapido}" /></label>
-            <label><span>Otimista (% acima do mercado)</span><input id="propOtimista" type="number" min="0" max="50" step="0.5" value="${p.ajustes.otimista}" /></label>
-          </div>
-          ${resultadoHtml(p, r)}
-        </section>`;
+          <span class="eyebrow">4 · CÁLCULO E REGULAÇÃO</span>
+          ${regulacaoHtml(p, r)}
+          <div id="propResultado">${resultadoHtml(p, r)}</div>
+        </section>
+        ${tipoHtml(p)}`;
         ligarEditor(box);
         preencherFotos(box);
+    }
+
+    // controles do cálculo: os deslizantes redesenham só o resultado (sem perder o dedo no controle)
+    function regulacaoHtml(p, r) {
+        const aj = p.ajustes, trava = travado(), dis = trava ? " disabled" : "", max = Math.max(0, Number(cfg.ajuste_max) || 0);
+        const venda = p.finalidade !== "aluguel";
+        const deslizante = (chave, rotulo, min, maxv, sinal) => `<label class="prop-desl"><span>${rotulo}</span>
+            <input type="range" data-desl="${chave}" min="${min}" max="${maxv}" step="0.5" value="${aj[chave] || 0}"${chave === "ajuste" ? "" : dis} />
+            <b data-desl-valor="${chave}">${sinal(aj[chave] || 0)}</b></label>`;
+        return `<div class="prop-grade prop-ajustes">
+            <label><span>Comparar pelo valor do m² da</span><select id="propBase">
+              <option value="auto"${aj.base === "auto" ? " selected" : ""}>Automático (${BASE_TXT[r.base]})</option>
+              <option value="construida"${aj.base === "construida" ? " selected" : ""}>Área construída</option>
+              <option value="terreno"${aj.base === "terreno" ? " selected" : ""}>Área do terreno</option></select></label>
+            <label><span>Calcular pela</span><select id="propCalculo"${dis}><option value="media"${aj.calculo !== "mediana" ? " selected" : ""}>Média do m²</option>
+              <option value="mediana"${aj.calculo === "mediana" ? " selected" : ""}>Mediana do m²</option></select></label>
+            <label><span>Deixar de fora quem passa de (% da mediana)</span><input id="propFaixa" type="number" min="0" max="200" value="${aj.faixa}"${dis} /></label>
+            <label><span>Desconto de negociação dos anúncios (%)</span><input id="propOferta" type="number" min="0" max="30" step="0.5" value="${aj.oferta || 0}"${dis} /></label>
+          </div>
+          <div class="prop-regula">
+            ${max ? deslizante("ajuste", "Ajuste por diferenciais do imóvel", -max, max, v => (v > 0 ? "+" : "") + numero(v, 1).replace("—", "0") + "%") : ""}
+            ${max ? `<label class="prop-largo prop-motivo-aj"><span>Motivo do ajuste (vai no PDF)</span><input id="propAjusteMotivo" value="${h(aj.ajuste_motivo || "")}" placeholder="Ex.: piscina e reforma recente; rua sem saída" /></label>` : ""}
+            ${deslizante("oportunidade", "Oportunidade (abaixo do mercado)", 0, 30, v => "−" + numero(v, 1).replace("—", "0") + "%")}
+            ${deslizante("competitivo", "Competitivo (abaixo do mercado)", 0, 20, v => "−" + numero(v, 1).replace("—", "0") + "%")}
+            ${deslizante("otimista", "Otimista (acima do mercado)", 0, 30, v => "+" + numero(v, 1).replace("—", "0") + "%")}
+            ${trava ? `<p class="prop-dica">🔒 Os percentuais seguem a configuração da imobiliária. Você pode usar o ajuste por diferenciais (até ±${numero(max, 1)}%).</p>` : ""}
+            <div class="prop-sugerido"><span>Valor sugerido para ${venda ? "a venda" : "a locação"}:</span>
+              ${FAIXAS.map(([ k, n ]) => `<button type="button" data-sugerido="${k}" class="${aj.sugerido === k ? "on" : ""}">${CURTO[k]}</button>`).join("")}</div>
+          </div>`;
+    }
+
+    function barrasHtml(p, r) {
+        const linhas = [ ...FAIXAS.map(([ k, n ]) => ({ n, m2: r.m2Faixa[k], total: r[k], faixa: true, on: p.ajustes.sugerido === k })),
+            ...r.linhas.filter(l => l.situacao === "ok").map(l => ({ n: "Amostra " + (l.i + 1), m2: l.m2 })) ];
+        const max = Math.max(...linhas.map(l => l.m2 || 0)) || 1;
+        return linhas.map(l => `<div class="prop-barra"><span>${h(l.n)}</span><div><i class="${l.faixa ? "faixa" : "amostra"}${l.on ? " on" : ""}" style="width:${Math.max(18, l.m2 / max * 100).toFixed(1)}%">
+            ${l.total ? `<b>${dinheiro(l.total)}</b>` : ""}<em>${dinheiro(l.m2, 2)}/m²</em></i></div></div>`).join("");
     }
 
     function resultadoHtml(p, r) {
         const venda = p.finalidade !== "aluguel", rotulo = venda ? "venda" : "locação";
         if (!r.usadas) return `<p class="muted-text">Adicione imóveis com valor e ${BASE_TXT[r.base]} para ver o cálculo.</p>`;
+        const aj = Number(p.ajustes.ajuste) || 0;
         return `<div class="prop-estat">
             <div><small>Imóveis no cálculo</small><strong>${r.usadas} de ${p.amostras.length}</strong></div>
             <div><small>Média R$/m²</small><strong>${dinheiro(r.media, 2)}</strong></div>
@@ -283,13 +375,41 @@
             <div><small>Menor – maior</small><strong>${dinheiro(r.min, 0)} – ${dinheiro(r.max, 0)}</strong></div>
             <div><small>Confiança</small><strong>${h(CONF_TXT[r.confianca] || "—")}</strong></div>
           </div>
-          ${r.mercado ? `<div class="prop-valores">
-            <div class="rapido"><small>Venda rápida</small><strong>${dinheiro(r.rapido)}</strong><span>${dinheiro(r.rapido / r.areaAlvo, 2)}/m²</span></div>
-            <div class="mercado"><small>Valor de mercado</small><strong>${dinheiro(r.mercado)}</strong><span>${dinheiro(r.media, 2)}/m² × ${numero(r.areaAlvo)} m²</span></div>
-            <div class="otimista"><small>Otimista</small><strong>${dinheiro(r.otimista)}</strong><span>${dinheiro(r.otimista / r.areaAlvo, 2)}/m²</span></div>
+          ${r.mercado ? `<div class="prop-previa">
+            <div class="prop-previa-topo"><strong>Valor sugerido para ${venda ? "a venda" : "a locação"} do imóvel</strong>
+              <div><small>${h(NOME_FAIXA[p.ajustes.sugerido] || "Valor de mercado")}</small><b>${dinheiro(r.sugerido)}</b></div></div>
+            <p class="prop-conta">${dinheiro(r.m2Partida, 2)}/m² (${p.ajustes.calculo === "mediana" ? "mediana" : "média"})${aj ? ` ${aj > 0 ? "+" : "−"} ${numero(Math.abs(aj), 1)}% de ajuste = ${dinheiro(r.m2, 2)}/m²` : ""} × ${numero(r.areaAlvo)} m² = ${dinheiro(r.mercado)}</p>
+            ${barrasHtml(p, r)}
+            ${r.usadas < (Number(cfg.min_amostras) || 0) ? `<p class="prop-dica">⚠ A imobiliária pede pelo menos ${cfg.min_amostras} imóveis no cálculo para gerar o PDF.</p>` : ""}
           </div>
-          ${r.pedido ? `<p class="prop-leitura ${r.leitura}">${venda ? "Valor pedido" : "Aluguel pedido"}: <b>${dinheiro(r.pedido)}</b> (${dinheiro(r.pedidoM2, 2)}/m²). ${h(leituraTexto(r))}</p>` : ""}`
+          ${r.pedido ? `<p class="prop-leitura ${r.leitura}">${venda ? "Valor pedido" : "Aluguel pedido"}: <b>${dinheiro(r.pedido)}</b> (${dinheiro(r.pedidoM2, 2)}/m²). ${h(leituraTexto(r))}
+            <small>${p.mostrar_pedido ? "O valor pedido vai no PDF." : "Este aviso fica só na tela; o valor pedido não vai no PDF."}</small></p>` : ""}`
             : `<p class="muted-text">Informe a ${BASE_TXT[r.base]} do imóvel avaliado para chegar ao valor de ${rotulo}.</p>`}`;
+    }
+
+    function tipoHtml(p) {
+        const ex = p.tipo === "exclusividade" && cfg.exclusividade_ligada !== false;
+        const u = ctx.usuario() || {};
+        const equipe = ehCentral() || (ctx.veTudo && ctx.veTudo()) ? (ctx.equipe() || []).filter(c => c.active !== false) : [];
+        const opcoesCorretor = equipe.length ? equipe : [ { id: u.id, display_name: u.display_name } ];
+        if (!opcoesCorretor.some(c => c.id === (p.corretor_id || u.id))) opcoesCorretor.unshift({ id: p.corretor_id || u.id, display_name: p.corretor || u.display_name });
+        return `<section class="panel form-panel prop-bloco">
+          <span class="eyebrow">5 · TIPO DE PROPOSTA</span>
+          <div class="prop-tipos">
+            <button type="button" data-tipo="estudo" class="${ex ? "" : "on"}"><b>📊 Apenas estudo de mercado</b><span>Capa, imóvel, comparados, resumo e valor sugerido</span></button>
+            ${cfg.exclusividade_ligada !== false ? `<button type="button" data-tipo="exclusividade" class="${ex ? "on" : ""}"><b>🏅 Com apresentação de exclusividade</b><span>Estudo + seu corretor + plano de divulgação + condições</span></button>` : ""}
+          </div>
+          <div class="prop-grade">
+            <label><span>Corretor da apresentação</span><select id="propCorretorId"${opcoesCorretor.length > 1 ? "" : " disabled"}>
+              ${opcoesCorretor.map(c => `<option value="${h(c.id)}"${c.id === (p.corretor_id || u.id) ? " selected" : ""}>${h(c.display_name || "—")}</option>`).join("")}</select></label>
+            <label class="prop-check"><input type="checkbox" id="propIncluirCorretor"${p.incluir_corretor ? " checked" : ""} /> Incluir a página "Seu corretor"</label>
+            <label class="prop-check"><input type="checkbox" id="propMostrarPedido"${p.mostrar_pedido ? " checked" : ""} /> Mostrar o valor pedido pelo proprietário no PDF</label>
+            ${ex ? `<label><span>Prazo da exclusividade (dias)</span><input id="propExPrazo" type="number" min="1" max="730" value="${h(p.exclusividade.prazo_dias)}" /></label>
+              <label><span>Comissão da imobiliária (%)</span><input id="propExComissao" type="number" min="0" max="30" step="0.5" value="${h(p.exclusividade.comissao_pct)}" /></label>
+              <label class="prop-check"><input type="checkbox" id="propExAutorizacao"${p.exclusividade.autorizacao ? " checked" : ""} /> Incluir a autorização de venda para assinar</label>` : ""}
+          </div>
+          <p class="prop-dica" id="propPerfilAviso" hidden></p>
+        </section>`;
     }
 
     function ligarEditor(box) {
@@ -299,8 +419,42 @@
         campo("propValidade", "validade_dias", v => Math.max(1, Number(v) || 30));
         campo("propFinalidade", "finalidade");
         $("propBase").addEventListener("change", e => { p.ajustes.base = e.target.value; render(); });
-        [ [ "propFaixa", "faixa" ], [ "propRapido", "rapido" ], [ "propOtimista", "otimista" ] ].forEach(([ id, k ]) =>
+        $("propCalculo").addEventListener("change", e => { p.ajustes.calculo = e.target.value; atualizarResultado(); });
+        [ [ "propFaixa", "faixa" ], [ "propOferta", "oferta" ] ].forEach(([ id, k ]) =>
             $(id).addEventListener("change", e => { p.ajustes[k] = Math.max(0, Number(e.target.value) || 0); render(); }));
+        box.querySelectorAll("[data-desl]").forEach(inp => inp.addEventListener("input", () => {
+            const k = inp.dataset.desl;
+            p.ajustes[k] = Number(inp.value) || 0;
+            const v = p.ajustes[k], txt = numero(Math.abs(v), 1).replace("—", "0") + "%";
+            box.querySelector(`[data-desl-valor="${k}"]`).textContent = k === "ajuste" ? (v > 0 ? "+" : v < 0 ? "−" : "") + txt : k === "otimista" ? "+" + txt : "−" + txt;
+            atualizarResultado();
+        }));
+        const motivo = $("propAjusteMotivo");
+        if (motivo) motivo.addEventListener("input", () => { p.ajustes.ajuste_motivo = motivo.value; });
+        box.querySelectorAll("[data-sugerido]").forEach(b => b.addEventListener("click", () => {
+            p.ajustes.sugerido = b.dataset.sugerido;
+            box.querySelectorAll("[data-sugerido]").forEach(x => x.classList.toggle("on", x === b));
+            atualizarResultado();
+        }));
+        box.querySelectorAll("[data-tipo]").forEach(b => b.addEventListener("click", () => {
+            if (p.tipo === b.dataset.tipo) return;
+            p.tipo = b.dataset.tipo;
+            if (p.tipo === "exclusividade") p.incluir_corretor = true;
+            render();
+        }));
+        const ck = (id, fn) => { const el = $(id); if (el) el.addEventListener("change", () => fn(el)); };
+        ck("propIncluirCorretor", el => { p.incluir_corretor = el.checked; avisoPerfil(); });
+        ck("propMostrarPedido", el => { p.mostrar_pedido = el.checked; atualizarResultado(); });
+        ck("propExAutorizacao", el => { p.exclusividade.autorizacao = el.checked; });
+        ck("propExPrazo", el => { p.exclusividade.prazo_dias = Math.max(1, Number(el.value) || 90); });
+        ck("propExComissao", el => { p.exclusividade.comissao_pct = Math.max(0, Number(String(el.value).replace(",", ".")) || 0); });
+        ck("propCorretorId", el => {
+            p.corretor_id = el.value;
+            p.corretor = el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : p.corretor;
+            if ($("propCorretor")) $("propCorretor").value = p.corretor;
+            avisoPerfil();
+        });
+        avisoPerfil();
         $("propVoltar").addEventListener("click", () => { if (mudou() && !confirm("Sair sem salvar as mudanças desta proposta?")) return; atual = null; render(); });
         $("propSalvar").addEventListener("click", () => salvar(true));
         $("propExcluir").addEventListener("click", excluir);
@@ -324,6 +478,201 @@
         box.querySelectorAll("[data-cadastrar]").forEach(b => b.addEventListener("click", () => cadastrarNaCentral(b.dataset.cadastrar)));
     }
     const lerArea = v => { const n = ctx.parseValor(String(v || "").replace(/m²|m2/gi, "")); return n > 0 ? n : null; };
+    function atualizarResultado() { const el = $("propResultado"); if (el && atual) el.innerHTML = resultadoHtml(atual, calcular(atual)); }
+
+    // ---------- perfil profissional ("Eu corretor") ----------
+    const perfis = new Map();
+    async function perfilDe(usuarioId, recarregar) {
+        const id = usuarioId || (ctx.usuario() || {}).id;
+        if (!recarregar && perfis.has(id)) return perfis.get(id);
+        const { data, error } = await ctx.sb.rpc("perfil_profissional", { p_carteira: ctx.carteiraId(), p_usuario: id || null });
+        if (error) throw error;
+        perfis.set(id, data);
+        return data;
+    }
+    const perfilVazio = d => !d || !d.perfil || !(d.perfil.historia || d.perfil.creci || d.perfil.nome_apresentacao);
+    async function avisoPerfil() {
+        const el = $("propPerfilAviso");
+        if (!el || !atual) return;
+        if (!atual.incluir_corretor) { el.hidden = true; return; }
+        try {
+            const d = await perfilDe(atual.corretor_id);
+            const meu = !atual.corretor_id || atual.corretor_id === (ctx.usuario() || {}).id;
+            if (!perfilVazio(d)) { el.hidden = true; return; }
+            el.hidden = false;
+            el.innerHTML = meu ? `👤 Seu perfil profissional ainda está vazio. <button type="button" class="secondary-button" id="propAbrirPerfil">Preencher "Eu corretor"</button>`
+                : `👤 ${h(d.nome || "Este corretor")} ainda não preencheu o "Eu corretor". A página sai só com nome e foto.`;
+            const b = $("propAbrirPerfil");
+            if (b) b.addEventListener("click", () => abrirEuCorretor());
+        } catch { el.hidden = true; }
+    }
+
+    const DIFERENCIAIS = [ "Fotos profissionais", "Vídeo do imóvel", "Retorno semanal ao proprietário", "Anúncio nos principais portais",
+        "Acompanho todas as visitas", "Atendimento aos fins de semana", "Ajuda com financiamento", "Especialista em alto padrão", "Especialista em imóveis rurais" ];
+    let perfilAberto = null;
+    async function abrirEuCorretor() {
+        montarDialogos();
+        let d;
+        try { d = await perfilDe(null, true); } catch (e) { return ctx.toast(ctx.traduzErro ? ctx.traduzErro(e.message || String(e)) : String(e.message || e)); }
+        perfilAberto = d;
+        const p = d.perfil || {}, set = (id, v) => { $(id).value = v == null ? "" : v; };
+        set("euNome", p.nome_apresentacao || d.apelido || d.nome); set("euCreci", p.creci); set("euDesde", p.desde);
+        set("euBairros", p.bairros); set("euEspecialidade", p.especialidade); set("euHistoria", p.historia);
+        set("euWhats", p.whatsapp || d.telefone); set("euEmail", p.email || d.email); set("euInstagram", p.instagram);
+        const marcados = new Set(p.diferenciais || []);
+        const extras = (p.diferenciais || []).filter(x => !DIFERENCIAIS.includes(x));
+        $("euDiferenciais").innerHTML = [ ...DIFERENCIAIS, ...extras ].map(x => `<label class="prop-check"><input type="checkbox" value="${h(x)}"${marcados.has(x) ? " checked" : ""} /> ${h(x)}</label>`).join("");
+        set("euOutroDif", "");
+        $("euNumNegocios").textContent = d.negocios_fechados || 0;
+        $("euNumCaptados").textContent = d.imoveis_captados || 0;
+        $("euMostrarNegocios").checked = !!p.mostrar_negocios;
+        $("euMostrarCaptados").checked = !!p.mostrar_captados;
+        $("euMostrarFoto").checked = p.mostrar_foto !== false;
+        $("euMostrarContato").checked = p.mostrar_contato !== false;
+        $("euCorretorDialog").showModal();
+    }
+    async function salvarEuCorretor() {
+        const v = id => $(id).value.trim();
+        const dif = [ ...$("euDiferenciais").querySelectorAll("input:checked") ].map(i => i.value);
+        v("euOutroDif").split(/[;\n]/).map(s => s.trim()).filter(Boolean).forEach(s => { if (!dif.includes(s)) dif.push(s.slice(0, 80)); });
+        const desde = parseInt(v("euDesde"), 10);
+        const dados = { nome_apresentacao: v("euNome").slice(0, 80), creci: v("euCreci").slice(0, 40),
+            desde: desde >= 1950 && desde <= new Date().getFullYear() ? desde : null, bairros: v("euBairros").slice(0, 300),
+            especialidade: v("euEspecialidade").slice(0, 120), historia: v("euHistoria").slice(0, 1500), diferenciais: dif.slice(0, 15),
+            whatsapp: v("euWhats").slice(0, 30), email: v("euEmail").slice(0, 120), instagram: v("euInstagram").replace(/^@/, "").slice(0, 60),
+            mostrar_negocios: $("euMostrarNegocios").checked, mostrar_captados: $("euMostrarCaptados").checked,
+            mostrar_foto: $("euMostrarFoto").checked, mostrar_contato: $("euMostrarContato").checked };
+        const b = $("euSalvar");
+        b.disabled = true;
+        try {
+            const { error } = await ctx.sb.rpc("perfil_profissional_salvar", { p_carteira: ctx.carteiraId(), p_dados: dados });
+            if (error) throw error;
+            perfis.delete((ctx.usuario() || {}).id);
+            $("euCorretorDialog").close();
+            ctx.toast("Perfil profissional salvo.");
+            avisoPerfil();
+        } catch (e) { ctx.toast(ctx.traduzErro ? ctx.traduzErro(e.message || String(e)) : String(e.message || e)); }
+        finally { b.disabled = false; }
+    }
+
+    // ---------- configuração da imobiliária (só Central e administrador) ----------
+    const CAMPOS_CFG = [ [ "faixa", "n" ], [ "min_corte", "n" ], [ "min_amostras", "n" ], [ "calculo", "s" ], [ "oferta", "n" ], [ "arredondar", "n" ],
+        [ "oportunidade", "n" ], [ "competitivo", "n" ], [ "otimista", "n" ], [ "ajuste_max", "n" ], [ "sugerido", "s" ], [ "validade", "n" ],
+        [ "corretor_altera", "b" ], [ "mostrar_estatisticas", "b" ], [ "mostrar_pedido_pdf", "b" ], [ "texto_pdf", "s" ],
+        [ "exclusividade_ligada", "b" ], [ "ex_prazo", "n" ], [ "ex_comissao", "n" ], [ "ex_autorizacao", "b" ], [ "ex_texto", "s" ], [ "ex_plano", "s" ], [ "ex_compromissos", "s" ] ];
+    function preencherConfig(c) {
+        CAMPOS_CFG.forEach(([ k, t ]) => { const el = $("cfg_" + k); if (!el) return; if (t === "b") el.checked = !!c[k]; else el.value = c[k] == null ? "" : c[k]; });
+    }
+    function abrirConfig() {
+        montarDialogos();
+        preencherConfig(cfg);
+        $("propConfigDialog").showModal();
+    }
+    async function salvarConfig() {
+        const nova = {};
+        CAMPOS_CFG.forEach(([ k, t ]) => {
+            const el = $("cfg_" + k); if (!el) return;
+            nova[k] = t === "b" ? el.checked : t === "n" ? Math.max(0, Number(String(el.value).replace(",", ".")) || 0) : String(el.value).slice(0, 4000);
+        });
+        nova.min_corte = Math.max(2, nova.min_corte || 3);
+        const b = $("cfgSalvar");
+        b.disabled = true;
+        try {
+            const { data, error } = await ctx.sb.rpc("configurar_proposta", { p_carteira: ctx.carteiraId(), p_config: nova });
+            if (error) throw error;
+            cfg = { ...CFG_PADRAO, ...(data || nova) };
+            $("propConfigDialog").close();
+            ctx.toast("Configuração salva. Vale para as propostas novas.");
+            render();
+        } catch (e) { ctx.toast(ctx.traduzErro ? ctx.traduzErro(e.message || String(e)) : String(e.message || e)); }
+        finally { b.disabled = false; }
+    }
+    function dialogosNovos() {
+        const n = (id, rot, extra = "") => `<label><span>${rot}</span><input id="cfg_${id}" type="number" ${extra} /></label>`;
+        const ck = (id, rot) => `<label class="prop-check prop-largo"><input type="checkbox" id="cfg_${id}" /> ${rot}</label>`;
+        return `
+        <dialog id="propConfigDialog" class="crm-dialog crm-dialog-larga">
+          <form method="dialog" class="dialog-card">
+            <button class="dialog-close" type="submit" value="cancel">×</button>
+            <span class="eyebrow">PROPOSTA DE NEGÓCIOS</span>
+            <h2>Configuração da proposta</h2>
+            <p class="muted-text">Vale para todas as propostas novas da imobiliária. O que o corretor muda vale só na proposta dele.</p>
+            <h3 class="prop-cfg-sec">Imóveis comparados</h3>
+            <div class="prop-grade">
+              ${n("faixa", "Deixar de fora quem passa de (% da mediana)", 'min="0" max="200"')}
+              ${n("min_corte", "Só deixar de fora a partir de (imóveis)", 'min="2" max="20"')}
+              ${n("min_amostras", "Mínimo de imóveis para gerar o PDF", 'min="1" max="20"')}
+            </div>
+            <h3 class="prop-cfg-sec">Valor de mercado</h3>
+            <div class="prop-grade">
+              <label><span>Calcular pela</span><select id="cfg_calculo"><option value="media">Média do m²</option><option value="mediana">Mediana do m²</option></select></label>
+              ${n("oferta", "Desconto de negociação dos anúncios (%)", 'min="0" max="30" step="0.5"')}
+              <label><span>Arredondar o valor para</span><select id="cfg_arredondar"><option value="0">Automático (R$ 1.000)</option><option value="5000">R$ 5.000</option><option value="10000">R$ 10.000</option></select></label>
+              ${n("ajuste_max", "Ajuste por diferenciais: até (± %)", 'min="0" max="40"')}
+            </div>
+            <h3 class="prop-cfg-sec">Faixas de preço</h3>
+            <div class="prop-grade">
+              ${n("oportunidade", "Oportunidade (% abaixo do mercado)", 'min="0" max="40" step="0.5"')}
+              ${n("competitivo", "Competitivo (% abaixo do mercado)", 'min="0" max="30" step="0.5"')}
+              ${n("otimista", "Otimista (% acima do mercado)", 'min="0" max="40" step="0.5"')}
+              <label><span>Valor sugerido já escolhido</span><select id="cfg_sugerido">${FAIXAS.map(([ k, t ]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+              ${n("validade", "Validade da proposta (dias)", 'min="1" max="365"')}
+            </div>
+            <h3 class="prop-cfg-sec">Quem pode mexer e o que vai no PDF</h3>
+            <div class="prop-grade">
+              ${ck("corretor_altera", "Corretor pode mudar os percentuais na proposta dele (o ajuste por diferenciais fica sempre liberado, até o limite acima)")}
+              ${ck("mostrar_estatisticas", "Mostrar média, mediana e menor/maior m² no resumo do PDF")}
+              ${ck("mostrar_pedido_pdf", "Mostrar o valor pedido pelo proprietário no PDF (a pessoa pode mudar em cada proposta)")}
+              <label class="prop-largo"><span>Texto extra no fim do PDF (opcional)</span><textarea id="cfg_texto_pdf" rows="2"></textarea></label>
+            </div>
+            <h3 class="prop-cfg-sec">Apresentação de exclusividade</h3>
+            <div class="prop-grade">
+              ${ck("exclusividade_ligada", "Mostrar o botão \"Com apresentação de exclusividade\"")}
+              ${n("ex_prazo", "Prazo padrão (dias)", 'min="1" max="730"')}
+              ${n("ex_comissao", "Comissão padrão (%)", 'min="0" max="30" step="0.5"')}
+              ${ck("ex_autorizacao", "Incluir a autorização de venda para assinar (modelo: revise com o jurídico da imobiliária)")}
+              <label class="prop-largo"><span>Por que anunciar com a imobiliária</span><textarea id="cfg_ex_texto" rows="3"></textarea></label>
+              <label class="prop-largo"><span>Plano de divulgação (um item por linha)</span><textarea id="cfg_ex_plano" rows="5"></textarea></label>
+              <label class="prop-largo"><span>Nossos compromissos (um item por linha)</span><textarea id="cfg_ex_compromissos" rows="4"></textarea></label>
+            </div>
+            <div class="dialog-actions">
+              <button id="cfgPadrao" type="button" class="secondary-button">Voltar ao padrão</button>
+              <button id="cfgSalvar" type="button" class="primary-button">Salvar configuração</button>
+            </div>
+          </form>
+        </dialog>
+        <dialog id="euCorretorDialog" class="crm-dialog crm-dialog-larga">
+          <form method="dialog" class="dialog-card">
+            <button class="dialog-close" type="submit" value="cancel">×</button>
+            <span class="eyebrow">EU CORRETOR</span>
+            <h2>Meu perfil profissional</h2>
+            <p class="muted-text">Preenche sozinho a página "Seu corretor" das propostas. Escreva como quer ser apresentado ao proprietário.</p>
+            <div class="prop-grade">
+              <label><span>Nome de apresentação</span><input id="euNome" maxlength="80" /></label>
+              <label><span>CRECI</span><input id="euCreci" maxlength="40" placeholder="Ex.: CRECI-MT 12345-F" /></label>
+              <label><span>Atuo no mercado desde (ano)</span><input id="euDesde" type="number" min="1950" max="2100" placeholder="Ex.: 2016" /></label>
+              <label><span>Especialidade</span><input id="euEspecialidade" maxlength="120" placeholder="Ex.: casas de médio e alto padrão" /></label>
+              <label class="prop-largo"><span>Bairros e regiões em que mais atuo</span><input id="euBairros" maxlength="300" /></label>
+              <label class="prop-largo"><span>Minha história (o que quero passar ao cliente)</span><textarea id="euHistoria" rows="4" maxlength="1500"></textarea></label>
+            </div>
+            <h3 class="prop-cfg-sec">Meus diferenciais</h3>
+            <div id="euDiferenciais" class="prop-difs"></div>
+            <label class="prop-largo"><span>Outro diferencial (separe por ;)</span><input id="euOutroDif" /></label>
+            <h3 class="prop-cfg-sec">Contato e o que aparece</h3>
+            <div class="prop-grade">
+              <label><span>WhatsApp</span><input id="euWhats" inputmode="tel" /></label>
+              <label><span>E-mail</span><input id="euEmail" type="email" /></label>
+              <label><span>Instagram</span><input id="euInstagram" placeholder="@seuperfil" /></label>
+              <label class="prop-check"><input type="checkbox" id="euMostrarFoto" /> Mostrar minha foto</label>
+              <label class="prop-check"><input type="checkbox" id="euMostrarContato" /> Mostrar meu contato</label>
+              <label class="prop-check"><input type="checkbox" id="euMostrarNegocios" /> Mostrar negócios fechados (<b id="euNumNegocios">0</b>)</label>
+              <label class="prop-check"><input type="checkbox" id="euMostrarCaptados" /> Mostrar imóveis captados (<b id="euNumCaptados">0</b>)</label>
+            </div>
+            <p class="muted-text">Os números vêm do sistema: negócios ganhos de venda e locação e imóveis captados aprovados nesta imobiliária.</p>
+            <div class="dialog-actions"><button id="euSalvar" type="button" class="primary-button">Salvar</button></div>
+          </form>
+        </dialog>`;
+    }
     let fotografia = "";
     const retrato = p => JSON.stringify({ ...p, atualizado_em: "" });
     function mudou() { const salvo = propostas.find(x => x.id === atual.id); return !salvo ? (atual.alvo || atual.amostras.length) : retrato(salvo) !== retrato(atual); }
@@ -434,6 +783,12 @@
 
     // ---------- buscar no cadastro ----------
     function montarDialogos() {
+        if (!$("propConfigDialog")) {
+            document.body.insertAdjacentHTML("beforeend", dialogosNovos());
+            $("cfgSalvar").addEventListener("click", salvarConfig);
+            $("cfgPadrao").addEventListener("click", () => preencherConfig(CFG_PADRAO));
+            $("euSalvar").addEventListener("click", salvarEuCorretor);
+        }
         if ($("propBuscaDialog")) return;
         document.body.insertAdjacentHTML("beforeend", `
         <dialog id="propBuscaDialog" class="crm-dialog crm-dialog-larga">
@@ -697,9 +1052,9 @@
             [ "Área construída", area(d.area_construida) ], [ "Área do terreno", area(d.area_terreno) ],
             [ "Quartos / suítes", [ d.quartos, d.suites ].map(x => x == null ? "—" : x).join(" / ") ],
             [ "Banheiros / vagas", [ d.banheiros, d.vagas ].map(x => x == null ? "—" : x).join(" / ") ],
-            [ venda ? "Valor pedido" : "Aluguel pedido", d.valor ? dinheiro(d.valor) : "—" ],
-            [ "R$/m² pedido", r.pedidoM2 ? dinheiro(r.pedidoM2, 2) : "—" ]
-        ].filter(([ , v ]) => v && v !== "—" || true).map(([ k, v ]) => `<tr><td>${h(k)}</td><td>${h(v || "—")}</td></tr>`).join("");
+            ...(atual && atual.mostrar_pedido ? [ [ venda ? "Valor pedido" : "Aluguel pedido", d.valor ? dinheiro(d.valor) : "—" ],
+                [ "R$/m² pedido", r.pedidoM2 ? dinheiro(r.pedidoM2, 2) : "—" ] ] : [])
+        ].map(([ k, v ]) => `<tr><td>${h(k)}</td><td>${h(v || "—")}</td></tr>`).join("");
     }
     function resumoDescricao(t, max = 520) { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > max ? t.slice(0, max).replace(/\s\S*$/, "") + "…" : t; }
 
@@ -707,6 +1062,7 @@
         const p = atual, r = calcular(p);
         if (!p.alvo) return ctx.toast("Escolha o imóvel avaliado.");
         if (!r.mercado) return ctx.toast("Ainda não dá para calcular: confira as áreas e os valores dos imóveis.");
+        if (r.usadas < (Number(cfg.min_amostras) || 0)) return ctx.toast(`A imobiliária pede pelo menos ${cfg.min_amostras} imóveis no cálculo para gerar o PDF.`);
         if (!ctx.imprimir) return ctx.toast("Impressão indisponível.");
         $("propPdf").disabled = true;
         try {
@@ -729,17 +1085,23 @@
         const baseTxt = BASE_TXT[r.base];
         const usadas = r.linhas.filter(l => l.situacao === "ok");
         const foraLista = r.linhas.filter(l => l.situacao !== "ok");
-        const totalPag = 5 + Math.ceil(r.linhas.length / 2);
         let pag = 0;
         const cab = titulo => `<div class="pp-cab"><img src="${logo}" alt="" /><span>${h(titulo)}</span></div>`;
-        const rod = () => `<div class="pp-rod"><span>${h(marca)} · ${h(p.titulo)}</span><span>Página @@PAG@@ de ${totalPag}</span></div>`;
+        const rod = () => `<div class="pp-rod"><span>${h(marca)} · ${h(p.titulo)}</span><span>Página @@PAG@@ de @@TOT@@</span></div>`;
+        const ex = p.tipo === "exclusividade" && cfg.exclusividade_ligada !== false;
+        const aj = p.ajustes, ajuste = Number(aj.ajuste) || 0;
+        // perfil do corretor da apresentação (página "Seu corretor")
+        let corretor = null, fotoCorretor = "";
+        if (p.incluir_corretor) {
+            try { corretor = await perfilDe(p.corretor_id, true); } catch { corretor = null; }
+            if (corretor && corretor.foto_path && (corretor.perfil || {}).mostrar_foto !== false) {
+                try { const { data } = await ctx.sb.storage.from("fotos-perfil").createSignedUrl(corretor.foto_path, 3600); fotoCorretor = (data && data.signedUrl) || ""; } catch {}
+            }
+        }
+        const nomeCorretor = (corretor && corretor.perfil && corretor.perfil.nome_apresentacao) || p.corretor || "";
+        const linhasDe = t => String(t || "").split(/\n+/).map(s => s.trim()).filter(Boolean);
         const fotoBox = (u, cls) => u ? `<div class="${cls}" style="background-image:url('${u}')"></div>` : `<div class="${cls} pp-semfoto">Sem foto</div>`;
         const local = [ a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
-
-        // escala da régua de valores
-        const pontos = [ r.rapido, r.mercado, r.otimista, r.faixaMin, r.faixaMax, r.pedido ].filter(Boolean);
-        const lo = Math.min(...pontos) * 0.96, hi = Math.max(...pontos) * 1.04;
-        const pos = v => ((v - lo) / (hi - lo) * 100).toFixed(1) + "%";
 
         const paginasAmostras = [];
         for (let i = 0; i < r.linhas.length; i += 2) {
@@ -842,6 +1204,49 @@
 .pp-regua .marca.pedido{top:16mm;color:var(--dest);font-weight:800}
 .pp-regua .marca.pedido i{background:var(--dest);margin:0 auto 1mm;height:5mm}
 .pp-leitura{border-left:4px solid var(--dest);background:#fbf7f2;padding:4mm 5mm;font-size:10.5pt}
+.pp-sug-topo{display:flex;justify-content:space-between;align-items:center;gap:8mm;margin:2mm 0 7mm}
+.pp-sug-topo h2{max-width:95mm;margin:0;text-transform:uppercase;font-size:17pt;letter-spacing:.02em;line-height:1.25}
+.pp-sug-caixa{background:var(--esc);color:#fff;border-radius:3mm;padding:4mm 6mm;display:grid;gap:1mm;text-align:right;min-width:62mm}
+.pp-sug-caixa small{font-size:8.5pt;letter-spacing:.12em;text-transform:uppercase;color:var(--dest);font-weight:700}
+.pp-sug-caixa b{font-size:20pt}
+.pp-sug-caixa span{font-size:9pt;opacity:.85}
+.pp-barras{display:grid;gap:2.2mm;margin-bottom:5mm}
+.pp-barra{display:grid;grid-template-columns:44mm 1fr;align-items:center;gap:4mm}
+.pp-barra>span{font-size:10pt;text-transform:uppercase;letter-spacing:.04em;color:#33454f;text-align:right}
+.pp-barra i{display:flex;justify-content:space-between;align-items:center;gap:3mm;background:#2f6aa3;color:#fff;font-style:normal;border-radius:1.5mm;padding:2.3mm 3.5mm;font-size:10pt;white-space:nowrap}
+.pp-barra.faixa i{background:#3f8f3a}
+.pp-barra.faixa.on i{background:#24661f;box-shadow:0 0 0 1.2pt var(--dest)}
+.pp-barra.faixa.on>span{color:var(--esc);font-weight:800}
+.pp-barra i b{font-size:10.5pt}
+.pp-barra i em{font-style:normal;opacity:.92}
+.pp-conta{font-size:9.5pt!important;color:#4c5d66}
+.pp-corretor{display:flex;align-items:center;gap:8mm;margin:4mm 0 6mm}
+.pp-cor-foto{width:42mm;height:42mm;border-radius:50%;background:#e3e9ec center/cover no-repeat;flex:none;border:1.5mm solid #fff;box-shadow:0 0 0 .8pt var(--az)}
+.pp-cor-ini{display:flex;align-items:center;justify-content:center;font-size:26pt;font-weight:800;color:var(--az)}
+.pp-corretor small{letter-spacing:.14em;text-transform:uppercase;font-size:9pt;color:var(--dest);font-weight:700}
+.pp-corretor h2{margin:1mm 0 1.5mm}
+.pp-corretor span{display:block;font-size:10.5pt;color:#4c5d66}
+.pp-cor-esp{margin-top:1.5mm;color:var(--az)!important;font-weight:700}
+.pp-cor-num{display:grid;grid-template-columns:repeat(auto-fit,minmax(40mm,1fr));gap:4mm;margin:2mm 0 4mm}
+.pp-cor-num div{background:var(--az);color:#fff;border-radius:2.5mm;padding:4mm;display:grid;gap:1mm;text-align:center}
+.pp-cor-num b{font-size:20pt}
+.pp-cor-num small{font-size:9pt;text-transform:uppercase;letter-spacing:.08em}
+.pp-cor-contato{display:flex;flex-wrap:wrap;gap:3mm;margin-top:6mm}
+.pp-cor-contato span{border:1px solid var(--az);color:var(--esc);border-radius:10mm;padding:1.5mm 4mm;font-size:10pt}
+.pp-lista,.pp-plano{margin:0 0 4mm;padding-left:6mm;font-size:10.5pt;line-height:1.6}
+.pp-plano li::marker{color:var(--dest);font-weight:800}
+.pp-lista li::marker{color:var(--dest)}
+.pp-cond{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin:6mm 0}
+.pp-cond div{border:1.5px solid var(--az);border-radius:3mm;padding:4mm;display:grid;gap:1.5mm;text-align:center}
+.pp-cond div:first-child{background:var(--az);color:#fff}
+.pp-cond small{font-size:8.5pt;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.pp-cond b{font-size:16pt}
+.pp-cond span{font-size:8.5pt;opacity:.85}
+.pp-campos{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:5mm}
+.pp-campos td{border:1px solid #cfd9de;padding:2.6mm 3mm;height:9mm}
+.pp-campos td:first-child{width:46mm;color:#5b6c75;background:#f4f7f8}
+.pp-local-data{margin-top:8mm!important}
+.pp-test{margin-top:14mm}
 .pp-nota{font-size:9pt!important;color:#5b6c75}
 .pp-assin{margin-top:22mm;display:flex;justify-content:space-between;gap:12mm}
 .pp-assin div{flex:1;border-top:1px solid #1f2d36;padding-top:2mm;text-align:center;font-size:9.5pt}
@@ -851,7 +1256,7 @@
 
         const capa = `<section class="pp-pg pp-capa">
             <div class="pp-capa-foto" style="${fotosAlvo[0] ? `background-image:url('${fotosAlvo[0]}')` : ""}"></div>
-            <div class="pp-capa-faixa"><small>${venda ? "Estudo de mercado · proposta de valor de venda" : "Estudo de mercado · proposta de valor de locação"}</small>
+            <div class="pp-capa-faixa"><small>${ex ? "Estudo de mercado · proposta de exclusividade" : venda ? "Estudo de mercado · proposta de valor de venda" : "Estudo de mercado · proposta de valor de locação"}</small>
               <strong>${h(a.nome || p.titulo)}</strong><span>${h(local)}</span>
               ${p.cliente ? `<span>Preparado para: <b>${h(p.cliente)}</b></span>` : ""}</div>
             <div class="pp-capa-pe"><img src="${logo}" alt="${h(marca)}" />
@@ -874,50 +1279,125 @@
               ${r.linhas.map((l, k) => { const d = l.a.dados; return `<tr class="${l.situacao !== "ok" ? "fora" : ""}"><td>${fotosAm[k] ? `<div class="mini" style="background-image:url('${fotosAm[k]}')"></div>` : ""}</td>
                 <td>${l.i + 1}</td><td>${h((d.codigo ? d.codigo + " · " : "") + (d.bairro || d.nome || ""))}</td><td class="n">${numero(d.area_construida)}</td><td class="n">${numero(d.area_terreno)}</td>
                 <td class="n">${d.quartos ?? "—"}</td><td class="n">${dinheiro(d.valor)}</td><td class="n">${l.m2 ? dinheiro(l.m2, 0) : "—"}</td></tr>`; }).join("")}
-              <tr><td></td><td></td><td><b>Imóvel avaliado</b></td><td class="n"><b>${numero(a.area_construida)}</b></td><td class="n"><b>${numero(a.area_terreno)}</b></td><td class="n"><b>${a.quartos ?? "—"}</b></td><td class="n"><b>${dinheiro(a.valor)}</b></td><td class="n"><b>${r.pedidoM2 ? dinheiro(r.pedidoM2, 0) : "—"}</b></td></tr>
+              <tr><td></td><td></td><td><b>Imóvel avaliado</b></td><td class="n"><b>${numero(a.area_construida)}</b></td><td class="n"><b>${numero(a.area_terreno)}</b></td><td class="n"><b>${a.quartos ?? "—"}</b></td><td class="n"><b>${p.mostrar_pedido ? dinheiro(a.valor) : "—"}</b></td><td class="n"><b>${p.mostrar_pedido && r.pedidoM2 ? dinheiro(r.pedidoM2, 0) : "—"}</b></td></tr>
             </table>
-            <div class="pp-estat"><div><small>Imóveis no cálculo</small><b>${r.usadas} de ${r.linhas.length}</b></div><div><small>Média do m²</small><b>${dinheiro(r.media, 2)}</b></div>
-              <div><small>Mediana do m²</small><b>${dinheiro(r.mediana, 2)}</b></div><div><small>Menor – maior m²</small><b>${dinheiro(r.min, 0)} – ${dinheiro(r.max, 0)}</b></div></div>
+            ${Number(aj.oferta) ? `<p class="pp-nota">O valor do m² de cada imóvel já considera ${numero(aj.oferta, 1)}% de desconto de negociação sobre o valor anunciado.</p>` : ""}
+            ${cfg.mostrar_estatisticas !== false ? `<div class="pp-estat"><div><small>Imóveis no cálculo</small><b>${r.usadas} de ${r.linhas.length}</b></div><div><small>Média do m²</small><b>${dinheiro(r.media, 2)}</b></div>
+              <div><small>Mediana do m²</small><b>${dinheiro(r.mediana, 2)}</b></div><div><small>Menor – maior m²</small><b>${dinheiro(r.min, 0)} – ${dinheiro(r.max, 0)}</b></div></div>` : ""}
             ${foraLista.length ? `<p class="pp-nota">Riscados: ${foraLista.map(l => "amostra " + (l.i + 1) + " (" + (l.situacao === "longe" ? "m² muito diferente: " + l.motivo : l.motivo.toLowerCase()) + ")").join("; ")}.</p>` : ""}
             ${rod()}</section>`;
 
+        // página final no formato que o mercado conhece (valor sugerido + barras das faixas e das amostras)
+        const barras = [ ...FAIXAS.map(([ k, n ]) => ({ n, m2: r.m2Faixa[k], total: r[k], faixa: true, on: aj.sugerido === k })),
+            ...usadas.map(l => ({ n: "Amostra " + (l.i + 1), m2: l.m2 })) ];
+        const maxBarra = Math.max(...barras.map(b => b.m2 || 0)) || 1;
+        const pctTxt = v => numero(Math.abs(Number(v) || 0), 1).replace("—", "0") + "%";
         const valor = `<section class="pp-pg">${cab("Valor sugerido")}
-            <h2>Valor sugerido para ${venda ? "a venda" : "a locação"}</h2>
-            <p>${h(numero(r.areaAlvo))} m² de ${baseTxt} × ${dinheiro(r.media, 2)} por m² (média de ${r.usadas} imóve${r.usadas > 1 ? "is" : "l"} comparado${r.usadas > 1 ? "s" : ""}).</p>
-            <div class="pp-valores">
-              <div><small>Venda rápida</small><b>${dinheiro(r.rapido)}</b><span>${dinheiro(r.rapido / r.areaAlvo, 2)}/m² · ${p.ajustes.rapido}% abaixo</span></div>
-              <div class="m"><small>Valor de mercado</small><b>${dinheiro(r.mercado)}</b><span>${dinheiro(r.media, 2)}/m²</span></div>
-              <div><small>Otimista</small><b>${dinheiro(r.otimista)}</b><span>${dinheiro(r.otimista / r.areaAlvo, 2)}/m² · ${p.ajustes.otimista}% acima</span></div>
-            </div>
-            <div class="pp-regua"><div class="trilho"></div><div class="faixa" style="left:${pos(r.rapido)};width:calc(${pos(r.otimista)} - ${pos(r.rapido)})"></div>
-              <div class="marca" style="left:${pos(r.rapido)}">Rápida<i></i></div><div class="marca" style="left:${pos(r.mercado)}">Mercado<i></i></div><div class="marca" style="left:${pos(r.otimista)}">Otimista<i></i></div>
-              ${r.pedido ? `<div class="marca pedido" style="left:${pos(r.pedido)}"><i></i>Pedido ${dinheiro(r.pedido)}</div>` : ""}</div>
-            ${r.pedido ? `<p class="pp-leitura">${h(leituraTexto(r))}</p>` : ""}
+            <div class="pp-sug-topo"><h2>Valor sugerido para ${venda ? "a venda" : "a locação"} do imóvel</h2>
+              <div class="pp-sug-caixa"><small>${h(NOME_FAIXA[aj.sugerido] || "Valor de mercado")}</small><b>${dinheiro(r.sugerido)}</b><span>${dinheiro(r.m2Faixa[aj.sugerido] || r.m2, 2)}/m²</span></div></div>
+            <div class="pp-barras">${barras.map(b => `<div class="pp-barra${b.faixa ? " faixa" : ""}${b.on ? " on" : ""}"><span>${h(b.n)}</span>
+              <div><i style="width:${Math.max(30, b.m2 / maxBarra * 100).toFixed(1)}%">${b.total ? `<b>${dinheiro(b.total)}</b>` : ""}<em>${dinheiro(b.m2, 2)}/m²</em></i></div></div>`).join("")}</div>
+            <p class="pp-conta">${numero(r.areaAlvo)} m² de ${baseTxt} × ${dinheiro(r.m2, 2)} por m²${ajuste ? ` (${aj.calculo === "mediana" ? "mediana" : "média"} de ${dinheiro(r.m2Partida, 2)} ${ajuste > 0 ? "+" : "−"} ${pctTxt(ajuste)} de ajuste)` : ` (${aj.calculo === "mediana" ? "mediana" : "média"} de ${r.usadas} imóve${r.usadas > 1 ? "is" : "l"} comparado${r.usadas > 1 ? "s" : ""})`} = ${dinheiro(r.mercado)}.</p>
+            ${ajuste && aj.ajuste_motivo ? `<p class="pp-leitura"><b>Ajuste de ${ajuste > 0 ? "+" : "−"}${pctTxt(ajuste)}:</b> ${h(aj.ajuste_motivo)}</p>` : ""}
+            ${p.mostrar_pedido && r.pedido ? `<p class="pp-leitura">${h(leituraTexto(r))}</p>` : ""}
             <h3>O que cada valor quer dizer</h3>
-            <p><b>Valor de mercado:</b> o que os imóveis parecidos da região pedem, em média, por m². É o ponto de partida da negociação.</p>
-            <p><b>Venda rápida:</b> preço para atrair mais interessados e fechar em menos tempo.</p>
-            <p><b>Otimista:</b> teto razoável para anunciar quando o imóvel tem diferenciais (reforma, acabamento, localização na rua, área de lazer).</p>
-            <p>Faixa praticada pelos imóveis comparados, aplicada a este imóvel: ${dinheiro(r.faixaMin)} a ${dinheiro(r.faixaMax)}.</p>
+            <p><b>Oportunidade (${pctTxt(aj.oportunidade)} abaixo):</b> preço para atrair muitos interessados e fechar rápido.</p>
+            <p><b>Competitivo (${pctTxt(aj.competitivo)} abaixo):</b> um pouco abaixo do mercado, para se destacar entre os imóveis parecidos.</p>
+            <p><b>Mercado:</b> o que os imóveis parecidos da região pedem por m², aplicado ao seu imóvel. É o ponto de partida da negociação.</p>
+            <p><b>Otimista (${pctTxt(aj.otimista)} acima):</b> teto razoável quando o imóvel tem diferenciais (reforma, acabamento, localização, lazer).</p>
             ${rod()}</section>`;
 
         const metodo = `<section class="pp-pg">${cab("Como chegamos neste valor")}
             <h2>Como chegamos neste valor</h2>
             <p>1. Escolhemos imóveis parecidos com o seu (mesmo tipo e região comparável) anunciados ${venda ? "para venda" : "para locação"}.</p>
-            <p>2. Para cada um, dividimos o valor anunciado pela ${baseTxt} e chegamos ao valor do m².</p>
-            <p>3. Deixamos de fora os imóveis com valor do m² mais de ${p.ajustes.faixa}% acima ou abaixo da mediana, para um caso fora do comum não puxar a média.</p>
-            <p>4. Multiplicamos a média do m² pela ${baseTxt} do seu imóvel. Desse valor de mercado saem a venda rápida (${p.ajustes.rapido}% abaixo) e o otimista (${p.ajustes.otimista}% acima).</p>
+            <p>2. Para cada um, dividimos o valor anunciado${Number(aj.oferta) ? ` (com ${pctTxt(aj.oferta)} de desconto de negociação)` : ""} pela ${baseTxt} e chegamos ao valor do m².</p>
+            <p>3. Deixamos de fora os imóveis com valor do m² mais de ${aj.faixa}% acima ou abaixo da mediana, para um caso fora do comum não puxar o resultado.</p>
+            <p>4. Multiplicamos a ${aj.calculo === "mediana" ? "mediana" : "média"} do m²${ajuste ? `, com ${ajuste > 0 ? "+" : "−"}${pctTxt(ajuste)} de ajuste pelos diferenciais do imóvel,` : ""} pela ${baseTxt} do seu imóvel e chegamos ao valor de mercado. Dele saem o valor de oportunidade (${pctTxt(aj.oportunidade)} abaixo), o competitivo (${pctTxt(aj.competitivo)} abaixo) e o otimista (${pctTxt(aj.otimista)} acima).</p>
             <h3>Grau de confiança</h3>
             <p>${h(CONF_TXT[r.confianca] || "—")}. ${r.usadas} imóve${r.usadas > 1 ? "is" : "l"} no cálculo${r.cv != null ? `, variação de ${numero(r.cv, 1)}% entre eles` : ""}. Quanto mais imóveis parecidos e menor a variação, mais firme é o valor.</p>
             <h3>Importante</h3>
             <p class="pp-nota">Os valores usados são de anúncio (oferta), não de negócios fechados. Este estudo é uma opinião de mercado preparada pelo corretor para orientar a definição do preço; não é laudo de avaliação nos termos da ABNT NBR 14653 nem parecer técnico de avaliação. Proposta válida até ${validade.toLocaleDateString("pt-BR")}.</p>
-            <div class="pp-assin"><div>${h(p.corretor || "Corretor responsável")}<br>${h(marca)}</div><div>${h(p.cliente || "Proprietário / cliente")}<br>Ciente</div></div>
+            ${cfg.texto_pdf ? `<p class="pp-nota">${h(cfg.texto_pdf)}</p>` : ""}
+            ${ex ? "" : `<div class="pp-assin"><div>${h(p.corretor || "Corretor responsável")}<br>${h(marca)}</div><div>${h(p.cliente || "Proprietário / cliente")}<br>Ciente</div></div>`}
             ${rod()}</section>`;
 
-        // páginas na ordem; a numeração do rodapé segue a ordem em que foram montadas acima
+        // ---- página "Seu corretor" ----
+        let paginaCorretor = "";
+        if (p.incluir_corretor) {
+            const pf = (corretor && corretor.perfil) || {};
+            const nome = pf.nome_apresentacao || p.corretor || (corretor && corretor.nome) || "";
+            const anos = pf.desde ? new Date().getFullYear() - Number(pf.desde) : null;
+            const numeros = [ anos > 0 ? [ anos === 1 ? "ano de mercado" : "anos de mercado", anos ] : null,
+                pf.mostrar_negocios && corretor ? [ "negócios fechados", corretor.negocios_fechados || 0 ] : null,
+                pf.mostrar_captados && corretor ? [ "imóveis captados", corretor.imoveis_captados || 0 ] : null ].filter(Boolean);
+            const contato = pf.mostrar_contato !== false ? [ pf.whatsapp ? "WhatsApp " + pf.whatsapp : "", pf.email || "", pf.instagram ? "@" + pf.instagram : "" ].filter(Boolean) : [];
+            paginaCorretor = `<section class="pp-pg">${cab("Seu corretor")}
+              <div class="pp-corretor">
+                ${fotoCorretor ? `<div class="pp-cor-foto" style="background-image:url('${fotoCorretor}')"></div>` : `<div class="pp-cor-foto pp-cor-ini">${h(nome.split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase())}</div>`}
+                <div><small>Quem vai cuidar do seu imóvel</small><h2>${h(nome)}</h2>
+                  <span>${h([ pf.creci, marca ].filter(Boolean).join(" · "))}</span>
+                  ${pf.especialidade ? `<span class="pp-cor-esp">${h(pf.especialidade)}</span>` : ""}</div>
+              </div>
+              ${numeros.length ? `<div class="pp-cor-num">${numeros.map(([ t, v ]) => `<div><b>${h(String(v))}</b><small>${h(t)}</small></div>`).join("")}</div>` : ""}
+              ${pf.historia ? `<h3>Minha história</h3><p>${h(pf.historia)}</p>` : ""}
+              ${pf.bairros ? `<h3>Onde mais atuo</h3><p>${h(pf.bairros)}</p>` : ""}
+              ${(pf.diferenciais || []).length ? `<h3>Como eu trabalho</h3><ul class="pp-lista">${pf.diferenciais.map(d => `<li>${h(d)}</li>`).join("")}</ul>` : ""}
+              ${contato.length ? `<div class="pp-cor-contato">${contato.map(c => `<span>${h(c)}</span>`).join("")}</div>` : ""}
+              ${rod()}</section>`;
+        }
+
+        // ---- apresentação de exclusividade ----
+        let paginasEx = "";
+        if (ex) {
+            const e = p.exclusividade || {}, prazo = Number(e.prazo_dias) || 90, comissao = Number(e.comissao_pct) || 0;
+            const plano = linhasDe(cfg.ex_plano), comp = linhasDe(cfg.ex_compromissos);
+            const negocio = venda ? "venda" : "locação";
+            paginasEx += `<section class="pp-pg">${cab("Por que com a " + marca)}
+              <h2>Por que anunciar com a ${h(marca)}</h2>
+              ${cfg.ex_texto ? `<p>${h(cfg.ex_texto)}</p>` : ""}
+              ${plano.length ? `<h3>Plano de divulgação do seu imóvel</h3><ol class="pp-plano">${plano.map(x => `<li>${h(x)}</li>`).join("")}</ol>` : ""}
+              ${comp.length ? `<h3>Nossos compromissos com você</h3><ul class="pp-lista">${comp.map(x => `<li>${h(x)}</li>`).join("")}</ul>` : ""}
+              ${rod()}</section>`;
+            paginasEx += `<section class="pp-pg">${cab("Proposta de exclusividade")}
+              <h2>Proposta de exclusividade</h2>
+              <p>Para cuidar da ${negocio} do seu imóvel com toda a nossa estrutura, propomos as condições abaixo.</p>
+              <div class="pp-cond">
+                <div><small>Valor de anúncio sugerido</small><b>${dinheiro(r.sugerido)}</b><span>${h(NOME_FAIXA[aj.sugerido] || "Valor de mercado")}</span></div>
+                <div><small>Prazo da exclusividade</small><b>${prazo} dias</b><span>a partir da assinatura</span></div>
+                <div><small>Comissão da imobiliária</small><b>${numero(comissao, 2).replace("—", "0")}%</b><span>sobre o valor da ${negocio}, paga só quando o negócio fechar</span></div>
+              </div>
+              <h3>Como funciona</h3>
+              <p>Durante o prazo, a ${h(marca)} é a única imobiliária responsável por anunciar e negociar o imóvel. Todos os interessados, inclusive os que procurarem o proprietário diretamente, são atendidos por nós, e você recebe o retorno de cada visita e de cada proposta.</p>
+              <p>O valor de anúncio pode ser revisto a qualquer momento, em comum acordo, com base no retorno dos interessados.</p>
+              <div class="pp-assin"><div>${h(nomeCorretor || "Corretor responsável")}<br>${h(marca)}</div><div>${h(p.cliente || "Proprietário")}<br>De acordo</div></div>
+              ${rod()}</section>`;
+            if (e.autorizacao) {
+                const end = [ a.logradouro, a.numero, a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(", ");
+                paginasEx += `<section class="pp-pg">${cab("Autorização")}
+                  <h2>Autorização de ${negocio} com exclusividade</h2>
+                  <table class="pp-campos">
+                    <tr><td>Proprietário(a)</td><td>${h(p.cliente || "")}</td></tr><tr><td>CPF/CNPJ</td><td></td></tr>
+                    <tr><td>Endereço do proprietário</td><td></td></tr><tr><td>Telefone / e-mail</td><td></td></tr>
+                    <tr><td>Imóvel</td><td>${h([ a.tipo_imovel, a.nome ].filter(Boolean).join(" · "))}</td></tr><tr><td>Endereço do imóvel</td><td>${h(end)}</td></tr>
+                    <tr><td>Matrícula / cartório</td><td></td></tr>
+                  </table>
+                  <p>O(A) proprietário(a) acima identificado(a) autoriza a ${h(marca)} a promover, com exclusividade, a ${negocio} do imóvel descrito, pelo valor de anúncio de <b>${dinheiro(r.sugerido)}</b>, pelo prazo de <b>${prazo} dias</b> contados da assinatura deste documento.</p>
+                  <p>Pela intermediação, será devida à ${h(marca)} a remuneração de <b>${numero(comissao, 2).replace("—", "0")}%</b> sobre o valor da ${negocio}, paga na conclusão do negócio. Durante o prazo, a remuneração também é devida se o negócio for fechado diretamente pelo(a) proprietário(a) ou por terceiros.</p>
+                  <p>O(A) proprietário(a) declara que as informações do imóvel são verdadeiras e se compromete a fornecer a documentação necessária.</p>
+                  <p class="pp-local-data">${h(a.cidade || "")}, ____ de ______________ de ________.</p>
+                  <div class="pp-assin"><div>Proprietário(a)</div><div>${h(marca)}<br>${h(nomeCorretor)}</div></div>
+                  <div class="pp-assin pp-test"><div>Testemunha 1 · CPF</div><div>Testemunha 2 · CPF</div></div>
+                  ${rod()}</section>`;
+            }
+        }
+
+        // páginas na ordem; a numeração do rodapé segue a ordem em que foram montadas
         pag = 1;
-        const corpo = `${capa}${imovel}${paginasAmostras.join("")}${resumo}${valor}${metodo}`.replace(/@@PAG@@/g, () => ++pag);
+        const corpoSem = `${capa}${paginaCorretor}${imovel}${paginasAmostras.join("")}${resumo}${valor}${metodo}${paginasEx}`;
+        const total = (corpoSem.match(/class="pp-pg/g) || []).length;
+        const corpo = corpoSem.replace(/@@PAG@@/g, () => ++pag).replace(/@@TOT@@/g, total);
         return `${css}<div class="pp-doc" lang="pt-BR">${corpo}</div>`;
     }
 
-    window.SKLPropostas = { iniciar, sair, aoMostrar, calcular, areasDaDescricao };
+    window.SKLPropostas = { iniciar, sair, aoMostrar, calcular, areasDaDescricao, abrirEuCorretor };
 })();

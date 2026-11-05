@@ -24,7 +24,7 @@
         slogan: "Mapeamento · Gestão · Conexão comercial",
         logo: "logo.png",
         cor_primaria: "#0a2a4a", cor_secundaria: "#0b4f78", cor_destaque: "#29abe2", cor_ouro: "#c9a227",
-        rodape: "SKL Soluções Digitais · contato@sklgeosolucoes.com.br · (66) 9.9612-1567",
+        rodape: "SKL Soluções Digitais · contato@sklgeosolucoes.com.br · (66) 9.9273-7646",
         mostrar_selo_skl: false
     };
 
