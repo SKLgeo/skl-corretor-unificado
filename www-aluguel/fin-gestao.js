@@ -37,6 +37,18 @@
         const cli = I.clientes.get(n.cliente_id);
         return [ n.titulo, cli && cli.nome ].filter(Boolean).join(" — ") || "Negócio";
     }
+    // parcela a receber criada no contrato de compra e venda (sem negócio no CRM)
+    function nomeRecebivel(r) {
+        if (r.negociacao_id || !r.contrato_venda_id) return nomeNegocio(r.negociacao_id);
+        const F = window.SKLFinanceiro, v = F && F.vendas ? F.vendas().find(x => x.id === r.contrato_venda_id) : null;
+        if (!v) return "Contrato de compra e venda";
+        const cli = v.comprador_id && F.cliente ? F.cliente(v.comprador_id) : null;
+        return [ `Contrato de venda nº ${v.numero}`, (cli && cli.nome) || v.comprador_nome ].filter(Boolean).join(" — ");
+    }
+    function abrirOrigem(r) {
+        if (r.negociacao_id) { if (window.SKLCRM) window.SKLCRM.abrirNegociacao(r.negociacao_id); return; }
+        if (r.contrato_venda_id && window.SKLFinanceiro && window.SKLFinanceiro.abrirVendaId) window.SKLFinanceiro.abrirVendaId(r.contrato_venda_id);
+    }
     const recebido = r => !!(r.recebido_em || r.recebido_sem_data);
     const liquidado = l => !!(l.pago_em || l.pago_sem_data);
     const nomeConta = id => (contas.find(c => c.id === id) || {}).nome || "";
@@ -191,11 +203,11 @@
               <select id="fgRecFiltro"><option value="aberto">Em aberto</option><option value="vencido">Vencidas</option><option value="recebido">Recebidas</option><option value="todos">Todas</option></select>
               <span class="crm-contagem">${lista.length} parcela(s) · ${h(dinheiro(soma(lista)))}</span>
             </div>
-            <p class="muted-text crm-dica">As parcelas são criadas no negócio ganho (Negociações → abrir o negócio → "Parcelas a receber").</p>
+            <p class="muted-text crm-dica">As parcelas são criadas no negócio ganho (Negociações → abrir o negócio → "Parcelas a receber") ou no contrato de compra e venda (Contratos → abrir o contrato → "Comissão").</p>
             <div class="panel table-panel">${lista.length ? `<table class="crm-tabela fin-tabela"><thead><tr><th>Vencimento</th><th>Negócio</th><th>Parcela</th><th>Valor</th><th>Situação</th><th>Conta</th><th></th></tr></thead><tbody>
               ${lista.map(r => `<tr>
                 <td data-r="Vencimento">${h(dataBr(r.vencimento))}</td>
-                <td data-r="Negócio"><button type="button" class="text-button" data-abrir-neg="${h(r.negociacao_id)}">${h(nomeNegocio(r.negociacao_id))}</button></td>
+                <td data-r="Negócio"><button type="button" class="text-button" data-abrir-rec="${h(r.id)}">${h(nomeRecebivel(r))}</button></td>
                 <td data-r="Parcela">${h(r.parcela)}ª${r.observacao ? `<small class="fin-sub">${h(r.observacao)}</small>` : ""}</td>
                 <td data-r="Valor"><strong>${h(dinheiro(r.valor))}</strong></td>
                 <td data-r="Situação">${situacaoRec(r)}${programado(r)}</td>
@@ -205,7 +217,7 @@
               </tr>`).join("")}</tbody></table>` : `<div class="empty-state">Nenhuma parcela nesta seleção.</div>`}</div>`;
         $("fgRecFiltro").value = filtroRec;
         $("fgRecFiltro").addEventListener("change", () => { filtroRec = $("fgRecFiltro").value; renderReceber(box); });
-        box.querySelectorAll("[data-abrir-neg]").forEach(b => b.addEventListener("click", () => window.SKLCRM && window.SKLCRM.abrirNegociacao(b.dataset.abrirNeg)));
+        box.querySelectorAll("[data-abrir-rec]").forEach(b => b.addEventListener("click", () => abrirOrigem(recebiveis.find(r => r.id === b.dataset.abrirRec) || {})));
         box.querySelectorAll("[data-rec-baixa]").forEach(b => b.addEventListener("click", () => abrirBaixa("recebivel", recebiveis.find(r => r.id === b.dataset.recBaixa))));
         box.querySelectorAll("[data-rec-prog]").forEach(b => b.addEventListener("click", () => abrirProgramar("recebivel", recebiveis.find(r => r.id === b.dataset.recProg))));
         box.querySelectorAll("[data-rec-estornar]").forEach(b => b.addEventListener("click", async () => {
@@ -226,7 +238,7 @@
         const rec = tipo === "recebivel";
         $("fgBaixaEyebrow").textContent = rec ? "COMISSÃO A RECEBER" : (item.natureza === "receita" ? "RECEITA" : "DESPESA");
         $("fgBaixaTitulo").textContent = rec ? "Registrar recebimento" : (item.natureza === "receita" ? "Registrar recebimento" : "Registrar pagamento");
-        $("fgBaixaInfo").textContent = rec ? `${nomeNegocio(item.negociacao_id)} · ${item.parcela}ª parcela · ${dinheiro(item.valor)}` : `${item.descricao} · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`;
+        $("fgBaixaInfo").textContent = rec ? `${nomeRecebivel(item)} · ${item.parcela}ª parcela · ${dinheiro(item.valor)}` : `${item.descricao} · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`;
         $("fgBaixaRotulo").textContent = rec || item.natureza === "receita" ? "Recebido em" : "Pago em";
         $("fgBaixaData").value = hojeIso();
         $("fgBaixaConta").innerHTML = opcoesContas(item.conta_id || (contas.length === 1 ? contas[0].id : ""));
@@ -256,7 +268,7 @@
         progAlvo = { tipo, item, aoConcluir };
         const rec = tipo === "recebivel";
         $("fgProgTitulo").textContent = rec || item.natureza === "receita" ? "Programar recebimento" : "Programar pagamento";
-        $("fgProgInfo").textContent = rec ? `${nomeNegocio(item.negociacao_id)} · ${item.parcela}ª parcela · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`
+        $("fgProgInfo").textContent = rec ? `${nomeRecebivel(item)} · ${item.parcela}ª parcela · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`
             : `${item.descricao} · ${dinheiro(item.valor)} · vence ${dataBr(item.vencimento)}`;
         $("fgProgRotulo").textContent = rec || item.natureza === "receita" ? "Receber em" : "Pagar em";
         $("fgProgData").value = item.programado_para || item.vencimento || hojeIso();
@@ -570,5 +582,5 @@
 
     function sair() { contas = []; plano = []; lancamentos = []; recebiveis = []; const b = $("finGestao"); if (b) b.innerHTML = ""; }
 
-    window.SKLFinGestao = { iniciar, sair, carregar, temAba, render, desenharNaNegociacao, abrirBaixa, abrirProgramar, nomeNegocio, dados: () => ({ contas, plano, lancamentos, recebiveis }) };
+    window.SKLFinGestao = { iniciar, sair, carregar, temAba, render, desenharNaNegociacao, abrirBaixa, abrirProgramar, nomeNegocio, nomeRecebivel, dados: () => ({ contas, plano, lancamentos, recebiveis }) };
 })();

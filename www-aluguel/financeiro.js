@@ -166,6 +166,7 @@
         $("finCtGarantia").addEventListener("change", mostrarGarantia);
         $("finCtAddItem").addEventListener("click", () => { itens.push({ descricao: "", valor: "", repassar: false }); desenharItens(); });
         $("finPgAdd").addEventListener("click", () => { parcelasPg.push({ vencimento: "", valor: "", status: "" }); desenharParcelasPg(true); });
+        [ "finCvComValor", "finCvComPct", "finCvValor" ].forEach(id => $(id).addEventListener("input", () => { if (window.SKLComissaoContrato) window.SKLComissaoContrato.atualizar(); }));
         $("finPgGerarBotao").addEventListener("click", gerarParcelasPg);
         $("finCvValor").addEventListener("input", () => notaParcelasPg());
         $("finCtSalvar").addEventListener("click", salvarContrato);
@@ -585,6 +586,16 @@
         const ctLoc = tipo === "locacao" ? c : null; // documentos, vistoria e rescisão são da locação
         if (window.SKLDocumentos) window.SKLDocumentos.aoAbrirContrato(ctLoc);
         if (window.SKLFinExtra) window.SKLFinExtra.aoAbrirContrato(ctLoc);
+        // compra e venda: bloco "Comissão" (recebimento da imobiliária e repasses). Depois de concluída a venda, a comissão
+        // continua editável (ela costuma cair depois da assinatura); só o contrato cancelado trava.
+        if (window.SKLComissaoContrato) {
+            const podeCom = podeGerir() && (!c || c.status !== "cancelado");
+            window.SKLComissaoContrato.abrir({ ctx, tipo, contrato: c && tipo === "venda" ? c : null, pode: podeCom, negociacaoId: base.negociacao_id || null,
+                soComissao: podeCom && !!c && !pode, parceiros,
+                participantes: () => [ ...($("finCtCorretor").value ? [ { tipo: "corretor", usuario_id: $("finCtCorretor").value } ] : []), ...participantesCt() ],
+                total: totalComissaoVenda, dataContrato: () => $("finCvData").value,
+                aoSalvar: async () => { await carregar(true); } });
+        }
         $("finContratoDialog").showModal();
     }
     function definirTipo(tipo) {
@@ -595,6 +606,7 @@
         $("finCtInquilinoRot").textContent = ctTipo === "venda" ? "Comprador" : "Inquilino";
         $("finCtProprietarioRot").textContent = ctTipo === "venda" ? "Vendedor (proprietário)" : "Proprietário";
         if (!vendaAberta && !contratoAberto) $("finCtAddItem").hidden = ctTipo !== "locacao" || !podeGerir();
+        if (window.SKLComissaoContrato) window.SKLComissaoContrato.definirTipo(ctTipo);
         notaParcelasPg();
         // imóveis que servem para o tipo escolhido (mantém o que já estava escolhido)
         const sel = $("finCtImovel").value || $("finCtImovel").dataset.sel || "";
@@ -720,6 +732,12 @@
         const g = $("finCtGarantia").value;
         $("finCtGarantiaDetLabel").hidden = g === "nenhuma";
         $("finCtCaucaoLabel").hidden = g !== "caucao";
+    }
+    function totalComissaoVenda() {
+        const v = num($("finCvComValor").value);
+        if (v) return v;
+        const pv = num($("finCvValor").value), pc = num($("finCvComPct").value);
+        return pv && pc ? Math.round(pv * pc) / 100 : 0;
     }
     // Forma de pagamento do contrato (locação e compra e venda): texto livre + parcelas com vencimento, valor e situação
     // escrita à mão ("Pago", "a vencer"…). Fica no contrato (fin_definir_pagamento_contrato); a lista de contratos mostra
@@ -849,6 +867,7 @@
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
         await salvarPagamentoCt("venda", data.id);
+        if (window.SKLComissaoContrato) await window.SKLComissaoContrato.salvar(data.id);
         $("finContratoDialog").close();
         ctx.toast(vendaAberta ? "Contrato de compra e venda atualizado." : `Contrato de compra e venda nº ${data.numero} criado.`);
         await carregar(true);
@@ -1059,5 +1078,5 @@
     window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length,
         imprimir: html => abrirImpressao(html), contratos: () => contratos, vendas: () => vendas, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
         clientes: () => [ ...clientes.values() ], mostrarAba, renderizar: () => render(), recarregar: () => carregar(true),
-        abrirContratoId: id => abrirContrato(contrato(id)), abrirPagamentoId: id => abrirPagamento(cobrancas.find(x => x.id === id)) };
+        abrirContratoId: id => abrirContrato(contrato(id)), abrirVendaId: id => { const v = venda(id); if (v) abrirContrato(v); }, abrirPagamentoId: id => abrirPagamento(cobrancas.find(x => x.id === id)) };
 })();

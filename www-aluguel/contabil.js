@@ -110,7 +110,7 @@
                 .eq("carteira_id", cid).eq("status", "paga").gte("pago_em", p.ini).lte("pago_em", p.fim),
             ctx.sb.from("aluguel_repasses").select("id,contrato_id,cobranca_id,proprietario_id,competencia,valor_liquido,pago_em,observacao")
                 .eq("carteira_id", cid).eq("status", "pago").gte("pago_em", p.ini).lte("pago_em", p.fim),
-            ctx.sb.from("crm_comissao_recebiveis").select("id,negociacao_id,parcela,valor,recebido_em,conta_id,observacao")
+            ctx.sb.from("crm_comissao_recebiveis").select("id,negociacao_id,contrato_venda_id,parcela,valor,recebido_em,conta_id,observacao")
                 .eq("carteira_id", cid).gte("recebido_em", p.ini).lte("recebido_em", p.fim),
             ctx.sb.from("fin_lancamentos").select("id,descricao,natureza,valor,vencimento,pago_em,plano_conta_id,plano_origem,conta_id,observacao")
                 .eq("carteira_id", cid).gte("pago_em", p.ini).lte("pago_em", p.fim),
@@ -126,7 +126,10 @@
         const idsContrato = [ ...cobrancas.map(c => c.contrato_id), ...(repPagos.data || []).map(r => r.contrato_id) ];
         const contratos = idsContrato.length ? await emLotes("aluguel_contratos", "id,numero,construcao_id,inquilino_id,proprietario_id,inquilino_nome,proprietario_nome,imovel_avulso", "id", idsContrato) : [];
         const negs = (receb.data || []).length ? await emLotes("crm_negociacoes", "id,titulo,cliente_id,construcao_id", "id", receb.data.map(r => r.negociacao_id)) : [];
-        const idsCli = [ ...contratos.flatMap(c => [ c.inquilino_id, c.proprietario_id ]), ...negs.map(n => n.cliente_id), ...(repPagos.data || []).map(r => r.proprietario_id) ];
+        const vendasCt = (receb.data || []).some(r => !r.negociacao_id && r.contrato_venda_id)
+            ? await emLotes("imobiliaria_contratos_venda", "id,numero,comprador_id,comprador_nome,construcao_id,imovel_avulso", "id", receb.data.filter(r => !r.negociacao_id).map(r => r.contrato_venda_id)) : [];
+        const mVendaCt = new Map(vendasCt.map(v => [ v.id, v ]));
+        const idsCli = [ ...contratos.flatMap(c => [ c.inquilino_id, c.proprietario_id ]), ...negs.map(n => n.cliente_id), ...vendasCt.map(v => v.comprador_id), ...(repPagos.data || []).map(r => r.proprietario_id) ];
         const clientes = idsCli.length ? await emLotes("crm_clientes", "id,nome,cpf", "id", idsCli) : [];
 
         const mCont = new Map(contratos.map(c => [ c.id, c ]));
@@ -170,9 +173,11 @@
         }
         for (const r of receb.data || []) {
             const n = mNeg.get(r.negociacao_id) || {};
-            const cli = pessoa(n.cliente_id);
-            add({ data: r.recebido_em, tipo: "Entrada", natureza: "receita", categoria: "Comissão de venda", historico: `Comissão de venda${n.titulo ? " · " + n.titulo : ""}${r.parcela ? " · parcela " + r.parcela : ""}`,
-                pessoa: cli.nome, doc: cli.doc, imovel: imovelTxt(n.construcao_id), documento: "", conta: contaTxt(r.conta_id), valor: r.valor });
+            const vc = !r.negociacao_id ? (mVendaCt.get(r.contrato_venda_id) || {}) : {};
+            const cli = n.cliente_id ? pessoa(n.cliente_id) : pessoa(vc.comprador_id, vc.comprador_nome);
+            const titulo = n.titulo || (vc.numero ? "contrato de venda nº " + vc.numero : "");
+            add({ data: r.recebido_em, tipo: "Entrada", natureza: "receita", categoria: "Comissão de venda", historico: `Comissão de venda${titulo ? " · " + titulo : ""}${r.parcela ? " · parcela " + r.parcela : ""}`,
+                pessoa: cli.nome, doc: cli.doc, imovel: n.construcao_id ? imovelTxt(n.construcao_id) : imovelTxt(vc.construcao_id, vc.imovel_avulso), documento: "", conta: contaTxt(r.conta_id), valor: r.valor });
         }
         for (const l of lanc.data || []) {
             const pl = mPlano.get(l.plano_conta_id);

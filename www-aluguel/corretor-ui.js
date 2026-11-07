@@ -24,8 +24,10 @@
     const crm = () => window.SKLCRM && window.SKLCRM.interno;
     function lerEscolha() { try { return localStorage.getItem(CHAVE) === "1"; } catch { return false; } }
     function gravarEscolha(v) { try { v ? localStorage.setItem(CHAVE, "1") : localStorage.removeItem(CHAVE); } catch {} }
-    function lerFoco() { try { return localStorage.getItem(CHAVE_FOCO) || ""; } catch { return ""; } }
-    function gravarFoco(v) { try { v ? localStorage.setItem(CHAVE_FOCO, v) : localStorage.removeItem(CHAVE_FOCO); } catch {} }
+    // null = nunca escolheu (abre na própria tela); "" = toda a equipe
+    const TODOS = "__todos";
+    function lerFoco() { try { const v = localStorage.getItem(CHAVE_FOCO); return v === null ? null : v === TODOS ? "" : v; } catch { return null; } }
+    function gravarFoco(v) { try { localStorage.setItem(CHAVE_FOCO, v || TODOS); } catch {} }
     const centralNoModo = () => ativo && !!ctx && ctx.central() && ctx.papel() !== "corretor";
     // corretor escolhido no topo (só para a Central no modo corretor); "" = toda a equipe
     function foco() { return centralNoModo() ? focoId : ""; }
@@ -38,7 +40,9 @@
         if (!ligado) { ligarEventos(); ligado = true; }
         const papel = ctx.papel();
         ativo = papel === "corretor" || (papel !== "financeiro" && lerEscolha());
-        focoId = lerFoco();
+        // administrador/Central que também atende cliente: o modo corretor abre na própria tela (antes abria em "toda a equipe" e misturava tudo)
+        const guardado = lerFoco();
+        focoId = guardado === null ? ((ctx.usuario() && ctx.usuario().id) || "") : guardado;
         aplicar();
         return ativo ? "hoje" : "dashboard";
     }
@@ -72,12 +76,17 @@
         }
         barra.hidden = !centralNoModo();
         if (barra.hidden) return;
-        const equipe = (ctx.equipe() || []).filter(u => u.papel === "corretor" && (u.active !== false || u.id === focoId))
-            .sort((a, b) => String(a.display_name).localeCompare(String(b.display_name)));
+        // todos que atendem cliente (corretor, Central, gestor e administrador); o financeiro não usa o CRM
+        const eu = ctx.usuario() && ctx.usuario().id;
+        const PAPEL = { administrador: "administrador", central_vendas: "Central", gestor: "gestor" };
+        const equipe = (ctx.equipe() || []).filter(u => u.papel !== "financeiro" && (u.active !== false || u.id === focoId))
+            .sort((a, b) => (b.id === eu) - (a.id === eu) || String(a.display_name).localeCompare(String(b.display_name)));
         if (focoId && equipe.length && !equipe.some(u => u.id === focoId)) focoId = "";
-        $("ctFocoSel").innerHTML = '<option value="">Toda a equipe</option>' + equipe.map(u => '<option value="' + h(u.id) + '">' + h(u.display_name) + "</option>").join("");
+        $("ctFocoSel").innerHTML = '<option value="">Toda a equipe</option>' + equipe.map(u => '<option value="' + h(u.id) + '">'
+            + (u.id === eu ? "Eu — " : "") + h(u.display_name) + (PAPEL[u.papel] && u.id !== eu ? " (" + PAPEL[u.papel] + ")" : "") + "</option>").join("");
         $("ctFocoSel").value = focoId;
-        $("ctFocoDica").textContent = focoId ? "Você vê os clientes, negócios, agenda e cadastros só deste corretor." : "Você vê tudo da equipe junto. Escolha um corretor para ver a tela dele.";
+        $("ctFocoDica").textContent = focoId === eu ? "Você vê só os seus clientes, negócios, agenda e cadastros."
+            : focoId ? "Você vê os clientes, negócios, agenda e cadastros só desta pessoa." : "Você vê tudo da equipe junto. Escolha uma pessoa para ver a tela dela.";
         barra.classList.toggle("com-foco", !!focoId);
     }
     function escolherFoco(id) {
@@ -93,7 +102,8 @@
         if (atual) ctx.showPage(atual.id.replace(/^page-/, ""));
         if (ctx.recarregarCadastros) ctx.recarregarCadastros();
         const p = pessoaFoco();
-        ctx.toast(p ? "Vendo a tela de " + p.display_name + "." : "Vendo toda a equipe.");
+        const euId = ctx.usuario() && ctx.usuario().id;
+        ctx.toast(p ? (p.id === euId ? "Vendo a sua tela." : "Vendo a tela de " + p.display_name + ".") : "Vendo toda a equipe.");
     }
     function alternar() {
         if (!ctx || !ctx.usuario() || ctx.papel() === "corretor" || ctx.papel() === "financeiro") return;

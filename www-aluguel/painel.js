@@ -392,7 +392,7 @@
             : (f.lancamentos || []).filter(l => l.natureza === "despesa" && !l.pago_em && !l.pago_sem_data && l.vencimento && quando(l) <= ate);
         itens.sort((a, b) => quando(a).localeCompare(quando(b)));
         const vencidas = itens.filter(x => quando(x) < hoje);
-        const nome = x => rec ? (FG && FG.nomeNegocio ? FG.nomeNegocio(x.negociacao_id) : "Negócio") + ` · ${x.parcela}ª parcela` : x.descricao;
+        const nome = x => rec ? (FG && FG.nomeRecebivel ? FG.nomeRecebivel(x) : FG && FG.nomeNegocio ? FG.nomeNegocio(x.negociacao_id) : "Negócio") + ` · ${x.parcela}ª parcela` : x.descricao;
         const total = arr => arr.reduce((s, x) => s + Number(x.valor || 0), 0);
         box.innerHTML = (vencidas.length ? `<p class="pg-alerta">⚠ ${vencidas.length} ${rec ? "parcela(s) vencida(s) sem baixa" : "conta(s) vencida(s) sem pagamento"}: ${h(dinheiro(total(vencidas)))}</p>` : "")
             + (itens.length ? `<ul class="pg-pend">${itens.slice(0, 12).map(x => `<li class="${quando(x) < hoje ? "vencida" : ""}">
