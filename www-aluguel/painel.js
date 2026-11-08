@@ -25,6 +25,7 @@
     let per = {};                  // período escolhido em cada quadro (sem escolha = o do topo)
     let indCache = new Map();      // fin_indicadores_imobiliaria por período
     let modoTabela = {}, modoDesp = "barras", abaPend = "receber", mesSeg = "";
+    let mk = { fonte: "fechados", fin: "locacao", vMin: null, vMax: null, tipos: "pizza" };   // escolhas do Mercado
     const PERIODOS = [ [ "semana", "Semana" ], [ "mes", "Mês" ], [ "trimestre", "Trim." ], [ "ano", "Ano" ], [ "12m", "12 m" ], [ "tudo", "Tudo" ] ];
     const PERIODOS_SEG = [ [ "12m", "12 meses" ], [ "24m", "24 meses" ], [ "tudo", "Tudo" ], [ "mesames", "Mês a mês" ] ];
 
@@ -84,6 +85,7 @@
               <button type="button" class="pg-ico ativo" data-pg-filtro="todos" title="Tudo">⌂<span>Tudo</span></button>
               <button type="button" class="pg-ico" data-pg-filtro="venda" title="Só vendas">🏷️<span>Vendas</span></button>
               <button type="button" class="pg-ico" data-pg-filtro="locacao" title="Só locações">🔑<span>Locação</span></button>
+              <button type="button" class="pg-ico" data-pg-filtro="mercado" title="Mercado: faixas de valor, bairros e tipos que mais fecham ou são procurados">📍<span>Mercado</span></button>
               <span class="pg-espaco"></span>
               <button type="button" class="pg-ico" data-pg-fechar title="Fechar o painel">⟵<span>Fechar</span></button>
             </nav>
@@ -247,6 +249,7 @@
         if (modoTabela[id]) mostrarTabela(id);
     }
     function desenhar(d) {
+        if (filtro === "mercado") return desenharMercado();
         const grade = $("pgGrade");
         const segP = per.pgSeg || "12m";
         grade.innerHTML = [
@@ -473,6 +476,173 @@
           <p class="pg-nota">${lista.length} negócio(s) · ${h(rotuloPer(p === "mesames" ? mesSeg : p))}. Faixas de preço: Configurações → Faixas de padrão.${semImovel ? ` ${semImovel} negócio(s) sem imóvel ligado (o histórico do Power BI não traz o tipo do imóvel).` : ""}</p>`;
     }
 
+    // ------------------------------------------------------------------ Mercado (botão 📍 no menu lateral)
+    // Mesmo cálculo do Indicadores → Mercado (mercado.js): faixas de valor, bairros (urbanos), cidades (rurais) e tipos,
+    // do que FECHOU ou do que os clientes PROCURAM. Período = o do topo do painel (ou os botões do primeiro quadro).
+    function mercadoDados() {
+        const M = window.SKLMercado;
+        if (!M || !M.resumo) return null;
+        const p = perDe("pgMk"), [ ini, fim ] = intervaloDe(p);
+        const R = M.resumo({ desde: new Date(ini + "T00:00:00"), ate: new Date(fim + "T23:59:59"), fonte: mk.fonte, fin: mk.fin, vMin: mk.vMin, vMax: mk.vMax });
+        return R && Object.assign(R, { p, ini, fim });
+    }
+    function desenharMercado() {
+        const grade = $("pgGrade"), M = window.SKLMercado;
+        const R = mercadoDados();
+        if (!R) { grade.innerHTML = `<p class="pg-vazio">Mercado indisponível nesta versão.</p>`; return; }
+        const filtroAtivo = mk.vMin != null || mk.vMax != null;
+        const fmtN = v => v == null ? "" : Number(v).toLocaleString("pt-BR");
+        const proc = mk.fonte === "procurados";
+        grade.innerHTML = [
+            `<section class="pg-cartao pg-c-mkctrl" id="pgMk"><header><h2>📍 Mercado: o que ${proc ? "os clientes mais procuram" : "mais fecha"}</h2>
+                <small class="pg-sub">para orientar a captação</small></header>
+              ${chips("pgMk", PERIODOS, perDe("pgMk"))}
+              <div class="pg-mk-chaves">
+                <div class="pg-abas" role="group" aria-label="Fechados ou procurados">
+                  <button type="button" data-mk-fonte="fechados" aria-pressed="${!proc}">✅ Fechados</button>
+                  <button type="button" data-mk-fonte="procurados" aria-pressed="${proc}">🔎 Procurados</button></div>
+                <div class="pg-abas" role="group" aria-label="Locação ou venda">
+                  <button type="button" data-mk-fin="locacao" aria-pressed="${mk.fin === "locacao"}">🔑 Locação</button>
+                  <button type="button" data-mk-fin="venda" aria-pressed="${mk.fin === "venda"}">🏷️ Venda</button></div>
+                <div class="pg-abas" role="group" aria-label="Faixa de valor">${M.ATALHOS[mk.fin].map(([ r, a, b ]) =>
+                    `<button type="button" data-mk-a="${a ?? ""}" data-mk-b="${b ?? ""}" aria-pressed="${mk.vMin === a && mk.vMax === b}">${h(r)}</button>`).join("")}
+                  <button type="button" data-mk-a="" data-mk-b="" aria-pressed="${!filtroAtivo}">Todas</button></div>
+                <div class="pg-mk-de"><label>De R$ <input id="pgMkMin" inputmode="decimal" autocomplete="off" placeholder="mínimo" value="${h(fmtN(mk.vMin))}" /></label>
+                  <label>até R$ <input id="pgMkMax" inputmode="decimal" autocomplete="off" placeholder="máximo" value="${h(fmtN(mk.vMax))}" /></label>
+                  <button type="button" class="pg-tab" id="pgMkAplicar">Filtrar</button></div>
+              </div></section>`,
+            cartao("pgMkQtd", "pg-c-kpi", proc ? "Clientes procurando" : "Negócios fechados"),
+            cartao("pgMkMedia", "pg-c-kpi", "Valor médio"),
+            cartao("pgMkMediana", "pg-c-kpi", "Valor do meio (mediana)"),
+            cartao("pgMkFatia", "pg-c-kpi", "Fatia do período"),
+            cartao("pgMkFaixas", "pg-c-largo", `Por faixa de valor${mk.fin === "locacao" ? " (aluguel/mês)" : ""}`, botaoTabela("pgMkFaixas")),
+            cartao("pgMkTempo", "pg-c-largo", proc ? "Procura no tempo" : "Fechamentos no tempo", botaoTabela("pgMkTempo")),
+            cartao("pgMkBairros", "pg-c-largo", (proc ? "Bairros mais procurados" : "Bairros que mais fecham") + " (urbanos)", botaoTabela("pgMkBairros")),
+            cartao("pgMkTipos", "pg-c-largo", "Tipo de imóvel", `<div class="pg-abas" role="group">
+                <button type="button" data-mk-tipos="pizza" aria-pressed="${mk.tipos === "pizza"}">◔ pizza</button>
+                <button type="button" data-mk-tipos="barras" aria-pressed="${mk.tipos === "barras"}">▬ barras</button>
+                <button type="button" data-mk-tipos="tabela" aria-pressed="${mk.tipos === "tabela"}">≡ tabela</button></div>`),
+            cartao("pgMkCidades", "pg-c-largo", "Cidades (imóveis rurais)", botaoTabela("pgMkCidades")),
+            `<section class="pg-cartao pg-c-largo" id="pgMkNota"><header><h2>Como ler</h2></header><div class="pg-corpo"></div></section>`
+        ].join("");
+        const fazer = {
+            pgMkQtd: () => mkKpis(R), pgMkFaixas: () => mkFaixas(R), pgMkTempo: () => mkTempo(R),
+            pgMkBairros: () => mkRanking("pgMkBairros", R.bairros, "Bairro", "Nenhum bairro informado nesta seleção."),
+            pgMkCidades: () => mkRanking("pgMkCidades", R.cidades, "Cidade", "Nenhum imóvel rural nesta seleção."),
+            pgMkTipos: () => mkTipos(R), pgMkNota: () => mkNota(R)
+        };
+        desenhos = fazer; tabelas = {};
+        Object.keys(fazer).forEach(desenharCartao);
+        redesenhar = () => [ "pgMkQtd", "pgMkFaixas", "pgMkTempo", "pgMkTipos" ].forEach(desenharCartao);
+
+        const de = () => desenharMercado();
+        const num = v => { if (String(v || "").trim() === "") return null; const n = ctx.parseValor ? ctx.parseValor(String(v)) : Number(String(v).replace(/\./g, "").replace(",", ".")); return n == null || isNaN(n) ? null : n; };
+        grade.querySelectorAll("[data-per-card]").forEach(b => b.addEventListener("click", () => { per.pgMk = b.dataset.per; de(); }));
+        grade.querySelectorAll("[data-mk-fonte]").forEach(b => b.addEventListener("click", () => { mk.fonte = b.dataset.mkFonte; de(); }));
+        grade.querySelectorAll("[data-mk-fin]").forEach(b => b.addEventListener("click", () => { if (mk.fin !== b.dataset.mkFin) { mk.fin = b.dataset.mkFin; mk.vMin = mk.vMax = null; } de(); }));
+        grade.querySelectorAll("[data-mk-a]").forEach(b => b.addEventListener("click", () => {
+            mk.vMin = b.dataset.mkA === "" ? null : Number(b.dataset.mkA); mk.vMax = b.dataset.mkB === "" ? null : Number(b.dataset.mkB); de();
+        }));
+        grade.querySelectorAll("[data-mk-tipos]").forEach(b => b.addEventListener("click", () => { mk.tipos = b.dataset.mkTipos; de(); }));
+        const aplicar = () => { mk.vMin = num($("pgMkMin").value); mk.vMax = num($("pgMkMax").value); if (mk.vMin != null && mk.vMax != null && mk.vMin > mk.vMax) [ mk.vMin, mk.vMax ] = [ mk.vMax, mk.vMin ]; de(); };
+        $("pgMkAplicar").addEventListener("click", aplicar);
+        [ "pgMkMin", "pgMkMax" ].forEach(id => $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); aplicar(); } }));
+        grade.querySelectorAll("[data-tabela]").forEach(b => b.addEventListener("click", () => { modoTabela[b.dataset.tabela] = !modoTabela[b.dataset.tabela]; de(); }));
+    }
+    const mkSufixo = () => mk.fin === "locacao" ? "/mês" : "";
+    function mkKpis(R) {
+        const din = window.SKLMercado.dinheiro;
+        const ex = eixo(R.p, R.ini, R.fim, R.filtrados), serie = ex.chaves.map(k => R.filtrados.filter(r => r.dia && ex.de(r.dia) === k).length);
+        corpo("pgMkQtd").innerHTML = `<strong class="pg-heroi">${R.filtrados.length}</strong><small>${R.temFiltro ? `de ${R.todos.length} · ` : ""}${h(rotuloPer(R.p))}</small><div class="pg-faisca"></div>`;
+        faisca(corpo("pgMkQtd").querySelector(".pg-faisca"), ex.chaves.map(ex.rotulo), serie, COR.s3, v => `${v} negócio(s)`);
+        const comValor = R.filtrados.filter(r => r.valor != null).length;
+        const mediaMes = ex.chaves.map(k => { const v = R.filtrados.filter(r => r.dia && r.valor != null && ex.de(r.dia) === k).map(r => r.valor); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; });
+        corpo("pgMkMedia").innerHTML = `<strong class="pg-heroi">${h(din(R.media))}</strong><small>${mkSufixo() ? "aluguel por mês · " : ""}${comValor} com valor</small><div class="pg-faisca"></div>`;
+        const comMes = mediaMes.map((v, i) => i).filter(i => mediaMes[i] > 0);   // só os meses com negócio (sem "cair a zero")
+        if (comMes.length > 1) faisca(corpo("pgMkMedia").querySelector(".pg-faisca"), comMes.map(i => ex.rotulo(ex.chaves[i])), comMes.map(i => mediaMes[i]), COR.s2, v => "média " + din(v));
+        const vals = R.filtrados.filter(r => r.valor != null).map(r => r.valor);
+        corpo("pgMkMediana").innerHTML = `<strong class="pg-heroi">${h(din(R.mediana))}</strong><small>metade abaixo, metade acima</small>
+            ${vals.length ? `<div class="pg-duplo pg-mk-extremos"><div><span>menor</span><strong>${h(din(Math.min(...vals)))}</strong></div><div><span>maior</span><strong>${h(din(Math.max(...vals)))}</strong></div></div>` : ""}`;
+        const f = R.todos.length ? R.filtrados.length * 100 / R.todos.length : 0;
+        corpo("pgMkFatia").innerHTML = `<div class="pg-mk-fatia">${anelGrande(f, COR.s2)}<small>${R.temFiltro ? "estão nesta faixa de valor" : "todas as faixas de valor"}</small></div>`;
+    }
+    function mkFaixas(R) {
+        const box = corpo("pgMkFaixas");
+        if (!R.todos.length) { box.innerHTML = `<p class="pg-vazio">Nada ${h(rotuloPer(R.p))}.</p>`; return; }
+        const dentro = fx => (mk.vMin == null || fx[1] > mk.vMin) && (mk.vMax == null || fx[0] < mk.vMax);
+        const k = v => v >= 1e6 ? (v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "mi" : v >= 1000 ? (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "k" : String(v);
+        const curtoF = fx => fx[1] === Infinity ? k(fx[0]) + "+" : !fx[0] ? "até " + k(fx[1]) : k(fx[0]) + "–" + k(fx[1]);
+        tabelas.pgMkFaixas = [ [ "Faixa de valor", "Quantidade" ], ...R.faixas.map(f => [ f.rotulo, String(f.qtd) ]) ];
+        const filtrar = i => { const fx = R.faixas[i].fx; mk.vMin = fx[0] || null; mk.vMax = fx[1] === Infinity ? null : fx[1]; dica(null); desenharMercado(); };
+        if (box.clientWidth < 520) { // celular: barras deitadas (os rótulos não cabem embaixo)
+            const max = Math.max(1, ...R.faixas.map(f => f.qtd));
+            box.innerHTML = `<div class="pg-seg-bloco pg-mk-rank">${R.faixas.map((f, i) => `<button type="button" class="pg-funil-linha pg-mk-faixa${R.temFiltro && !dentro(f.fx) ? " fora" : ""}" data-mk-fx="${i}">
+                <span class="pg-funil-nome">${h(curtoF(f.fx))}</span><span class="pg-funil-barra"><i style="width:${f.qtd ? Math.max(3, f.qtd / max * 100) : 0}%"></i></span><b>${f.qtd}</b><small></small></button>`).join("")}</div>
+                <p class="pg-nota">Toque numa faixa para filtrar.</p>`;
+            box.querySelectorAll("[data-mk-fx]").forEach(b => b.addEventListener("click", () => filtrar(Number(b.dataset.mkFx))));
+            return;
+        }
+        barras(box, R.faixas.map(f => curtoF(f.fx)), R.faixas.map(f => f.qtd), COR.s1, null, v => String(Math.round(v)), R.faixas.map(f => f.rotulo), {
+            cores: R.faixas.map(f => R.temFiltro && !dentro(f.fx) ? clarear(COR.s1, 0.72) : COR.s1), todosRotulos: true,
+            dica: i => `<b>${h(R.faixas[i].rotulo)}</b><br>${R.faixas[i].qtd} negócio(s)<br><small>toque para filtrar</small>`,
+            aoClicar: filtrar
+        });
+    }
+    function mkTempo(R) {
+        const ex = eixo(R.p, R.ini, R.fim, R.filtrados);
+        const qtd = ex.chaves.map(k => R.filtrados.filter(r => r.dia && ex.de(r.dia) === k).length);
+        tabelas.pgMkTempo = [ [ ex.chaves[0] && ex.chaves[0].length > 7 ? "Dia" : "Mês", "Quantidade" ], ...ex.chaves.map((k, i) => [ ex.rotulo(k), String(qtd[i]) ]) ];
+        linhas(corpo("pgMkTempo"), ex.chaves.map(ex.rotulo), [ { nome: mk.fonte === "procurados" ? "Procuras" : "Fechados", cor: COR.s2, valores: qtd } ], x => String(Math.round(x)), true);
+    }
+    function mkRanking(id, itens, nomeCol, vazio) {
+        const din = window.SKLMercado.dinheiro, box = corpo(id);
+        tabelas[id] = [ [ nomeCol, "Quantidade", "Valor médio" ], ...itens.map(i => [ i.nome, String(i.qtd), i.nv ? din(i.soma / i.nv) + mkSufixo() : "" ]) ];
+        if (!itens.length) { box.innerHTML = `<p class="pg-vazio">${h(vazio)}</p>`; return; }
+        const max = Math.max(1, ...itens.map(i => i.qtd));
+        box.innerHTML = `<div class="pg-seg-bloco pg-mk-rank">${itens.slice(0, 10).map((i, k) => `<div class="pg-funil-linha" data-mk-i="${k}">
+            <span class="pg-funil-nome">${k === 0 ? "🏆 " : ""}${h(i.nome)}</span><span class="pg-funil-barra"><i style="width:${Math.max(3, i.qtd / max * 100)}%"></i></span>
+            <b>${i.qtd}</b><small>${i.nv ? "média " + h(din(i.soma / i.nv)) + mkSufixo() : ""}</small></div>`).join("")}</div>
+            ${itens.length > 10 ? `<p class="pg-nota">+${itens.length - 10} outro(s) — veja em ≡ tabela.</p>` : ""}`;
+        box.querySelectorAll("[data-mk-i]").forEach(l => { const i = itens[Number(l.dataset.mkI)]; ligarDica(l, () => `<b>${h(i.nome)}</b><br>${i.qtd} negócio(s)${i.nv ? `<br>Valor médio: <b>${h(din(i.soma / i.nv))}${mkSufixo()}</b>` : ""}`); });
+    }
+    function mkTipos(R) {
+        const din = window.SKLMercado.dinheiro, box = corpo("pgMkTipos"), itens = R.tipos;
+        if (!itens.length) { box.innerHTML = `<p class="pg-vazio">Sem tipo informado nesta seleção.</p>`; return; }
+        if (mk.tipos === "tabela") { tabelas.pgMkTipos = [ [ "Tipo", "Quantidade", "Valor médio" ], ...itens.map(i => [ i.nome, String(i.qtd), i.nv ? din(i.soma / i.nv) + mkSufixo() : "" ]) ]; mostrarTabela("pgMkTipos"); return; }
+        const total = itens.reduce((s, i) => s + i.qtd, 0);
+        const cores = [ COR.s1, COR.s2, COR.s3, clarear(COR.s2, 0.45), clarear(COR.s1, 0.62), "#7c9a5c", "#b07aa1" ];
+        const top = itens.slice(0, 6), resto = itens.slice(6).reduce((s, i) => s + i.qtd, 0);
+        const partes = [ ...top.map((i, k) => ({ nome: i.nome, v: i.qtd, cor: cores[k], media: i.nv ? i.soma / i.nv : null })), ...(resto ? [ { nome: "Outros", v: resto, cor: "#9aa6ab", media: null } ] : []) ];
+        const dicaDe = p => `<b>${h(p.nome)}</b><br>${p.v} negócio(s) · ${h(pct(p.v / total * 100))}${p.media ? `<br>Valor médio: <b>${h(din(p.media))}${mkSufixo()}</b>` : ""}`;
+        if (mk.tipos === "barras") {
+            barras(box, partes.map(p => p.nome), partes.map(p => p.v), COR.s1, null, v => String(Math.round(v)), partes.map(p => p.nome), {
+                cores: partes.map(p => p.cor), todosRotulos: true, dica: i => dicaDe(partes[i])
+            });
+            return;
+        }
+        const legenda = `<ul class="pg-partes">${partes.map(p => `<li><i style="background:${p.cor}"></i><span>${h(p.nome)}</span><b>${p.v}</b><small>${h(pct(p.v / total * 100))}</small></li>`).join("")}</ul>`;
+        const RR = 70, cx = 80, cy = 80;
+        let ang = -Math.PI / 2;
+        const fatias = partes.map((p, k) => {
+            const a0 = ang, a1 = ang + p.v / total * 2 * Math.PI; ang = a1;
+            if (partes.length === 1) return `<circle cx="${cx}" cy="${cy}" r="${RR}" fill="${p.cor}" data-parte="${k}"/>`;
+            const x0 = cx + RR * Math.cos(a0), y0 = cy + RR * Math.sin(a0), x1 = cx + RR * Math.cos(a1), y1 = cy + RR * Math.sin(a1);
+            return `<path d="M${cx},${cy}L${x0.toFixed(2)},${y0.toFixed(2)}A${RR},${RR} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}Z" fill="${p.cor}" stroke="#fff" stroke-width="2" data-parte="${k}"/>`;
+        }).join("");
+        box.innerHTML = `<div class="pg-pizza"><svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Tipos de imóvel">${fatias}</svg>${legenda}</div>`;
+        box.querySelectorAll("[data-parte]").forEach(sp => { const p = partes[Number(sp.dataset.parte)]; ligarDica(sp, () => dicaDe(p)); });
+    }
+    function mkNota(R) {
+        const proc = mk.fonte === "procurados";
+        corpo("pgMkNota").innerHTML = `<ul class="pg-mk-nota">${[
+            proc ? "Procurados = negócios abertos no período (inclui contatos do site e dos portais): o que o cliente procura ou o imóvel em que se interessou. Cada bairro pedido conta uma vez."
+                : "Fechados = negócios ganhos no período + contratos lançados no Financeiro sem negócio.",
+            "Toque numa barra das faixas de valor para ver só aquela faixa nos outros quadros (\"Todas\" volta).",
+            R.semLocal ? `${R.semLocal} sem bairro ou cidade: entram nas faixas de valor${R.historico ? ` (${R.historico} são do histórico do Power BI, que não traz o imóvel)` : ""}.` : "",
+            proc ? "Para a procura ficar completa, preencha \"O que o cliente procura\" nas negociações." : "Os bairros aparecem nos negócios com imóvel ligado e nos contratos com bairro preenchido."
+        ].filter(Boolean).map(t => `<li>${h(t)}</li>`).join("")}</ul>`;
+    }
+
     // ------------------------------------------------------------------ dica (tooltip)
     function dica(html, x, y) {
         const el = $("pgDica");
@@ -498,7 +668,7 @@
         const p = Math.pow(10, Math.floor(Math.log10(max))), f = max / p;
         return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
     }
-    function faisca(box, rotulos, valores, cor) {
+    function faisca(box, rotulos, valores, cor, fmt) {
         if (!box) return;
         box.innerHTML = "";
         const w = Math.max(box.clientWidth, 160), hgt = 56, max = Math.max(...valores, 1), n = valores.length;
@@ -511,7 +681,7 @@
         const alvo = el("rect", { x: 0, y: 0, width: w, height: hgt, fill: "transparent" }, s);
         alvo.addEventListener("mousemove", e => {
             const r = s.getBoundingClientRect(); const k = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - 6) / ((w - 12) / Math.max(n - 1, 1)))));
-            dica(`<b>${h(rotulos[k])}</b><br>${h(dinheiro(valores[k]))}`, e.clientX, e.clientY);
+            dica(`<b>${h(rotulos[k])}</b><br>${h(fmt ? fmt(valores[k]) : dinheiro(valores[k]))}`, e.clientX, e.clientY);
         });
         alvo.addEventListener("mouseleave", () => dica(null));
     }
@@ -562,9 +732,10 @@
         box.appendChild(s);
     }
     // barras de uma série (cantos arredondados no topo, 2px de folga), com a meta como linha de referência
-    function barras(box, rotulos, valores, cor, ref, fmt, nomes) {
+    function barras(box, rotulos, valores, cor, ref, fmt, nomes, op) {
+        op = op || {};
         box.innerHTML = "";
-        if (!valores.length) { box.innerHTML = `<p class="pg-vazio">Nenhum negócio de corretor neste trimestre.</p>`; return; }
+        if (!valores.length) { box.innerHTML = `<p class="pg-vazio">${h(op.vazio || "Nenhum negócio de corretor neste trimestre.")}</p>`; return; }
         const w = Math.max(box.clientWidth, 260), hgt = 220, esq = 56, dir = 10, topo = 16, base = 40;
         const max = escala(Math.max(...valores, ref || 0, 1)), n = valores.length, larg = w - esq - dir, alt = hgt - topo - base;
         const banda = larg / n, bw = Math.min(42, banda - 6), py = v => topo + alt - v / max * alt;
@@ -576,13 +747,15 @@
         }
         valores.forEach((v, i) => {
             const x = esq + i * banda + (banda - bw) / 2, y = py(v), hb = Math.max(py(0) - y, 1), r = Math.min(4, bw / 2, hb);
-            el("path", { d: `M${x},${py(0)}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${py(0)}Z`, fill: cor }, s);
+            el("path", { d: `M${x},${py(0)}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${py(0)}Z`, fill: op.cores ? op.cores[i] : cor }, s);
             const t = el("text", { x: x + bw / 2, y: hgt - base + 14, "text-anchor": "middle", class: "pg-eixo" }, s);
             t.textContent = rotulos[i].length > 11 ? rotulos[i].slice(0, 10) + "…" : rotulos[i];
             const alvo = el("rect", { x: esq + i * banda, y: topo, width: banda, height: alt + 20, fill: "transparent" }, s);
-            ligarDica(alvo, () => `<b>${h(nomes[i])}</b><br>VGC: <b>${h(dinheiro(v))}</b>${ref != null ? `<br>${v > ref ? "bateu a meta" : "abaixo da meta"} (${h(curto(ref))})` : ""}`);
+            if (op.aoClicar) { alvo.style.cursor = "pointer"; alvo.addEventListener("click", () => op.aoClicar(i)); }
+            ligarDica(alvo, () => op.dica ? op.dica(i) : `<b>${h(nomes[i])}</b><br>VGC: <b>${h(dinheiro(v))}</b>${ref != null ? `<br>${v > ref ? "bateu a meta" : "abaixo da meta"} (${h(curto(ref))})` : ""}`);
         });
-        el("text", { x: esq + banda * 0 + (banda - bw) / 2 + bw / 2, y: py(valores[0]) - 6, "text-anchor": "middle", class: "pg-rotulo" }, s).textContent = fmt(valores[0]);
+        if (op.todosRotulos) valores.forEach((v, i) => { if (v > 0) el("text", { x: esq + i * banda + banda / 2, y: py(v) - 6, "text-anchor": "middle", class: "pg-rotulo" }, s).textContent = fmt(v); });
+        else el("text", { x: esq + banda * 0 + (banda - bw) / 2 + bw / 2, y: py(valores[0]) - 6, "text-anchor": "middle", class: "pg-rotulo" }, s).textContent = fmt(valores[0]);
         if (ref != null) {
             const y = py(ref);
             el("line", { x1: esq, x2: w - dir, y1: y, y2: y, stroke: "#52514e", "stroke-width": 1.5, "stroke-dasharray": "5 4" }, s);

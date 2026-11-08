@@ -44,7 +44,7 @@
     }
 
     // ------------------------------------------------------------------ dados
-    function registros(x, estado) {
+    function registros(x, estado, fonte) {
         const ctx = x.ctx();
         const imoveis = new Map((ctx.imoveis ? ctx.imoveis() : []).map(i => [ i.id, i ]));
         const dentro = d => { if (!d) return false; const t = new Date(String(d).length === 10 ? d + "T12:00:00" : d); return t >= estado.desde && t <= estado.ate; };
@@ -59,7 +59,7 @@
                 const f = finDe(n);
                 if (f !== "venda" && f !== "locacao") return;
                 const im = imoveis.get(n.construcao_id);
-                lista.push({ fin: f, valor: Number(n.valor) || valorImovel(im, f), local: doImovel(im), historico: !!n.importacao });
+                lista.push({ fin: f, dia: String(n.fechado_em).slice(0, 10), valor: Number(n.valor) || valorImovel(im, f), local: doImovel(im), historico: !!n.importacao });
             });
             // contratos lançados direto no Financeiro (sem negócio no CRM)
             const F = window.SKLFinanceiro;
@@ -68,12 +68,12 @@
                 (F.contratos() || []).forEach(c => {
                     if (c.negociacao_id || c.status === "cancelado" || !dentro(c.inicio) || !doCorretor(c.corretor_id)) return;
                     const im = imoveis.get(c.construcao_id);
-                    lista.push({ fin: "locacao", valor: Number(c.valor_aluguel) || null, local: im ? doImovel(im) : avulso(c.imovel_avulso), contrato: true });
+                    lista.push({ fin: "locacao", dia: String(c.inicio).slice(0, 10), valor: Number(c.valor_aluguel) || null, local: im ? doImovel(im) : avulso(c.imovel_avulso), contrato: true });
                 });
                 (F.vendas ? F.vendas() : []).forEach(c => {
                     if (c.negociacao_id || c.status === "cancelado" || !dentro(c.data_contrato) || !doCorretor(c.corretor_id)) return;
                     const im = imoveis.get(c.construcao_id);
-                    lista.push({ fin: "venda", valor: Number(c.valor_venda) || null, local: im ? doImovel(im) : avulso(c.imovel_avulso), contrato: true });
+                    lista.push({ fin: "venda", dia: String(c.data_contrato).slice(0, 10), valor: Number(c.valor_venda) || null, local: im ? doImovel(im) : avulso(c.imovel_avulso), contrato: true });
                 });
             }
         } else {
@@ -93,10 +93,43 @@
                 if (im) locais = [ doImovel(im) ];
                 else if ((p.bairros || []).length) locais = p.bairros.map(b => ({ bairro: rural ? "" : b, cidade: rural ? b : "", tipo, rural }));
                 else if (proc && proc.regiao) locais = [ { bairro: rural ? "" : proc.regiao, cidade: rural ? proc.regiao : "", tipo, rural } ];
-                lista.push({ fin: f, valor, locais: locais.length ? locais : null, local: locais[0] || (tipo ? { bairro: "", cidade: "", tipo, rural } : null) });
+                lista.push({ fin: f, dia: String(n.created_at).slice(0, 10), valor, locais: locais.length ? locais : null, local: locais[0] || (tipo ? { bairro: "", cidade: "", tipo, rural } : null) });
             });
         }
         return lista;
+    }
+
+
+    // cálculo único (Indicadores e Painel): registros do período, filtro de valor, faixas e rankings
+    function resumo(o) {
+        const x = I();
+        if (!x || !x.ctx()) return null;
+        const todos = registros(x, { desde: o.desde, ate: o.ate, corretor: o.corretor || null }, o.fonte || "fechados").filter(r => r.fin === o.fin);
+        const vMin = o.vMin ?? null, vMax = o.vMax ?? null, temFiltro = vMin != null || vMax != null;
+        const noFiltro = r => r.valor != null && (vMin == null || r.valor >= vMin) && (vMax == null || r.valor <= vMax);
+        const filtrados = temFiltro ? todos.filter(noFiltro) : todos;
+        const valores = filtrados.filter(r => r.valor != null).map(r => r.valor).sort((a, b) => a - b);
+        const media = valores.length ? valores.reduce((s, v) => s + v, 0) / valores.length : null;
+        const mediana = valores.length ? (valores.length % 2 ? valores[(valores.length - 1) / 2] : (valores[valores.length / 2 - 1] + valores[valores.length / 2]) / 2) : null;
+        const faixas = FAIXAS[o.fin].map(fx => ({ fx, rotulo: rotuloFaixa(fx), qtd: todos.filter(r => r.valor != null && r.valor >= fx[0] && r.valor < fx[1]).length }));
+        const conta = (pegar) => {
+            const m = new Map();
+            filtrados.forEach(r => (r.locais || (r.local ? [ r.local ] : [])).forEach(l => {
+                const nome = pegar(l);
+                if (!nome) return;
+                const k = norm(nome), it = m.get(k) || { nome, qtd: 0, soma: 0, nv: 0 };
+                it.qtd++;
+                if (r.valor != null) { it.soma += r.valor; it.nv++; }
+                m.set(k, it);
+            }));
+            return [ ...m.values() ].sort((a, b) => b.qtd - a.qtd || b.soma - a.soma);
+        };
+        return {
+            todos, filtrados, media, mediana, faixas, temFiltro,
+            bairros: conta(l => !l.rural && l.bairro), cidades: conta(l => l.rural && (l.cidade || l.bairro)), tipos: conta(l => l.tipo),
+            semLocal: filtrados.filter(r => !(r.locais || (r.local && (r.local.bairro || r.local.cidade)))).length,
+            historico: filtrados.filter(r => r.historico).length
+        };
     }
 
     // ------------------------------------------------------------------ tela
@@ -110,40 +143,12 @@
         const P = window.SKLCRMPainel, estado = P && P.estado ? P.estado() : null;
         if (!estado) return;
         if (!fin) fin = estado.funil === "venda" ? "venda" : "locacao";
-        const todos = registros(x, estado).filter(r => r.fin === fin);
-        const noFiltro = r => r.valor != null && (vMin == null || r.valor >= vMin) && (vMax == null || r.valor <= vMax);
-        const filtrados = (vMin != null || vMax != null) ? todos.filter(noFiltro) : todos;
-        const comValor = filtrados.filter(r => r.valor != null);
-        const valores = comValor.map(r => r.valor).sort((a, b) => a - b);
-        const media = valores.length ? valores.reduce((s, v) => s + v, 0) / valores.length : null;
-        const mediana = valores.length ? (valores.length % 2 ? valores[(valores.length - 1) / 2] : (valores[valores.length / 2 - 1] + valores[valores.length / 2]) / 2) : null;
+        const R = resumo({ desde: estado.desde, ate: estado.ate, corretor: estado.corretor, fonte, fin, vMin, vMax });
+        const { todos, filtrados, media, mediana, faixas, bairros, cidades, tipos, semLocal, historico, temFiltro } = R;
         const sufixo = fin === "locacao" ? "/mês" : "";
         const nomeFonte = fonte === "fechados" ? "fechados" : "procurados";
-
-        // faixas (sempre de todos, destacando as que estão dentro do filtro)
-        const faixas = FAIXAS[fin].map(fx => ({ fx, qtd: todos.filter(r => r.valor != null && r.valor >= fx[0] && r.valor < fx[1]).length }));
         const maxF = Math.max(1, ...faixas.map(f => f.qtd));
         const dentroFiltro = fx => (vMin == null || fx[1] > vMin) && (vMax == null || fx[0] < vMax);
-        const temFiltro = vMin != null || vMax != null;
-
-        // rankings (bairro urbano, cidade rural, tipo) dentro do filtro
-        const conta = (pegar) => {
-            const m = new Map();
-            filtrados.forEach(r => (r.locais || (r.local ? [ r.local ] : [])).forEach(l => {
-                const nome = pegar(l);
-                if (!nome) return;
-                const k = norm(nome), it = m.get(k) || { nome, qtd: 0, soma: 0, nv: 0 };
-                it.qtd++;
-                if (r.valor != null) { it.soma += r.valor; it.nv++; }
-                m.set(k, it);
-            }));
-            return [ ...m.values() ].sort((a, b) => b.qtd - a.qtd || b.soma - a.soma);
-        };
-        const bairros = conta(l => !l.rural && l.bairro);
-        const cidades = conta(l => l.rural && (l.cidade || l.bairro));
-        const tipos = conta(l => l.tipo);
-        const semLocal = filtrados.filter(r => !(r.locais || (r.local && (r.local.bairro || r.local.cidade)))).length;
-        const historico = filtrados.filter(r => r.historico).length;
 
         const ranking = (titulo, itens, vazio) => `<div class="mk-rank"><h4>${h(titulo)}</h4>${itens.length ? (() => {
             const max = Math.max(1, ...itens.map(i => i.qtd));
@@ -211,5 +216,5 @@
         [ "mkMin", "mkMax" ].forEach(id => $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); aplicar(); } }));
     }
 
-    window.SKLMercado = { render, csv: () => ultimo, aberto: () => aberto };
+    window.SKLMercado = { render, csv: () => ultimo, aberto: () => aberto, resumo, FAIXAS, ATALHOS, dinheiro, rotuloFaixa };
 })();
