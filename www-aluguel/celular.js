@@ -60,6 +60,7 @@
         if (!telaPequena()) return;
         document.querySelectorAll("table").forEach(tabela => {
             if (tabela.classList.contains("fin-tabela")) return; // o Financeiro já tem os próprios cartões
+            if (tabela.closest(".ind-doc")) return;               // relatório de impressão dos Indicadores: tabela normal
             const titulos = [ ...tabela.querySelectorAll("thead th") ].map(th => th.textContent.trim());
             if (!titulos.length) return;
             tabela.classList.add("cartoes-celular");

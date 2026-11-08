@@ -369,17 +369,98 @@
             <span class="painel-barra"><i style="width:${pct(v, max)}%;background:${cor}"></i></span><strong>${v}</strong><small></small></div>`).join("");
     }
 
-    function imprimir() {
-        document.body.classList.add("imprimindo-painel");
-        const fim = () => document.body.classList.remove("imprimindo-painel");
-        if (window.NativeBridge && typeof window.NativeBridge.printPage === "function") {
-            window.NativeBridge.printPage();
-            setTimeout(fim, 4000);
-        } else {
-            window.addEventListener("afterprint", fim, { once: true });
-            window.print();
-            setTimeout(fim, 1500);
+    // Imprimir / PDF: relatório próprio com a marca da imobiliária (logo e nome do cliente, cores do app), A4 deitado,
+    // montado a partir dos quadros já desenhados na tela (sem botões, filtros nem o formato de celular).
+    function logoDocumento() {
+        return new Promise(ok => {
+            const tenta = (lista) => {
+                if (!lista.length) return ok("");
+                const i = new Image();
+                i.onload = () => ok(lista[0]);
+                i.onerror = () => tenta(lista.slice(1));
+                i.src = lista[0];
+            };
+            tenta([ "logo-documentos.png", "logo-fundo-claro.png", "logo.png" ]);
+        });
+    }
+    function textoDoSelect(id) { const s = $(id); if (!s || !s.value) return ""; const o = s.options[s.selectedIndex]; return o ? o.textContent.trim() : ""; }
+    async function imprimir() {
+        const x = I();
+        const pagina = $("page-indicadores");
+        if (!pagina) return;
+        const copia = pagina.cloneNode(true);
+        copia.removeAttribute("id");
+        copia.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
+        copia.querySelectorAll(".mk-faixa").forEach(b => { const d = document.createElement("div"); d.className = b.className; d.innerHTML = b.innerHTML; b.replaceWith(d); });
+        // fora do relatório: filtros, botões, campos e o que está escondido
+        copia.querySelectorAll(".painel-filtros, .painel-fatias, .fatias, [hidden], button, select, input, textarea, .mk-filtro, .mk-nota, script").forEach(e => {
+            if (e.classList && e.classList.contains("mk-chaves")) return;
+            e.remove();
+        });
+        // Mercado: troca os botões escolhidos por uma linha de texto
+        const mkOrig = $("painelMercado");
+        const mkCopia = copia.querySelector(".painel-mercado");
+        if (mkCopia && mkOrig && !mkOrig.hidden) {
+            const escolhas = [ ...mkOrig.querySelectorAll(".segmentado button.ativo, .mk-chip.ativo") ].map(b => b.textContent.trim()).filter(t => t && t !== "Todas");
+            const mn = mkOrig.querySelector("#mkMin"), mx = mkOrig.querySelector("#mkMax");
+            const faixa = (mn && mn.value) || (mx && mx.value) ? `faixa ${mn && mn.value ? "de R$ " + mn.value : ""}${mx && mx.value ? " até R$ " + mx.value : ""}` : "";
+            const ch = mkCopia.querySelector(".mk-chaves");
+            if (ch) ch.outerHTML = `<p class="ind-escolha">${h([ ...escolhas, faixa ].filter(Boolean).join(" · "))}</p>`;
+        } else if (mkCopia) mkCopia.remove();
+        copia.querySelectorAll(".mk-chaves").forEach(e => e.remove());
+        // tabelas: formato normal (o app as transforma em cartões no celular)
+        copia.querySelectorAll("table").forEach(t => t.classList.remove("cartoes-celular"));
+        copia.querySelectorAll(".panel, .painel-bloco").forEach(p => { if (!p.textContent.trim() || (p.children.length === 1 && p.querySelector("h3"))) p.remove(); });
+
+        const marca = window.SKL_MARCA || {};
+        const nome = marca.nome || (x && x.ctx() && x.ctx().carteiraNome ? x.ctx().carteiraNome() : "") || "Imobiliária";
+        const filtros = [
+            (estadoAtual && estadoAtual.rotulo) || textoDoSelect("painelPeriodo"),
+            textoDoSelect("painelFunil"), estadoAtual && estadoAtual.corretorNome ? "Corretor: " + estadoAtual.corretorNome : "", textoDoSelect("painelPadrao")
+        ].filter(Boolean);
+        const agora = new Date();
+        const emitido = agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        const logo = await logoDocumento();
+        const css = (v, p) => (getComputedStyle(document.documentElement).getPropertyValue(v) || "").trim() || p;
+        const cor1 = css("--navy", "#0a2a4a"), cor2 = css("--gold", "#c9962c");
+        const esc = t => String(t).replace(/["\\]/g, "");
+
+        let caixa = $("indImpressao");
+        if (!caixa) {
+            caixa = document.createElement("div");
+            caixa.id = "indImpressao"; caixa.className = "ind-impressao"; caixa.hidden = true;
+            caixa.innerHTML = `<div class="ind-imp-barra"><button type="button" class="primary-button" data-ind-imp="imprimir">Imprimir / salvar PDF</button>
+                <button type="button" class="secondary-button" data-ind-imp="fechar">Fechar</button></div><div class="ind-imp-conteudo"></div>`;
+            document.body.appendChild(caixa);
+            caixa.querySelector('[data-ind-imp="fechar"]').addEventListener("click", fecharImpressao);
+            caixa.querySelector('[data-ind-imp="imprimir"]').addEventListener("click", () => {
+                if (window.NativeBridge && typeof window.NativeBridge.printPage === "function") window.NativeBridge.printPage();
+                else window.print();
+            });
         }
+        caixa.querySelector(".ind-imp-conteudo").innerHTML = `
+          <style>@page indicadores{size:A4 landscape;margin:11mm 11mm 13mm;
+            @bottom-left{content:"${esc(nome)} · Relatório de indicadores · emitido em ${esc(emitido)}";font:8pt Arial,sans-serif;color:#6b7c85}
+            @bottom-right{content:"página " counter(page) " de " counter(pages);font:8pt Arial,sans-serif;color:#6b7c85}}</style>
+          <div class="ind-doc" style="--ind-c1:${h(cor1)};--ind-c2:${h(cor2)}">
+            <header class="ind-cab">
+              ${logo ? `<img src="${h(logo)}" alt="" class="ind-logo" />` : ""}
+              <div class="ind-cab-txt"><span class="ind-sobre">${h(nome)}</span><h1>Relatório de indicadores</h1>
+                <p>${h(filtros.join(" · "))}</p></div>
+              <div class="ind-cab-data"><span>Emitido em</span><strong>${h(emitido)}</strong></div>
+            </header>
+            <div class="ind-faixa"></div>
+            <div class="ind-corpo">${copia.innerHTML}</div>
+          </div>`;
+        document.querySelectorAll("dialog[open]").forEach(d => d.close());
+        caixa.hidden = false;
+        document.body.classList.add("ind-imprimindo");
+        window.scrollTo(0, 0);
+    }
+    function fecharImpressao() {
+        const caixa = $("indImpressao");
+        if (caixa) caixa.hidden = true;
+        document.body.classList.remove("ind-imprimindo");
     }
     function exportarCsv() {
         const esc = v => { const s = String(v == null ? "" : v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
