@@ -574,7 +574,7 @@
         const curtoF = fx => fx[1] === Infinity ? k(fx[0]) + "+" : !fx[0] ? "até " + k(fx[1]) : k(fx[0]) + "–" + k(fx[1]);
         tabelas.pgMkFaixas = [ [ "Faixa de valor", "Quantidade" ], ...R.faixas.map(f => [ f.rotulo, String(f.qtd) ]) ];
         const filtrar = i => { const fx = R.faixas[i].fx; mk.vMin = fx[0] || null; mk.vMax = fx[1] === Infinity ? null : fx[1]; dica(null); desenharMercado(); };
-        if (box.clientWidth < 520) { // celular: barras deitadas (os rótulos não cabem embaixo)
+        if (box.clientWidth < 420) { // celular: barras deitadas (os rótulos não cabem embaixo)
             const max = Math.max(1, ...R.faixas.map(f => f.qtd));
             box.innerHTML = `<div class="pg-seg-bloco pg-mk-rank">${R.faixas.map((f, i) => `<button type="button" class="pg-funil-linha pg-mk-faixa${R.temFiltro && !dentro(f.fx) ? " fora" : ""}" data-mk-fx="${i}">
                 <span class="pg-funil-nome">${h(curtoF(f.fx))}</span><span class="pg-funil-barra"><i style="width:${f.qtd ? Math.max(3, f.qtd / max * 100) : 0}%"></i></span><b>${f.qtd}</b><small></small></button>`).join("")}</div>
