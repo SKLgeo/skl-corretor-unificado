@@ -274,10 +274,12 @@
           <select id="painelCorretor"></select>
           <select id="painelPadrao"><option value="">Todos os padrões</option><option value="economico">Econômico</option><option value="medio">Médio padrão</option><option value="alto">Alto padrão</option></select>
           <span id="painelAtualizado" class="crm-contagem"></span>
+          <button id="painelMercadoBotao" type="button" class="secondary-button painel-mercado-botao" title="Faixas de valor, bairros e tipos que mais fecham e que os clientes mais procuram">📍 Mercado</button>
           <button id="painelExportar" type="button" class="secondary-button">Excel (CSV)</button>
           <button id="painelImprimir" type="button" class="primary-button">Imprimir / PDF</button>
         </div>
         <div id="painelFatias" class="fatias painel-fatias" aria-label="Escolher ano, trimestre ou mês"></div>
+        <article id="painelMercado" class="panel painel-bloco painel-mercado" hidden></article>
         <div id="painelKpis" class="crm-resumo painel-kpis"></div>
         <div id="painelFunis" class="painel-grade"></div>
         <div class="painel-grade">
@@ -1349,6 +1351,7 @@
         <label class="fin-largo"><span>Descrição do imóvel</span><input id="finCtAvDesc" placeholder="ex.: Casa 3 quartos no Jardim Atlântico" autocomplete="off" /></label>
         <label><span>Tipo</span><input id="finCtAvTipo" placeholder="Casa, apartamento, terreno…" autocomplete="off" /></label>
         <label class="fin-largo"><span>Endereço</span><input id="finCtAvEnd" placeholder="Rua, número, bairro" autocomplete="off" /></label>
+        <label><span>Bairro</span><input id="finCtAvBairro" placeholder="ex.: Sagrada Família" autocomplete="off" /></label>
         <label><span>Cidade/UF</span><input id="finCtAvCidade" placeholder="ex.: Rondonópolis/MT" autocomplete="off" /></label>
         <label><span>Matrícula</span><input id="finCtAvMatricula" autocomplete="off" /></label>
         <label><span>Área</span><input id="finCtAvArea" placeholder="ex.: 360 m²" autocomplete="off" /></label>
@@ -1514,6 +1517,7 @@
   <script src="avatar.js"></script>
   <script src="crm.js"></script>
   <script src="crm-painel.js"></script>
+  <script src="mercado.js"></script>
   <script src="corretor-ui.js"></script>
   <script src="comissoes.js"></script>
   <script src="divisao.js"></script>

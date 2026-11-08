@@ -506,7 +506,7 @@
         document.querySelectorAll("input[name=finCtOrigem]").forEach(r => { r.checked = r.value === (avulso ? "avulso" : "cadastrado"); });
         const a = base.imovel_avulso || {};
         $("finCtAvDesc").value = a.descricao || ""; $("finCtAvTipo").value = a.tipo || ""; $("finCtAvEnd").value = a.endereco || "";
-        $("finCtAvCidade").value = a.cidade || ""; $("finCtAvMatricula").value = a.matricula || ""; $("finCtAvArea").value = a.area || "";
+        $("finCtAvBairro").value = a.bairro || ""; $("finCtAvCidade").value = a.cidade || ""; $("finCtAvMatricula").value = a.matricula || ""; $("finCtAvArea").value = a.area || "";
         $("finCtImovel").value = "";
         $("finCtImovel").dataset.sel = base.construcao_id || "";
         const pessoa = (sel, idPessoa, nome, input) => {
@@ -707,7 +707,7 @@
     function imovelAvulso() {
         if (!origemAvulsa()) return null;
         const v = id => $(id).value.trim();
-        return { descricao: v("finCtAvDesc"), tipo: v("finCtAvTipo"), endereco: v("finCtAvEnd"), cidade: v("finCtAvCidade"), matricula: v("finCtAvMatricula"), area: v("finCtAvArea") };
+        return { descricao: v("finCtAvDesc"), tipo: v("finCtAvTipo"), endereco: v("finCtAvEnd"), bairro: v("finCtAvBairro"), cidade: v("finCtAvCidade"), matricula: v("finCtAvMatricula"), area: v("finCtAvArea") };
     }
     function calcularComissaoVenda() {
         const v = num($("finCvValor").value), p = num($("finCvComPct").value);

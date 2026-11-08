@@ -10,7 +10,8 @@
     let atividadesDesde = null;
     let carregando = null;
     let ultimoCsv = [];
-    let periodoEscolhido = null;   // "mes", "90"… do seletor, ou "2026", "2026-T3", "2026-05" dos botões
+    let periodoEscolhido = null;
+    let estadoAtual = null;        // período e corretor em uso (para o quadro "📍 Mercado", mercado.js)   // "mes", "90"… do seletor, ou "2026", "2026-T3", "2026-05" dos botões
 
     const I = () => window.SKLCRM && window.SKLCRM.interno;
     const h = v => I().ctx().h(v);
@@ -274,6 +275,8 @@
         $("painelPadraoBloco").innerHTML = Object.keys(porPadrao).map(p => `<div class="crm-resumo-item painel-padrao-${p}"><span>${h(x.PADROES[p])}</span><strong>${porPadrao[p].length}</strong><small>${porPadrao[p].length ? h(x.dinheiroCurto(porPadrao[p].reduce((s, n) => s + (Number(n.valor) || 0), 0))) + " em negociação" : ""}</small></div>`).join("")
             + `<p class="muted-text painel-nota">Faixas da carteira — venda: médio a partir de ${h(x.dinheiro(fx.venda && fx.venda.medio))}, alto a partir de ${h(x.dinheiro(fx.venda && fx.venda.alto))}; locação: médio a partir de ${h(x.dinheiro(fx.locacao && fx.locacao.medio))}, alto a partir de ${h(x.dinheiro(fx.locacao && fx.locacao.alto))}. ${ctx.central() ? "Altere em Configurações." : ""}</p>`;
         renderFinanceiro(x);
+        estadoAtual = { desde, ate, rotulo: rotuloPeriodo(periodo), corretor: filtroCorretor, corretorNome: filtroCorretor ? x.corretorDe(filtroCorretor) : "", funil: filtroFunil };
+        if (window.SKLMercado) { window.SKLMercado.render(); if (window.SKLMercado.aberto()) ultimoCsv.unshift(...window.SKLMercado.csv()); }
         $("painelAtualizado").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · ${rotuloPeriodo(periodo)}${filtroCorretor ? " · " + x.corretorDe(filtroCorretor) : ""}`;
     }
 
@@ -394,5 +397,5 @@
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     }
 
-    window.SKLCRMPainel = { render, invalidar: () => { atividadesDesde = null; } };
+    window.SKLCRMPainel = { render, invalidar: () => { atividadesDesde = null; }, estado: () => estadoAtual };
 })();

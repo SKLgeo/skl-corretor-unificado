@@ -346,3 +346,35 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
 /* 05/11/2026: resumo da negociação em caixa de texto (antes era uma linha só e cortava no celular) */
 .crm-resumo-campo{display:grid;gap:4px;margin:0 0 10px}
 .crm-resumo-campo textarea{width:100%;min-height:84px;max-height:260px;resize:vertical;field-sizing:content;line-height:1.45}
+/* Indicadores → 📍 Mercado (mercado.js) */
+.painel-mercado-botao.ativo{background:var(--navy-deep);color:#fff}
+.painel-mercado{border:2px solid var(--navy);scroll-margin-top:12px}
+.mk-topo{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.mk-topo h3{margin:0 0 4px}
+.mk-topo p{margin:0}
+.mk-chaves{display:flex;gap:8px;flex-wrap:wrap}
+.mk-filtro{margin:12px 0 10px;display:grid;gap:6px}
+.mk-atalhos{display:flex;gap:6px;flex-wrap:wrap}
+.mk-chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--navy-deep)}
+.mk-chip.ativo{background:var(--navy-deep);border-color:var(--navy-deep);color:#fff}
+.mk-de-ate{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.mk-de-ate label{display:grid;gap:3px}
+.mk-de-ate label span{font-size:12px;color:var(--muted);font-weight:600}
+.mk-de-ate input{width:150px}
+.mk-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mk-h{margin:12px 0 6px;font-size:13.5px;color:var(--navy-deep)}
+.mk-h small{font-weight:500;color:var(--muted)}
+.mk-faixas{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px;align-items:end;min-height:150px;padding-bottom:4px}
+.mk-faixa{display:grid;grid-template-rows:96px auto auto;gap:3px;justify-items:center;border:1px solid transparent;border-radius:10px;background:none;padding:4px 2px;cursor:pointer;min-width:0}
+.mk-faixa:hover{border-color:var(--line)}
+.mk-faixa.ativo{border-color:var(--navy);background:#eef6fb}
+.mk-faixa-barra{width:70%;height:96px;display:flex;align-items:flex-end;background:#f1f4f6;border-radius:6px;overflow:hidden}
+.mk-faixa-barra i{display:block;width:100%;background:var(--navy);border-radius:6px 6px 0 0}
+.mk-faixa b{font-size:14px;color:var(--navy-deep)}
+.mk-faixa small{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.2}
+.mk-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:10px}
+.mk-rank h4{margin:6px 0}
+.mk-nota{margin-top:10px;font-size:12.5px}
+@media(max-width:1100px){.mk-grade{grid-template-columns:minmax(0,1fr)}.mk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.mk-faixas{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(0,1fr));min-height:0}.mk-faixa{grid-template-rows:70px auto auto}.mk-faixa-barra{height:70px}.mk-de-ate input{width:120px}}
+
