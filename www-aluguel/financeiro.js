@@ -166,7 +166,7 @@
         $("finCtGarantia").addEventListener("change", mostrarGarantia);
         $("finCtAddItem").addEventListener("click", () => { itens.push({ descricao: "", valor: "", repassar: false }); desenharItens(); });
         $("finPgAdd").addEventListener("click", () => { parcelasPg.push({ vencimento: "", valor: "", status: "" }); desenharParcelasPg(true); });
-        [ "finCvComValor", "finCvComPct", "finCvValor" ].forEach(id => $(id).addEventListener("input", () => { if (window.SKLComissaoContrato) window.SKLComissaoContrato.atualizar(); }));
+        [ "finCvComValor", "finCvComPct", "finCvValor", "finCtValor", "finCtInter" ].forEach(id => $(id).addEventListener("input", () => { if (window.SKLComissaoContrato) window.SKLComissaoContrato.atualizar(); }));
         $("finPgGerarBotao").addEventListener("click", gerarParcelasPg);
         $("finCvValor").addEventListener("input", () => notaParcelasPg());
         $("finCtSalvar").addEventListener("click", salvarContrato);
@@ -590,10 +590,12 @@
         // continua editável (ela costuma cair depois da assinatura); só o contrato cancelado trava.
         if (window.SKLComissaoContrato) {
             const podeCom = podeGerir() && (!c || c.status !== "cancelado");
-            window.SKLComissaoContrato.abrir({ ctx, tipo, contrato: c && tipo === "venda" ? c : null, pode: podeCom, negociacaoId: base.negociacao_id || null,
+            window.SKLComissaoContrato.abrir({ ctx, tipo, contrato: c || null, pode: podeCom, negociacaoId: base.negociacao_id || null,
+                semAdministracao: () => !administradoCt(),
                 soComissao: podeCom && !!c && !pode, parceiros,
                 participantes: () => [ ...($("finCtCorretor").value ? [ { tipo: "corretor", usuario_id: $("finCtCorretor").value } ] : []), ...participantesCt() ],
-                total: totalComissaoVenda, dataContrato: () => $("finCvData").value,
+                total: () => ctTipo === "venda" ? totalComissaoVenda() : totalComissaoLocacao(),
+                dataContrato: () => ctTipo === "venda" ? $("finCvData").value : $("finCtInicio").value,
                 aoSalvar: async () => { await carregar(true); } });
         }
         $("finContratoDialog").showModal();
@@ -606,6 +608,7 @@
         $("finCtInquilinoRot").textContent = ctTipo === "venda" ? "Comprador" : "Inquilino";
         $("finCtProprietarioRot").textContent = ctTipo === "venda" ? "Vendedor (proprietário)" : "Proprietário";
         if (!vendaAberta && !contratoAberto) $("finCtAddItem").hidden = ctTipo !== "locacao" || !podeGerir();
+        avisoAdministracao();
         if (window.SKLComissaoContrato) window.SKLComissaoContrato.definirTipo(ctTipo);
         notaParcelasPg();
         // imóveis que servem para o tipo escolhido (mantém o que já estava escolhido)
@@ -732,6 +735,43 @@
         const g = $("finCtGarantia").value;
         $("finCtGarantiaDetLabel").hidden = g === "nenhuma";
         $("finCtCaucaoLabel").hidden = g !== "caucao";
+    }
+    // locação sem administração: a comissão da imobiliária é o 1º aluguel × intermediação
+    function totalComissaoLocacao() {
+        const al = num($("finCtValor").value), pc = num($("finCtInter").value);
+        return al ? Math.round(al * (pc == null ? 100 : pc)) / 100 : 0;
+    }
+    // o contrato aberto gera cobranças mensais? (novo: segue a função "Administração de aluguéis" da imobiliária)
+    function administradoCt() {
+        const c = contratoAberto ? contrato(contratoAberto) : null;
+        if (c) return c.administrado !== false;
+        return !window.SKLFuncoes || window.SKLFuncoes.ativa("administracao");
+    }
+    function avisoAdministracao() {
+        const box = $("finCtAdminAviso");
+        if (!box) return;
+        const c = contratoAberto ? contrato(contratoAberto) : null;
+        const funcaoLigada = !window.SKLFuncoes || window.SKLFuncoes.ativa("administracao");
+        const adm = administradoCt();
+        document.body.classList.toggle("ct-sem-admin", ctTipo === "locacao" && !adm);
+        box.hidden = ctTipo !== "locacao" || !c || adm === funcaoLigada;
+        if (box.hidden) return;
+        box.innerHTML = adm
+            ? `<span>Este contrato gera cobranças mensais (administração do aluguel), mas a imobiliária está em <b>só intermediação</b>. Dá para passar este contrato também; as cobranças já lançadas continuam como estão.</span>
+               ${podeGerir() ? `<button type="button" class="secondary-button fin-mini" data-admin-ct="0">Passar para só intermediação</button>` : ""}`
+            : `<span>Só intermediação: este contrato não gera cobranças mensais; a comissão da imobiliária fica no quadro “Comissão” abaixo.</span>
+               ${podeGerir() ? `<button type="button" class="secondary-button fin-mini" data-admin-ct="1">Ligar cobranças mensais</button>` : ""}`;
+        const b = box.querySelector("[data-admin-ct]");
+        if (b) b.addEventListener("click", async () => {
+            b.disabled = true;
+            const { data, error } = await ctx.sb.rpc("fin_definir_administrado", { p_contrato: c.id, p_administrado: b.dataset.adminCt === "1" });
+            if (error) { b.disabled = false; ctx.toast(erro(error)); return; }
+            Object.assign(c, data);
+            ctx.toast(data.administrado ? "Cobranças mensais ligadas neste contrato." : "Contrato em só intermediação. Preencha a comissão abaixo.");
+            avisoAdministracao();
+            if (window.SKLComissaoContrato) window.SKLComissaoContrato.definirTipo("locacao");
+            carregar(true);
+        });
     }
     function totalComissaoVenda() {
         const v = num($("finCvComValor").value);
@@ -902,8 +942,10 @@
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
         await salvarPagamentoCt("locacao", data.id);
+        if (window.SKLComissaoContrato) await window.SKLComissaoContrato.salvar(data.id);
         $("finContratoDialog").close();
-        ctx.toast(contratoAberto ? "Contrato atualizado. As cobranças em aberto acompanham as mudanças." : `Contrato nº ${data.numero} criado. As cobranças já estão em Financeiro → Cobranças.`);
+        ctx.toast(contratoAberto ? (data.administrado === false ? "Contrato atualizado." : "Contrato atualizado. As cobranças em aberto acompanham as mudanças.")
+            : data.administrado === false ? `Contrato nº ${data.numero} criado (só intermediação, sem cobranças mensais).` : `Contrato nº ${data.numero} criado. As cobranças já estão em Financeiro → Cobranças.`);
         await carregar(true);
         if (!contratoAberto && d.construcao_id) ctx.recarregarImoveis();
         renderNegocioAberto();

@@ -425,6 +425,13 @@
         $("crmCliSalvar").addEventListener("click", salvarCliente);
         $("crmCliExcluir").addEventListener("click", excluirCliente);
         $("crmCliAprovar").addEventListener("click", () => revisarCliente(true));
+        $("crmCliCadImovel").addEventListener("click", () => {
+            const id = cliAberto;
+            if (!id || !ctx.novoImovel) return;
+            $("crmClienteDialog").close();
+            ctx.novoImovel({ finalidade: "venda" });
+            proprietarioUsar(id);
+        });
         $("crmCliRecusar").addEventListener("click", () => {
             $("crmRecusarCliMotivo").value = "";
             $("crmRecusarCliMsg").hidden = true;
@@ -1068,10 +1075,13 @@
             const tipos = (c.tipos || []).map(t => `<span class="crm-tipo crm-tipo-${h(t)}">${h(TIPOS_CLIENTE[t] || t)}</span>`).join("");
             const aprov = c.aprovacao === "pendente" ? ` <span class="status-pill aprov-pendente">Aguardando aprovação</span>`
                 : c.aprovacao === "recusado" ? ` <span class="status-pill aprov-recusado">Recusado</span>` : "";
+            const semImovel = (c.tipos || []).includes("proprietario") && !imoveisDoProprietario(c.id).length
+                ? ` <span class="status-pill aprov-pendente" title="Este proprietário não possui imóvel vinculado">Sem imóvel</span>` : "";
+            const equipe = c.visivel_equipe ? ` <span class="status-pill crm-pill-equipe" title="Toda a equipe pode ver este cliente">👥 Equipe</span>` : "";
             const abertas = abertasPorCliente.get(c.id) || 0;
             const total = totalPorCliente.get(c.id) || 0;
             return `<tr data-cli="${h(c.id)}" class="crm-linha">
-              <td><strong>${h(c.nome)}</strong>${c.apelido ? ` <small class="muted-text">(${h(c.apelido)})</small>` : ""}${aprov}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
+              <td><strong>${h(c.nome)}</strong>${c.apelido ? ` <small class="muted-text">(${h(c.apelido)})</small>` : ""}${aprov}${semImovel}${equipe}${c.origem ? `<br><small class="muted-text">${h(c.origem)}</small>` : ""}</td>
               <td>${h(formatarTelefone(c.telefone)) || "—"}${c.email ? `<br><small class="muted-text">${h(c.email)}</small>` : ""}</td>
               <td>${tipos}${window.SKLPerfis && (c.perfis || []).length ? "<br>" + window.SKLPerfis.chips(c.perfis) : ""}${(() => { const q = qualidadeCliente(c); return q.conta ? `<br><span class="card-estrelas" title="Qualidade do cadastro: ${q.pct}%">${estrelas(q.estrelas)}</span>` : ""; })()}</td>
               <td class="crm-col-central" ${central() ? "" : "hidden"}>${c.corretor_id ? `<span class="crm-card-corretor">${ctx.fotoDoUsuario(c.corretor_id, 20)}<span>${h(corretorDe(c.corretor_id))}</span></span>` : "—"}</td>
@@ -1089,6 +1099,20 @@
     function atualizarAvisoProprietario() {
         const marcado = document.querySelector('[data-crm-tipo][value="proprietario"]').checked;
         $("crmCliAvisoProp").hidden = !(marcado && !central());
+        $("crmCliAvisoProp").textContent = aprovaProprietario()
+            ? "Proprietário cadastrado por corretor vai para a aprovação da Central. Depois disso, os dados ficam só com a Central."
+            : "O proprietário entra direto. Você continua vendo e pode completar o cadastro depois; a Central também vê.";
+    }
+    const aprovaProprietario = () => !window.SKLFuncoes || window.SKLFuncoes.ativa("aprovar_proprietarios");
+    const imoveisDoProprietario = id => (ctx && ctx.imoveis ? ctx.imoveis() : []).filter(i => i.proprietario_cliente_id === id);
+    // "é meu" = a mesma regra do banco (_crm_cliente_e_meu): quem pode alterar o cadastro
+    function clienteEMeu(c) {
+        const eu = (ctx.usuario() || {}).id;
+        if ((c.tipos || []).includes("proprietario")) {
+            return (c.criado_por === eu && (c.aprovacao !== "aprovado" || !aprovaProprietario()))
+                || imoveisDoProprietario(c.id).some(i => (i.captador_id || i.cadastrado_por) === eu);
+        }
+        return c.corretor_id === eu || [ ...negs.values() ].some(n => n.cliente_id === c.id && n.corretor_id === eu);
     }
     function abrirCliente(id) {
         cliAberto = id;
@@ -1138,6 +1162,24 @@
         $("crmCliExcluir").hidden = !(c && (central() || (c.criado_por === ctx.usuario().id && c.aprovacao !== "aprovado")));
         $("crmCliNovaNeg").hidden = !c || (!central() && ehProprietario);
         $("crmCliSalvar").textContent = c ? "Salvar alterações" : "Cadastrar cliente";
+        // cliente de outro corretor liberado para a equipe: só leitura
+        const leitura = !!c && !central() && !clienteEMeu(c);
+        $("crmCliEquipe").checked = !!(c && c.visivel_equipe);
+        $("crmCliEquipeLabel").hidden = leitura;
+        document.querySelectorAll("#crmClienteDialog input, #crmClienteDialog select, #crmClienteDialog textarea").forEach(el => {
+            if (el.closest(".dialog-actions") || el.closest(".crm-sublista") || el.closest(".crm-timeline")) return;
+            if (leitura) { el.dataset.travadoEquipe = "1"; el.disabled = true; }
+            else if (el.dataset.travadoEquipe) { delete el.dataset.travadoEquipe; el.disabled = false; }
+        });
+        if (leitura) {
+            banner.className = "aprovacao-banner rascunho";
+            banner.textContent = `👥 Cliente da equipe${c.corretor_id ? " — atendido por " + corretorDe(c.corretor_id) : ""}. Só quem atende ou a Central altera o cadastro.`;
+            banner.hidden = false;
+            $("crmCliSalvar").hidden = true; $("crmCliNovaNeg").hidden = true;
+        } else $("crmCliSalvar").hidden = false;
+        const semImovel = !!c && ehProprietario && !imoveisDoProprietario(c.id).length;
+        $("crmCliSemImovel").hidden = !semImovel;
+        $("crmCliCadImovel").hidden = leitura || !(ctx.novoImovel);
         desenharSublistasCliente(c);
         if (window.SKLExtras) window.SKLExtras.aoAbrirCliente(c);
         $("crmClienteDialog").showModal();
@@ -1176,7 +1218,8 @@
             origem: $("crmCliOrigem").value,
             observacoes: $("crmCliObs").value.trim(),
             tipos: tipos.length ? tipos : [ "comprador" ],
-            consentimento_lgpd: $("crmCliLgpd").checked
+            consentimento_lgpd: $("crmCliLgpd").checked,
+            visivel_equipe: $("crmCliEquipe").checked
         };
         if (central()) {
             const escolhido = $("crmCliCorretor").value;
@@ -2086,6 +2129,22 @@
             }
         }
     }
+    // "+ Cadastrar imóvel deste proprietário": abre o cadastro do imóvel com ele já escolhido
+    function proprietarioUsar(id) {
+        const c = clientes.get(id);
+        if (!c || !prop.modo || prop.modo === "leitura") return;
+        if (prop.modo === "central") {
+            $("proprietarioSelect").value = id;
+            atualizarProprietarioSelect();
+        } else {
+            prop.clienteVisivel = c;
+            $("proprietarioNovo").hidden = false; $("proprietarioResumo").hidden = true;
+            $("propNomeInput").value = c.nome || "";
+            $("propTelefoneInput").value = formatarTelefone(c.telefone);
+            $("propEmailInput").value = c.email || "";
+            $("propCpfInput").value = c.cpf || "";
+        }
+    }
     function atualizarProprietarioSelect() {
         const v = $("proprietarioSelect").value;
         $("proprietarioNovo").hidden = v !== "__novo";
@@ -2135,5 +2194,5 @@
         normal, dataCurta, dataHora, linksContato, abrirNegociacao: id => abrirNegociacao(id),
         visitas, lembretes, abrirVisita: id => abrirVisita(id), concluirLembrete: id => concluirLembrete(id)
     };
-    window.SKLCRM = { interno, iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, abrirNegociacao, abrirCliente };
+    window.SKLCRM = { interno, iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, proprietarioUsar, abrirNegociacao, abrirCliente };
 })();

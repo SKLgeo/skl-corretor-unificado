@@ -1,4 +1,5 @@
-// Contrato de compra e venda → "💰 Comissão": quando a imobiliária recebe a comissão e quando repassa a corretores e parceiros.
+// Contrato de compra e venda (e, desde 09/11/2026, de locação sem administração) → "💰 Comissão": quando a imobiliária recebe a
+// comissão e quando repassa a corretores e parceiros. Na locação o total é o 1º aluguel × "Intermediação: % do 1º aluguel".
 // A venda em si é paga pelo comprador à incorporadora/vendedor; aqui só entra a comissão da imobiliária.
 // Recebimentos → crm_comissao_recebiveis (o mesmo "A receber" do Financeiro, Painel e Contabilidade).
 // Repasses → comissoes_aluguel (aparecem em Comissões e em "Minhas comissões" do corretor).
@@ -33,7 +34,7 @@
         pg.insertAdjacentHTML("beforebegin", `<details id="finComBloco" class="fin-com-bloco" hidden>
           <summary><span>💰 Comissão — recebimento e repasses</span><small id="finComResumo"></small></summary>
           <p class="muted-text fin-com-intro">Aqui fica só a comissão da imobiliária: quando ela recebe e quando paga corretores e parceiros. A venda em si é paga pelo comprador à incorporadora ou ao vendedor.</p>
-          <p class="fin-com-total">Comissão total: <b id="finComTotal">—</b> <small>(campo "Comissão" acima)</small></p>
+          <p class="fin-com-total">Comissão total: <b id="finComTotal">—</b> <small id="finComOrigem">(campo "Comissão" acima)</small></p>
           <h4 class="fin-com-h">1 · Quando a imobiliária recebe</h4>
           <div class="fin-com-modo" role="group" aria-label="Como a comissão é recebida">
             <label class="check-inline"><input type="radio" name="finComModo" value="unica" checked /> Uma vez só</label>
@@ -89,8 +90,9 @@
         if (!bloco) return;
         const c = op.contrato;
         rec = []; regras = []; linhas = []; travado = false; mexeu = false;
-        bloco.hidden = op.tipo !== "venda";
-        if (op.tipo !== "venda") return;
+        bloco.hidden = !ativo();
+        if (!ativo()) return;
+        intro();
         const cfg = (c && c.comissao_config) || {};
         document.querySelectorAll("input[name=finComModo]").forEach(r => { r.checked = r.value === (cfg.modo || "unica"); });
         $("finComDias").value = cfg.dias ?? 0; $("finComQtd").value = cfg.qtd ?? 3; $("finComPrimeira").value = cfg.primeira ?? 30; $("finComIntervalo").value = cfg.intervalo || "m1";
@@ -99,11 +101,13 @@
         const negId = (c && c.negociacao_id) || op.negociacaoId || null;
         if ((c && c.id) || negId) {
             const sb = op.ctx.sb;
-            const filtro = [ c && c.id ? `contrato_venda_id.eq.${c.id}` : "", negId ? `negociacao_id.eq.${negId}` : "" ].filter(Boolean).join(",");
+            const col = op.tipo === "venda" ? "contrato_venda_id" : "contrato_aluguel_id";
+            const filtro = [ c && c.id ? `${col}.eq.${c.id}` : "", negId ? `negociacao_id.eq.${negId}` : "" ].filter(Boolean).join(",");
+            let qRep = c && c.id ? op.ctx.sb.from("comissoes_aluguel").select("id, corretor_id, corretor_nome, beneficiario_nome, valor_comissao, competencia, status, parcela, parcelas, tipo") : null;
+            if (qRep) qRep = op.tipo === "venda" ? qRep.eq("contrato_venda_id", c.id) : qRep.eq("contrato_id", c.id).eq("base_tipo", "contrato_locacao");
             const [ a, b ] = await Promise.all([
                 sb.from("crm_comissao_recebiveis").select("id, vencimento, valor, observacao, recebido_em, recebido_sem_data, parcela").or(filtro).order("vencimento"),
-                c && c.id ? sb.from("comissoes_aluguel").select("id, corretor_id, corretor_nome, beneficiario_nome, valor_comissao, competencia, status, parcela, parcelas, tipo").eq("contrato_venda_id", c.id).order("competencia")
-                    : Promise.resolve({ data: [] })
+                qRep ? qRep.order("competencia") : Promise.resolve({ data: [] })
             ]);
             rec = (a.data || []).map(r => ({ id: r.id, vencimento: r.vencimento, valor: campo(r.valor), observacao: r.observacao || "", recebido_em: r.recebido_em, recebido_sem_data: r.recebido_sem_data }));
             linhas = b.data || [];
@@ -117,7 +121,7 @@
     // ------------------------------------------------------------------ recebimentos
     function montarDatas() {
         const t = total();
-        if (!t) { op.ctx.toast("Preencha a comissão (% ou R$) do contrato antes de montar as datas."); return; }
+        if (!t) { op.ctx.toast(op.tipo === "venda" ? "Preencha a comissão (% ou R$) do contrato antes de montar as datas." : "Preencha o aluguel e a intermediação (%) antes de montar as datas."); return; }
         const recebidos = rec.filter(r => r.recebido_em || r.recebido_sem_data);
         const jaRecebido = recebidos.reduce((s, r) => s + (num(r.valor) || 0), 0);
         const falta = Math.round((t - jaRecebido) * 100) / 100;
@@ -193,7 +197,7 @@
 
     // ------------------------------------------------------------------ desenho
     function desenhar() {
-        if (!op || op.tipo !== "venda") return;
+        if (!op || !ativo()) return;
         const pode = !!op.pode;
         $("finComTotal").textContent = total() ? dinheiro(total()) : "não informada";
         $("finComRec").innerHTML = rec.map((r, i) => {
@@ -293,7 +297,7 @@
 
     // ------------------------------------------------------------------ salvar (chamado depois de salvar o contrato)
     async function salvar(contratoId) {
-        if (!op || op.tipo !== "venda" || !op.pode || !mexeu) return true;
+        if (!op || !ativo() || !op.pode || !mexeu) return true;
         const abertos = rec.filter(r => !(r.recebido_em || r.recebido_sem_data));
         if (abertos.some(r => !r.vencimento || !(num(r.valor) > 0))) { op.ctx.toast("O contrato foi salvo, mas a comissão não: cada recebimento precisa de data e valor."); return false; }
         const dados = {
@@ -302,7 +306,7 @@
                 intervalo: $("finComIntervalo").value, repasses: regras.map(r => ({ tipo: r.tipo, usuario_id: r.usuario_id || "", parceiro_id: r.parceiro_id || "", nome: r.nome || "", pct: r.pct || "", valor: r.valor || "", quando: r.quando || "recebimento", dias: Number(r.dias) || 0, vencimento: r.vencimento || "" })) }
         };
         if (!travado) dados.repasses = expandir();
-        const { error } = await op.ctx.sb.rpc("contrato_venda_salvar_comissao", { p_contrato: contratoId, p_dados: dados });
+        const { error } = await op.ctx.sb.rpc(op.tipo === "venda" ? "contrato_venda_salvar_comissao" : "contrato_aluguel_salvar_comissao", { p_contrato: contratoId, p_dados: dados });
         if (error) { op.ctx.toast("O contrato foi salvo, mas a comissão não: " + op.ctx.traduzErro(error.message || String(error))); return false; }
         mexeu = false;
         return true;
@@ -313,10 +317,20 @@
         op.tipo = t;
         const b = $("finComBloco");
         if (!b) return;
-        b.hidden = t !== "venda";
-        if (t === "venda") desenhar();
+        b.hidden = !ativo();
+        if (ativo()) { intro(); desenhar(); }
     }
-    function atualizar() { if (op && op.tipo === "venda" && montado) { $("finComTotal").textContent = total() ? dinheiro(total()) : "não informada"; notaRec(); previa(); } }
+    // venda sempre; locação só quando a imobiliária não administra o aluguel (sem cobranças mensais)
+    function ativo() { return !!op && (op.tipo === "venda" || (op.tipo === "locacao" && !!op.semAdministracao && op.semAdministracao())); }
+    function intro() {
+        const el = document.querySelector("#finComBloco .fin-com-intro");
+        const o = $("finComOrigem");
+        if (o) o.textContent = op.tipo === "venda" ? '(campo "Comissão" acima)' : '(aluguel × "Intermediação: % do 1º aluguel")';
+        if (el) el.textContent = op.tipo === "venda"
+            ? "Aqui fica só a comissão da imobiliária: quando ela recebe e quando paga corretores e parceiros. A venda em si é paga pelo comprador à incorporadora ou ao vendedor."
+            : "Aqui fica só a comissão da imobiliária na locação (o 1º aluguel × a intermediação): quando ela recebe e quando paga corretores e parceiros. Os aluguéis seguintes o inquilino paga direto ao proprietário.";
+    }
+    function atualizar() { if (op && ativo() && montado) { $("finComTotal").textContent = total() ? dinheiro(total()) : "não informada"; notaRec(); previa(); } }
 
     window.SKLComissaoContrato = { abrir, salvar, atualizar, definirTipo, esconder: () => { const b = $("finComBloco"); if (b) b.hidden = true; } };
 })();

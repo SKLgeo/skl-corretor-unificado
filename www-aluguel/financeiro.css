@@ -225,3 +225,9 @@
   .fin-com-linha .fin-pg-del,.fin-com-regra .fin-pg-del{grid-column:auto;grid-row:auto;justify-self:end}
   .fin-com-linha .fin-com-sit{grid-column:2}
 }
+
+/* 09/11/2026: locação sem administração (só intermediação) e garantia/itens como função */
+body.ct-sem-admin #finCtLocacaoCampos [data-admin]{display:none!important}
+body.sem-contrato_garantia_itens #finCtLocacaoCampos [data-garantia-itens]{display:none!important}
+.fin-ct-admin-aviso{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.fin-ct-admin-aviso[hidden]{display:none}

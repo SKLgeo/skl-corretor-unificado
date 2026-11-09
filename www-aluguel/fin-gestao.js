@@ -39,6 +39,12 @@
     }
     // parcela a receber criada no contrato de compra e venda (sem negócio no CRM)
     function nomeRecebivel(r) {
+        if (!r.negociacao_id && r.contrato_aluguel_id) {
+            const F = window.SKLFinanceiro, k = F && F.contratos ? F.contratos().find(x => x.id === r.contrato_aluguel_id) : null;
+            if (!k) return "Contrato de locação";
+            const cli = k.inquilino_id && F.cliente ? F.cliente(k.inquilino_id) : null;
+            return [ `Contrato de locação nº ${k.numero}`, (cli && cli.nome) || k.inquilino_nome ].filter(Boolean).join(" — ");
+        }
         if (r.negociacao_id || !r.contrato_venda_id) return nomeNegocio(r.negociacao_id);
         const F = window.SKLFinanceiro, v = F && F.vendas ? F.vendas().find(x => x.id === r.contrato_venda_id) : null;
         if (!v) return "Contrato de compra e venda";
@@ -48,6 +54,7 @@
     function abrirOrigem(r) {
         if (r.negociacao_id) { if (window.SKLCRM) window.SKLCRM.abrirNegociacao(r.negociacao_id); return; }
         if (r.contrato_venda_id && window.SKLFinanceiro && window.SKLFinanceiro.abrirVendaId) window.SKLFinanceiro.abrirVendaId(r.contrato_venda_id);
+        if (r.contrato_aluguel_id && window.SKLFinanceiro && window.SKLFinanceiro.abrirContratoId) window.SKLFinanceiro.abrirContratoId(r.contrato_aluguel_id);
     }
     const recebido = r => !!(r.recebido_em || r.recebido_sem_data);
     const liquidado = l => !!(l.pago_em || l.pago_sem_data);

@@ -417,3 +417,11 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
 @media(max-width:1100px){.mk-grade{grid-template-columns:minmax(0,1fr)}.mk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:780px){.mk-faixas{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(0,1fr));min-height:0}.mk-faixa{grid-template-rows:70px auto auto}.mk-faixa-barra{height:70px}.mk-de-ate input{width:120px}}
 
+
+/* 09/11/2026: cliente visível para a equipe e proprietário sem imóvel */
+.crm-pill-equipe{background:#e0f2fe;color:#075985}
+.crm-cli-equipe{align-items:flex-start;gap:8px;margin:6px 0}
+.crm-cli-equipe span{display:grid;gap:2px}
+.crm-cli-equipe small{color:var(--muted);font-weight:400;font-size:12px}
+.crm-sem-imovel{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.crm-sem-imovel[hidden]{display:none}

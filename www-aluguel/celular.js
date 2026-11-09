@@ -15,7 +15,7 @@
         const emPe = !window.matchMedia || matchMedia("(orientation: portrait)").matches;
         if (!curto || curto >= 500 || !emPe) return { conteudo: VIEWPORT_NORMAL, escala: 1 };
         const largura = Math.round(curto / Math.min(ESCALA_MAX, Math.max(1, curto / LARGURA_ALVO)));
-        const e = Number((curto / largura).toFixed(3));
+        const e = Math.floor(curto / largura * 1000) / 1000;
         if (e < 1.03) return { conteudo: VIEWPORT_NORMAL, escala: 1 };
         return { conteudo: `width=${largura}, initial-scale=${e}, minimum-scale=${e}, maximum-scale=${e}, user-scalable=no`, escala: e };
     }

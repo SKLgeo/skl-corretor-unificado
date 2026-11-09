@@ -11,6 +11,12 @@
           texto: "No celular e no tablet o sistema fica sempre na horizontal: se a pessoa colocar o aparelho em pé, aparece um aviso para virar de volta. Ligar este desliga o \"em pé\" (e vice-versa). No computador nada muda." },
         { chave: "propostas", nome: "Proposta de negócios (estudo de mercado)",
           texto: "Menu \"Proposta de negócios\": compara o imóvel com outros parecidos, calcula o valor do m² e gera o PDF com a proposta de valor e a marca da imobiliária." },
+        { chave: "aprovar_proprietarios", nome: "Central aprova proprietários cadastrados por corretor",
+          texto: "Ligado: o proprietário cadastrado por um corretor fica aguardando a Central aprovar antes de entrar. Desligado: o cadastro entra direto e quem cadastrou continua vendo e completando o cadastro." },
+        { chave: "administracao", nome: "Administração de aluguéis (cobranças mensais)",
+          texto: "Ligado: o contrato de locação gera as cobranças de todo mês, com vencimento, taxa de administração, multa, juros e repasse ao proprietário. Desligado (só intermediação): o contrato registra a locação e a comissão da imobiliária, sem cobranças mensais. As cobranças já lançadas continuam como estão." },
+        { chave: "contrato_garantia_itens", nome: "Garantia e itens cobrados com o aluguel no contrato",
+          texto: "Campos de garantia (caução, fiador, seguro…) e de itens cobrados junto com o aluguel todo mês (condomínio, IPTU…) no contrato de locação." },
         { chave: "repasses", nome: "Repasses aos proprietários",
           texto: "A aba Repasses do Financeiro e o valor \"A repassar\" no Resumo. Ligue se a imobiliária recebe o aluguel e repassa ao proprietário." },
         { chave: "manutencao", nome: "Manutenção e chamados de defeito",
@@ -86,6 +92,7 @@
         const abaAtiva = document.querySelector(".fin-aba.ativa");
         if (fin && !ligar && abaAtiva && (abaAtiva.hidden || getComputedStyle(abaAtiva).display === "none")) fin.mostrarAba("resumo");
         else if (fin && fin.renderizar) fin.renderizar();
+        if (window.SKLCRM && window.SKLCRM.recarregar && chave === "aprovar_proprietarios") window.SKLCRM.recarregar();
         ctx.toast(ligar ? "Função ligada." : "Função desligada. Os dados já lançados continuam guardados.");
     }
 

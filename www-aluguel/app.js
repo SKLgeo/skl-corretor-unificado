@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.18.5";
+    const APP_VERSION = "0.18.6";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -287,6 +287,11 @@
         $("heroNextButton").addEventListener("click", heroProxima);
         $("imovelHeroImg").addEventListener("click", () => abrirLightbox(heroIndex));
         $("fotoLightboxClose").addEventListener("click", fecharLightbox);
+        $("fotoLightboxBaixar").addEventListener("click", () => {
+            const it = lightboxItens[lightboxIndex];
+            if (!it || !window.SKLBaixarFotos) return;
+            window.SKLBaixarFotos.baixar([ itemParaBaixar(it, lightboxIndex) ], { botao: $("fotoLightboxBaixar"), avisar: toast });
+        });
         $("fotoLightboxPrev").addEventListener("click", lightboxAnterior);
         $("fotoLightboxNext").addEventListener("click", lightboxProxima);
         $("fotoLightbox").addEventListener("click", event => { if (event.target === $("fotoLightbox")) fecharLightbox(); });
@@ -896,7 +901,7 @@
     // O CRM (crm.js) recebe daqui o que precisa; ele mesmo cuida de clientes, negociações e agenda.
     function contextoCrm() {
         return {
-            sb, h, toast, traduzErro, parseValor, nomeDoUsuario, fotoDoUsuario,
+            sb, h, toast, traduzErro, parseValor, nomeDoUsuario, fotoDoUsuario, novoImovel: novoImovelPreenchido,
             carteiraId: () => carteiraId,
             usuario: () => currentUser,
             central: () => veTudo(),
@@ -2600,6 +2605,14 @@
         renderGaleria();
     }
 
+    // nome dos arquivos baixados: código do imóvel + número da foto (ex.: 00200-03.jpg)
+    function nomeArquivoImovel() {
+        const c = editandoId ? construcoes.get(editandoId) : null;
+        return (c && (c.codigo || c.nome)) || "imovel";
+    }
+    function itemParaBaixar(item, i) {
+        return { url: () => resolveUrlItem(item), nome: `${nomeArquivoImovel()}-${String(i + 1).padStart(2, "0")}`, chave: item.path || item.previewUrl };
+    }
     function resolveUrlItem(item) {
         return item.tipo === "nova" ? Promise.resolve(item.previewUrl) : resolveFotoUrl(item.path);
     }
@@ -2633,6 +2646,23 @@
             $("heroTirarBtn").addEventListener("click", () => tirarFoto(heroIndex));
         }
         acoes.hidden = !podeEditar || !itens.length;
+        // "Baixar todas as fotos": só fotos já guardadas (as recém-escolhidas ainda estão no aparelho)
+        let baixar = $("heroBaixarTodas");
+        if (!baixar) {
+            baixar = document.createElement("button");
+            baixar.type = "button"; baixar.id = "heroBaixarTodas"; baixar.className = "secondary-button hero-baixar-todas";
+            acoes.insertAdjacentElement("afterend", baixar);
+            baixar.addEventListener("click", () => {
+                const guardadas = obterItensFotos().map((it, i) => ({ it, i })).filter(x => x.it.tipo !== "nova");
+                if (!window.SKLBaixarFotos) return;
+                window.SKLBaixarFotos.baixar(guardadas.map(x => itemParaBaixar(x.it, x.i)),
+                    { botao: baixar, nomeZip: "fotos-" + nomeArquivoImovel(), avisar: toast });
+            });
+        }
+        const qtdGuardadas = itens.filter(it => it.tipo !== "nova").length;
+        baixar.hidden = !window.SKLBaixarFotos || !qtdGuardadas;
+        baixar.textContent = `⬇ Baixar ${qtdGuardadas > 1 ? "todas as " + qtdGuardadas + " fotos" : "a foto"}`;
+        delete baixar.dataset.rotulo;
         mostrarHero(heroIndex);
         atualizarQualidade();
     }

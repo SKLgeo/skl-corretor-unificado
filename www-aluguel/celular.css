@@ -97,3 +97,17 @@
   body.menu-topo .sidebar-user #currentUserRole{grid-column:2}
   body.menu-topo .sidebar-user button{grid-column:3;grid-row:1/3;justify-self:end;font-size:15px}
 }
+
+/* 09/11/2026 (Cerrado, vídeo do iPhone): no celular a tela só rola para cima e para baixo — nada de "andar" para os lados.
+   As faixas que rolam de lado de propósito (fotos, abas, quadro de negócios) continuam rolando dentro delas. */
+@media(max-width:780px){
+  html,body{overflow-x:hidden!important;overscroll-behavior-x:none}
+  body{position:relative;width:100%;max-width:100%}
+  .workspace,.page,.panel,.crm-toolbar{max-width:100%;min-width:0}
+  dialog{overflow-x:hidden!important;overscroll-behavior:contain}
+  dialog > *{max-width:100%;min-width:0}
+  dialog img,dialog table,dialog select,dialog input,dialog textarea{max-width:100%}
+  /* abas do funil (Todos | Venda | Locação | Captação): todas visíveis, sem precisar arrastar */
+  #crmFunilTabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));overflow-x:visible!important;gap:4px;width:100%}
+  #crmFunilTabs button{padding:8px 4px!important;min-width:0;font-size:13px;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
