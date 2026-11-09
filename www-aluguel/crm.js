@@ -2112,6 +2112,9 @@
         } else {
             $("proprietarioEscolherLabel").hidden = true;
             $("propAvisoCorretor").hidden = false;
+            $("propAvisoCorretor").textContent = aprovaProprietario()
+                ? "Depois de enviado, os dados do proprietário ficam só com a Central."
+                : "Você continua vendo o proprietário e pode completar o cadastro dele depois; a Central também vê.";
             if (linkado && !visivel) {
                 // já foi para a Central: o corretor não vê mais os dados
                 $("proprietarioNovo").hidden = true;

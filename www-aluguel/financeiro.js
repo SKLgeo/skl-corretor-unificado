@@ -769,6 +769,7 @@
             Object.assign(c, data);
             ctx.toast(data.administrado ? "Cobranças mensais ligadas neste contrato." : "Contrato em só intermediação. Preencha a comissão abaixo.");
             avisoAdministracao();
+            notaParcelasPg();
             if (window.SKLComissaoContrato) window.SKLComissaoContrato.definirTipo("locacao");
             carregar(true);
         });
@@ -810,7 +811,9 @@
         if (ctTipo === "venda") {
             const valor = num($("finCvValor").value);
             if (valor && parcelasPg.length && Math.abs(valor - total) >= 0.01) partes.push(`o valor da venda é ${dinheiro(valor)} (diferença de ${dinheiro(valor - total)})`);
-        } else partes.push("as cobranças mensais do aluguel continuam automáticas em Cobranças; aqui fica como o contrato é pago (caução parcelada, acordos…)");
+        } else partes.push(administradoCt()
+            ? "as cobranças mensais do aluguel continuam automáticas em Cobranças; aqui fica como o contrato é pago (caução parcelada, acordos…)"
+            : "só intermediação: o inquilino paga os aluguéis direto ao proprietário; aqui fica, se quiser, como o contrato é pago (caução parcelada, acordos…)");
         $("finPgNota").textContent = partes.join(" · ");
     }
     function gerarParcelasPg() {
