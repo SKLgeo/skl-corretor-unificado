@@ -68,9 +68,9 @@
             // campo "vazio" = em branco ou com um valor padrão que o app colocou (data-cep-pode-trocar), ex.: a cidade da imobiliária
             const livre = e => !e.value.trim() || e.dataset.cepPodeTrocar === "1";
             const diferentes = pares.filter(([ e, v ]) => !livre(e) && e.value.trim().toLowerCase() !== v.toLowerCase());
-            pares.forEach(([ e, v ]) => { if (livre(e)) { e.value = v; e.dataset.cepPodeTrocar = ""; e.dispatchEvent(new Event("input", { bubbles: true })); } });
+            pares.forEach(([ e, v ]) => { if (livre(e)) { e.value = v; e.dataset.cepPodeTrocar = ""; e.dispatchEvent(new Event("change", { bubbles: true })); } });
             const resumo = [ r.logradouro, r.bairro, r.cidade && r.uf ? `${r.cidade}/${r.uf}` : r.cidade ].filter(Boolean).join(" · ");
-            const trocar = () => { pares.forEach(([ e, v ]) => { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); }); avisar(`Endereço do CEP: ${resumo}.`, "ok"); if (depois) depois(r); };
+            const trocar = () => { pares.forEach(([ e, v ]) => { e.value = v; e.dispatchEvent(new Event("change", { bubbles: true })); }); avisar(`Endereço do CEP: ${resumo}.`, "ok"); if (depois) depois(r); };
             if (diferentes.length) avisar(`O CEP é de ${resumo}. Mantive o que já estava escrito.`, "aviso", { rotulo: "Usar o endereço do CEP", acao: trocar });
             else avisar(`Endereço do CEP: ${resumo}.${r.logradouro ? "" : " (CEP geral da cidade: escreva a rua.)"}`, "ok");
             const num = el(campos.numero);
