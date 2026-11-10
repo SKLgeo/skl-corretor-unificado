@@ -122,3 +122,17 @@
   dialog label,dialog .form-row>*,dialog fieldset,dialog details{min-width:0;max-width:100%}
   dialog select{min-width:0;text-overflow:ellipsis}
 }
+
+/* 10/11/2026 (print do Android: tela Imóveis cortada à direita). O quadro de busca é uma grade que crescia até o conteúdo
+   mais largo (a linha Todos | Urbanos | Rurais sem quebra), passando da tela. Agora a grade cabe na tela, os botões
+   encolhem e sobra a mesma bordinha dos dois lados. */
+@media(max-width:780px){
+  .busca-painel{grid-template-columns:minmax(0,1fr);max-width:100%}
+  .busca-painel>*{min-width:0;max-width:100%}
+  .busca-painel .segmentado{max-width:100%;box-sizing:border-box;min-width:0}
+  .busca-painel .segmentado button{min-width:0;padding-left:6px;padding-right:6px}
+  .zona-filtro button{font-size:13.5px}
+  .busca-acoes>*{max-width:100%}
+  .busca-acoes .secondary-button,.busca-acoes .primary-button{white-space:normal}
+  .page>*{max-width:100%;min-width:0}
+}
