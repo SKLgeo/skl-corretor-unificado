@@ -60,8 +60,10 @@
         const rua = i.localizacao ? [ e.logradouro, e.numero ].filter(Boolean).join(", ") : "";
         $("local").textContent = [ rua, e.bairro, [ e.cidade, e.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
         const precos = [];
-        if (i.valor_aluguel) precos.push([ "Aluguel", dinheiro(i.valor_aluguel) + "/mês" ]);
-        if (i.valor_venda) precos.push([ "Venda", dinheiro(i.valor_venda) ]);
+        // "a partir de": empreendimento/imóvel com valores que variam (marcado no cadastro)
+        const ap = i.valor_a_partir ? "a partir de " : "";
+        if (i.valor_aluguel) precos.push([ "Aluguel", ap + dinheiro(i.valor_aluguel) + "/mês" ]);
+        if (i.valor_venda) precos.push([ "Venda", ap + dinheiro(i.valor_venda) ]);
         $("precos").innerHTML = "";
         precos.forEach(([ r, v ]) => { const div = document.createElement("div"); div.className = "preco"; div.innerHTML = "<span></span><strong></strong>"; div.firstChild.textContent = r; div.lastChild.textContent = v; $("precos").appendChild(div); });
         const extras = [];

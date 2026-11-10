@@ -103,7 +103,7 @@
             const sb = op.ctx.sb;
             const col = op.tipo === "venda" ? "contrato_venda_id" : "contrato_aluguel_id";
             const filtro = [ c && c.id ? `${col}.eq.${c.id}` : "", negId ? `negociacao_id.eq.${negId}` : "" ].filter(Boolean).join(",");
-            let qRep = c && c.id ? op.ctx.sb.from("comissoes_aluguel").select("id, corretor_id, corretor_nome, beneficiario_nome, valor_comissao, competencia, status, parcela, parcelas, tipo") : null;
+            let qRep = c && c.id ? op.ctx.sb.from("comissoes_aluguel").select("id, corretor_id, corretor_nome, beneficiario_nome, valor_comissao, competencia, status, parcela, parcelas, tipo, pago_em") : null;
             if (qRep) qRep = op.tipo === "venda" ? qRep.eq("contrato_venda_id", c.id) : qRep.eq("contrato_id", c.id).eq("base_tipo", "contrato_locacao");
             const [ a, b ] = await Promise.all([
                 sb.from("crm_comissao_recebiveis").select("id, vencimento, valor, observacao, recebido_em, recebido_sem_data, parcela").or(filtro).order("vencimento"),
@@ -271,19 +271,38 @@
         $("finComRecNota").textContent = partes.join(" · ");
         resumo();
     }
+    // 10/11/2026 (Cerrado: "onde marcar que o corretor já recebeu?"): sem alteração por salvar, a lista mostra os repasses
+    // gravados, cada um com "✓ Paguei" (quem gere o financeiro). Com alteração pendente, é só a prévia até salvar.
+    async function marcarPago(id, botao) {
+        const l = linhas.find(x => x.id === id);
+        if (!l || !window.confirm(`Confirmar que ${l.corretor_nome || l.beneficiario_nome || "a pessoa"} recebeu ${dinheiro(Number(l.valor_comissao))}?`)) return;
+        botao.disabled = true;
+        const pago = new Date().toISOString();
+        const { error } = await op.ctx.sb.from("comissoes_aluguel").update({ status: "paga", pago_em: pago }).eq("id", id);
+        if (error) { botao.disabled = false; op.ctx.toast(op.ctx.traduzErro ? op.ctx.traduzErro(error.message) : error.message); return; }
+        l.status = "paga"; l.pago_em = pago;
+        travado = true;
+        desenhar();
+        op.ctx.toast("Repasse marcado como pago. Aparece como pago em Comissões e no “Minhas comissões” do corretor.");
+    }
     function previa() {
         const box = $("finComPrevia");
-        const futuros = travado ? [] : expandir();
+        const gravadas = !mexeu && linhas.length > 0;
+        const futuros = travado || gravadas ? [] : expandir();
         const pagos = linhas.filter(l => l.status !== "pendente");
-        const lista = travado ? linhas.map(l => ({ nome: l.corretor_nome || l.beneficiario_nome, valor: l.valor_comissao, competencia: l.competencia, status: l.status, parcela: l.parcela, parcelas: l.parcelas }))
+        const lista = travado || gravadas ? linhas.map(l => ({ id: l.id, nome: l.corretor_nome || l.beneficiario_nome, valor: l.valor_comissao, competencia: l.competencia, status: l.status, parcela: l.parcela, parcelas: l.parcelas, pago_em: l.pago_em }))
             : [ ...pagos.map(l => ({ nome: l.corretor_nome || l.beneficiario_nome, valor: l.valor_comissao, competencia: l.competencia, status: l.status, parcela: l.parcela, parcelas: l.parcelas })),
                 ...futuros.map(x => ({ nome: x.tipo === "corretor" ? nomePessoa({ tipo: "corretor", usuario_id: x.usuario_id }) : x.nome, valor: x.valor, competencia: x.competencia, status: "pendente", parcela: x.parcela, parcelas: x.parcelas })) ];
         const somaRep = lista.filter(x => x.status !== "cancelada").reduce((s, x) => s + Number(x.valor || 0), 0);
-        box.innerHTML = lista.length ? `<span class="crm-rotulo">Repasses ${travado ? "lançados" : "que vão para Comissões"}</span>
+        const podePagar = !!(op && op.pode);
+        box.innerHTML = lista.length ? `<span class="crm-rotulo">Repasses ${travado || gravadas ? "lançados" : "que vão para Comissões"}</span>
             <table class="fin-com-tabela"><thead><tr><th>Quem</th><th>Valor</th><th>Paga em</th><th>Situação</th></tr></thead><tbody>
             ${lista.sort((a, b) => String(a.competencia).localeCompare(String(b.competencia))).map(x => `<tr><td>${h(x.nome)}${x.parcelas ? ` <small>${x.parcela}/${x.parcelas}</small>` : ""}</td>
-              <td>${h(dinheiro(Number(x.valor)))}</td><td>${h(dataBr(x.competencia))}</td><td>${h(STATUS[x.status] || x.status)}</td></tr>`).join("")}</tbody></table>
+              <td>${h(dinheiro(Number(x.valor)))}</td><td>${h(dataBr(x.competencia))}</td><td>${x.status === "paga" ? `<span class="fin-com-pago">✓ Paga${x.pago_em ? " em " + h(dataBr(String(x.pago_em).slice(0, 10))) : ""}</span>`
+                : h(STATUS[x.status] || x.status)}${x.id && podePagar && (x.status === "pendente" || x.status === "aprovada") ? ` <button type="button" class="secondary-button fin-mini" data-com-pagar="${h(x.id)}">✓ Paguei</button>` : ""}</td></tr>`).join("")}</tbody></table>
+            ${mexeu && linhas.some(l => l.status === "pendente") ? `<p class="muted-text fin-pg-nota">Salve o contrato para marcar os repasses como pagos.</p>` : ""}
             <p class="muted-text fin-pg-nota">Total repassado: ${h(dinheiro(somaRep))}${total() ? ` · fica com a imobiliária: ${h(dinheiro(total() - somaRep))}` : ""}</p>` : "";
+        box.querySelectorAll("[data-com-pagar]").forEach(b => b.addEventListener("click", () => marcarPago(b.dataset.comPagar, b)));
         resumo();
     }
     function resumo() {

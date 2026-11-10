@@ -46,11 +46,18 @@
   <button class="dialog-close" type="button" data-fechar>×</button>
   <span class="eyebrow">ENVIAR AO CLIENTE</span><h2 id="extEnvTitulo">Imóvel</h2>
   <label><span>Telefone do cliente (WhatsApp)</span><input id="extEnvTel" inputmode="tel" placeholder="(66) 99999-0000" autocomplete="off" /></label>
+  <div class="ext-env-contato">
+    <button id="extEnvAgenda" type="button" class="secondary-button fin-mini" hidden>📇 Buscar na agenda</button>
+    <label class="ext-env-cli"><input id="extEnvCliente" list="extEnvClientes" placeholder="🔎 Buscar cliente cadastrado" autocomplete="off" aria-label="Buscar cliente cadastrado" /></label>
+    <datalist id="extEnvClientes"></datalist>
+  </div>
+  <p class="muted-text ext-env-dica-tel">Sem o número? Deixe em branco: o WhatsApp abre para você escolher o contato.</p>
   <label class="check-inline ext-env-local"><input id="extEnvLocal" type="checkbox" /> Incluir localização do imóvel</label>
   <p id="extEnvLocalDica" class="muted-text ext-env-local-dica"></p>
   <label><span>Mensagem</span><textarea id="extEnvTexto" rows="9"></textarea></label>
   <p id="extEnvAviso" class="muted-text"></p>
-  <div class="dialog-actions"><button id="extEnvFicha" type="button" class="secondary-button">Ficha em PDF</button><button id="extEnvCopiar" type="button" class="secondary-button">Copiar texto</button><button id="extEnvWhats" type="button" class="primary-button">Abrir WhatsApp</button></div>
+  <div class="dialog-actions"><button id="extEnvFicha" type="button" class="secondary-button">Ficha em PDF</button><button id="extEnvCopiar" type="button" class="secondary-button">Copiar texto</button><button id="extEnvFotos" type="button" class="secondary-button" hidden>📷 Enviar com as fotos</button><button id="extEnvWhats" type="button" class="primary-button">Abrir WhatsApp</button></div>
+  <p id="extEnvFotosDica" class="muted-text ext-env-dica-tel" hidden>“Enviar com as fotos” manda as fotos de verdade junto com o texto: escolha o WhatsApp e depois o contato. O texto também fica copiado, para colar se o WhatsApp não trouxer.</p>
 </form></dialog>
 <dialog id="extChaveDialog" class="crm-dialog"><form method="dialog" class="dialog-card">
   <button class="dialog-close" type="button" data-fechar>×</button>
@@ -66,6 +73,10 @@
         document.querySelectorAll("#extPropostaDialog [data-fechar], #extEnviarDialog [data-fechar], #extChaveDialog [data-fechar]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
         $("extPropSalvar").addEventListener("click", salvarProposta);
         $("extEnvWhats").addEventListener("click", abrirWhats);
+        $("extEnvFotos").addEventListener("click", enviarComFotos);
+        $("extEnvAgenda").addEventListener("click", buscarNaAgenda);
+        $("extEnvCliente").addEventListener("change", usarClienteCadastrado);
+        $("extEnvTel").addEventListener("input", rotuloWhats);
         $("extEnvLocal").addEventListener("change", alternarLocalizacao);
         $("extEnvCopiar").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("extEnvTexto").value); ctx.toast("Texto copiado."); } catch { ctx.toast("Selecione o texto e copie."); } });
         $("extEnvFicha").addEventListener("click", () => fichaPdf(imovelAberto));
@@ -342,14 +353,17 @@
         const linhas = [ `🏠 *${c.nome}*${c.codigo ? ` (cód. ${c.codigo})` : ""}` ];
         const local = [ c.bairro, c.cidade ].filter(Boolean).join(" · ");
         if (local) linhas.push(`📍 ${local}`);
+        // o link das fotos vem ANTES do link do mapa: o WhatsApp mostra a prévia (foto) do primeiro link da mensagem
+        if (link) linhas.push(`📸 Fotos e detalhes: ${link}`);
         if (comLocal) {
             const rua = [ c.logradouro, c.numero ].filter(Boolean).join(", ");
             if (rua) linhas.push(`🏷️ ${rua}${c.complemento ? " - " + c.complemento : ""}`);
             if (c.latitude != null && c.longitude != null) linhas.push(`🗺️ Localização: https://www.google.com/maps/search/?api=1&query=${c.latitude},${c.longitude}`);
         }
         const precos = [];
-        if (c.para_aluguel && c.valor_aluguel) precos.push(`Aluguel ${dinheiro(c.valor_aluguel)}`);
-        if (c.para_venda && c.valor_venda) precos.push(`Venda ${dinheiro(c.valor_venda)}`);
+        const ap = c.valor_a_partir ? "a partir de " : "";
+        if (c.para_aluguel && c.valor_aluguel) precos.push(`Aluguel ${ap}${dinheiro(c.valor_aluguel)}`);
+        if (c.para_venda && c.valor_venda) precos.push(`Venda ${ap}${dinheiro(c.valor_venda)}`);
         if (precos.length) linhas.push(`💰 ${precos.join(" | ")}`);
         const extras = [];
         if (c.valor_condominio) extras.push(`condomínio ${dinheiro(c.valor_condominio)}`);
@@ -363,7 +377,6 @@
         if (c.vagas) carac.push(`${c.vagas} vaga(s)`);
         if (carac.length) linhas.push(`📐 ${carac.join(" · ")}`);
         if (c.rural && (c.benfeitorias || []).length) linhas.push(`🏗️ ${c.benfeitorias.map(b => b.nome + (b.detalhe ? " (" + b.detalhe + ")" : "")).join(", ")}`);
-        if (link) linhas.push(``, `Veja fotos e detalhes: ${link}`);
         // assina com o apelido do corretor; sem apelido, com o nome completo (evita confundir dois "Victor Alves")
         const eu = ctx.usuario() || {};
         linhas.push(``, `Posso agendar uma visita? — ${eu.apelido || eu.display_name || ""}, ${ctx.carteiraNome()}`);
@@ -372,7 +385,7 @@
     // Enquanto a mensagem é montada (busca o link do imóvel), os botões ficam travados: antes dava para enviar "Montando…" ao cliente.
     // Leva menos de 1 segundo com internet boa; se passar de 8 s, a mensagem sai sem o link (com a ficha em PDF como alternativa).
     function preparandoEnvio(sim) {
-        [ "extEnvWhats", "extEnvCopiar" ].forEach(id => { const b = $(id); if (b) b.disabled = sim; });
+        [ "extEnvWhats", "extEnvCopiar", "extEnvFotos" ].forEach(id => { const b = $(id); if (b) b.disabled = sim; });
         const t = $("extEnvTexto");
         t.readOnly = sim;
         if (sim) { t.value = ""; t.placeholder = "Preparando a mensagem com o link do imóvel… aguarde um instante."; }
@@ -382,12 +395,24 @@
     async function abrirEnviar(c) {
         $("extEnvTitulo").textContent = `${c.codigo ? c.codigo + " · " : ""}${c.nome}`;
         $("extEnvTel").value = "";
+        $("extEnvCliente").value = "";
+        prepararContatos();
+        rotuloWhats();
         preparandoEnvio(true);
         $("extEnviarDialog").showModal();
         let link = null;
         try {
             link = await comLimite((async () => {
-                let l = window.SKLIntegracoes ? await window.SKLIntegracoes.linkPublico(c.publicar_site ? c.codigo : null) : null;
+                // 10/11/2026: o link vai mesmo sem "Publicar no site". Nesse caso leva uma chave do envio (imovel_envios), que abre
+                // a página só deste imóvel para quem recebeu; a vitrine do site e os portais continuam só com os publicados.
+                let chave = null;
+                if (!c.publicar_site && c.codigo) {
+                    const r = await ctx.sb.rpc("imovel_link_envio", { p_construcao: c.id, p_localizacao: false });
+                    chave = r.error ? null : r.data;
+                }
+                let l = window.SKLIntegracoes && (c.publicar_site || chave)
+                    ? await window.SKLIntegracoes.linkPublico(c.codigo, { semPrevia: !c.publicar_site }) : null;
+                if (l && chave) l += "&e=" + encodeURIComponent(chave);
                 if (l) {
                     // o botão "Falar no WhatsApp" da página pública chama quem enviou o link
                     const { data: eu } = await ctx.sb.from("perfis").select("telefone").eq("id", (ctx.usuario() || {}).id).maybeSingle();
@@ -407,7 +432,10 @@
         $("extEnvTexto").value = textoImovel(c, link, false);
         preparandoEnvio(false);
         $("extEnvAviso").textContent = link ? "O link abre uma página com as fotos e a descrição, sem dados do proprietário."
-            : (c.publicar_site ? "Sem link: a vitrine de imóveis está desligada (Configurações → Site e portais). Use a ficha em PDF." : "Sem link: este imóvel não está marcado \"Publicar no site\". Use a ficha em PDF.");
+            : (!c.codigo ? "Sem link: o imóvel ainda não foi aprovado pela Central. Use a ficha em PDF." : "Sem link: a vitrine de imóveis está desligada (Configurações → Site e portais). Use a ficha em PDF.");
+        const podeFotos = (c.fotos || []).some(f => f && f.path) && podeCompartilharArquivos();
+        $("extEnvFotos").hidden = !podeFotos;
+        $("extEnvFotosDica").hidden = !podeFotos;
     }
     let envioAtual = null;
     // marcar/desmarcar refaz a mensagem; com localização, o link leva uma chave que libera endereço e mapa na página do imóvel
@@ -423,7 +451,7 @@
                 if (error) { ctx.toast(ctx.traduzErro(error.message)); $("extEnvLocal").checked = false; $("extEnvTexto").value = textoImovel(e.c, e.link, false); preparandoEnvio(false); return; }
                 e.chave = data;
             }
-            link += "&e=" + encodeURIComponent(e.chave);
+            link = link.replace(/&e=[^&]*/, "") + "&e=" + encodeURIComponent(e.chave);
         }
         $("extEnvTexto").value = textoImovel(e.c, link, com);
         preparandoEnvio(false);
@@ -434,6 +462,78 @@
         const texto = encodeURIComponent($("extEnvTexto").value);
         const url = d.length >= 10 ? `https://wa.me/55${d}?text=${texto}` : `https://wa.me/?text=${texto}`;
         window.open(url, "_blank", "noopener");
+    }
+    function rotuloWhats() {
+        const d = $("extEnvTel").value.replace(/\D/g, "");
+        $("extEnvWhats").textContent = d.length >= 10 ? "Abrir WhatsApp" : "Escolher o contato no WhatsApp";
+    }
+    // 📇 agenda do celular: só onde o navegador deixa (Chrome no Android). No iPhone o Safari não permite ler a agenda:
+    // lá a pessoa deixa o número em branco e escolhe o contato no próprio WhatsApp.
+    const temAgenda = () => !!(navigator.contacts && navigator.contacts.select);
+    async function buscarNaAgenda() {
+        try {
+            const r = await navigator.contacts.select([ "name", "tel" ], { multiple: false });
+            const tel = r && r[0] && (r[0].tel || [])[0];
+            if (!tel) { if (r && r.length) ctx.toast("Esse contato não tem telefone."); return; }
+            $("extEnvTel").value = String(tel).replace(/^\s*\+?\s*55\s*/, "").trim();
+            rotuloWhats();
+        } catch (e) { if (!(e && e.name === "AbortError")) ctx.toast("Não foi possível abrir a agenda."); }
+    }
+    // 🔎 clientes cadastrados (os que a pessoa vê no CRM) com telefone
+    let clientesEnvio = [];
+    const rotCli = c => `${c.nome} — ${c.telefone}`;
+    function prepararContatos() {
+        $("extEnvAgenda").hidden = !temAgenda();
+        const I = window.SKLCRM && window.SKLCRM.interno;
+        clientesEnvio = I ? [ ...I.clientes.values() ].filter(c => String(c.telefone || "").replace(/\D/g, "").length >= 10)
+            .sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR")) : [];
+        $("extEnvClientes").innerHTML = clientesEnvio.map(c => `<option value="${h(rotCli(c))}"></option>`).join("");
+        $("extEnvCliente").closest(".ext-env-cli").hidden = !clientesEnvio.length;
+    }
+    function usarClienteCadastrado() {
+        const c = clientesEnvio.find(x => rotCli(x) === $("extEnvCliente").value);
+        if (!c) return;
+        $("extEnvTel").value = c.telefone;
+        rotuloWhats();
+    }
+    // 📷 manda as fotos de verdade com o texto (compartilhar do celular → WhatsApp → contato). A prévia do link depende do
+    // WhatsApp; aqui a foto vai garantida. Até 10 fotos (a capa primeiro).
+    function podeCompartilharArquivos() {
+        if (!(navigator.canShare && navigator.share) || !(window.matchMedia && matchMedia("(pointer: coarse)").matches)) return false;
+        try { return navigator.canShare({ files: [ new File([ "x" ], "x.jpg", { type: "image/jpeg" }) ] }); } catch { return false; }
+    }
+    let fotosEnvio = null;
+    async function enviarComFotos() {
+        const e = envioAtual, botao = $("extEnvFotos");
+        if (!e || !$("extEnvTexto").value.trim()) { ctx.toast("Aguarde a mensagem ficar pronta."); return; }
+        const texto = $("extEnvTexto").value;
+        const rotulo = "📷 Enviar com as fotos";
+        try {
+            if (!fotosEnvio || fotosEnvio.id !== e.c.id) {
+                botao.disabled = true; botao.textContent = "Preparando as fotos…";
+                const paths = (e.c.fotos || []).map(f => f && f.path).filter(Boolean).slice(0, 10);
+                const { data } = await ctx.sb.storage.from("fotos-construcoes").createSignedUrls(paths, 600);
+                const arquivos = [];
+                for (const [ i, u ] of (data || []).entries()) {
+                    if (!u || !u.signedUrl) continue;
+                    const r = await fetch(u.signedUrl);
+                    if (!r.ok) continue;
+                    const b = await r.blob();
+                    arquivos.push(new File([ b ], `${e.c.codigo || "imovel"}-${String(i + 1).padStart(2, "0")}.jpg`, { type: b.type || "image/jpeg" }));
+                }
+                if (!arquivos.length) throw new Error("Não foi possível baixar as fotos.");
+                fotosEnvio = { id: e.c.id, arquivos };
+            }
+            botao.disabled = false; botao.textContent = rotulo;
+            try { await navigator.clipboard.writeText(texto); } catch { /* sem permissão de copiar: segue */ }
+            await navigator.share({ files: fotosEnvio.arquivos, text: texto });
+        } catch (err) {
+            botao.disabled = false;
+            if (err && err.name === "AbortError") { botao.textContent = rotulo; return; }
+            if (err && err.name === "NotAllowedError") { botao.textContent = "📲 Toque para enviar as fotos"; return; }
+            botao.textContent = rotulo;
+            ctx.toast((err && err.message) || "Não foi possível enviar as fotos.");
+        }
     }
     async function fichaPdf(c) {
         if (!c || !window.SKLFinanceiro) return;

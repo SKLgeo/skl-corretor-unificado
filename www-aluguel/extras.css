@@ -284,3 +284,31 @@ body.sem-propostas #navPropostas,body.sem-propostas #contaIrPropostas,body.sem-p
   .cfg-abas::-webkit-scrollbar{display:none}
   .cfg-abas button{flex:none;min-height:44px;font-size:15px}
 }
+/* 10/11/2026 — Enviar ao cliente: agenda, clientes cadastrados e "Enviar com as fotos" */
+.ext-env-contato{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 0}
+.ext-env-contato .ext-env-cli{flex:1 1 200px;min-width:0;margin:0}
+.ext-env-contato .ext-env-cli input{width:100%}
+.ext-env-dica-tel{margin:4px 0 8px;font-size:12px}
+/* 10/11/2026 — 🔎 Busca no sistema */
+dialog.busca-sistema{border:0;padding:0;background:transparent;width:min(640px,calc(100% - 24px));max-height:calc(100% - 40px);margin:24px auto auto}
+dialog.busca-sistema::backdrop{background:rgba(6,27,46,.45)}
+.busca-sistema-card{background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(6,27,46,.3);padding:12px;display:flex;flex-direction:column;max-height:calc(100vh - 60px)}
+.busca-sistema-topo{display:flex;gap:8px;align-items:center}
+.busca-sistema-topo input{flex:1;min-width:0;font-size:16px;padding:12px 14px;border-radius:12px}
+.busca-sistema-x{border:0;background:#eef2f3;border-radius:50%;width:38px;height:38px;font-size:22px;line-height:1;flex:none;cursor:pointer}
+.busca-sistema-lista{overflow-y:auto;margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.busca-sistema-grupo{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 2px 0}
+.busca-sistema-dado{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;border:1px solid var(--line);background:#f8fafb;border-radius:12px;padding:9px 12px;cursor:pointer}
+.busca-sistema-dado small{color:var(--muted)}
+.busca-sistema-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.busca-sistema-cab{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.busca-sistema-cab small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.busca-sistema-item details{margin-top:6px}
+.busca-sistema-item summary{cursor:pointer;font-size:12.5px;font-weight:800;color:var(--navy)}
+.busca-sistema-item ol{margin:6px 0 0 18px;padding:0;font-size:13.5px;line-height:1.45}
+.busca-sistema-pop{font-size:12px;color:var(--muted);margin:6px 0 0}
+.busca-sistema-dica{color:var(--muted);font-size:13px;margin:6px 2px}
+.busca-sistema-sug{display:flex;flex-wrap:wrap;gap:6px}
+.busca-sistema-sug button{border:1px solid var(--line);background:#f4f7f8;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+@media(max-width:780px){dialog.busca-sistema{margin-top:10px;width:calc(100% - 16px)}.busca-sistema-botao{padding-left:12px;padding-right:12px}}
+.busca-sistema-cab .primary-button{white-space:nowrap;flex:none}

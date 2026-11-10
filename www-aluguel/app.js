@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.18.6";
+    const APP_VERSION = "0.19.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -88,7 +88,7 @@
     let pickerMarker = null;
 
     let finalidadeFiltro = "todos";
-    let zonaFiltro = "urbano";
+    let zonaFiltro = "todos";   // 10/11/2026: padrão mostra urbanos e rurais juntos
     let perimetroAtual = null;
     let perimetroNome = null;
     let perimetroAreaM2 = null;
@@ -243,6 +243,8 @@
             definirZonaImovel(b.dataset.zona === "rural", true);
             atualizarQualidade();
         }));
+        if (window.SKLCep) window.SKLCep.ligar({ cep: "cepInput", logradouro: "logradouroInput", numero: "numeroInput", bairro: "bairroInput", cidade: "cidadeInput", uf: "ufInput", aviso: "cepAviso" },
+            () => atualizarQualidade());
         $("zonaFiltro").querySelectorAll("[data-zona]").forEach(b => b.addEventListener("click", () => {
             zonaFiltro = b.dataset.zona;
             $("zonaFiltro").querySelectorAll("[data-zona]").forEach(x => x.classList.toggle("ativo", x === b));
@@ -1042,6 +1044,7 @@
         if (window.SKLFuncoes) await seguro("funções da imobiliária", () => window.SKLFuncoes.iniciar(contextoExtras()));
         if (window.SKLFinanceiro) await seguro("financeiro", () => window.SKLFinanceiro.iniciar(contextoFinanceiro()));
         if (window.SKLPainel) await seguro("painel", () => window.SKLPainel.iniciar({ ...contextoFinanceiro(), showPage }));
+        if (window.SKLBusca) await seguro("busca no sistema", () => window.SKLBusca.iniciar({ ...contextoExtras(), showPage, abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); } }));
         if (window.SKLFiscal) await seguro("fiscal", () => window.SKLFiscal.iniciar(contextoFinanceiro()));
         if (window.SKLConciliacao) await seguro("extrato do banco", () => window.SKLConciliacao.iniciar(contextoFinanceiro()));
         if (window.SKLContabil) await seguro("contabilidade", () => window.SKLContabil.iniciar(contextoFinanceiro()));
@@ -1249,7 +1252,7 @@
         return [ ...construcoes.values() ].filter(imovelVisivelNaBusca);
     }
     function passaFinalidade(c) {
-        if (!!c.rural !== (zonaFiltro === "rural")) return false;
+        if (zonaFiltro !== "todos" && !!c.rural !== (zonaFiltro === "rural")) return false;
         if (finalidadeFiltro === "aluguel") return c.para_aluguel !== false;
         if (finalidadeFiltro === "venda") return !!c.para_venda;
         return true;
@@ -1537,9 +1540,12 @@
         return !!window.SKLPerfis && meusPerfis().length > 0 && window.SKLPerfis.combina(meusPerfis(), window.SKLPerfis.doImovel(c));
     }
 
+    // "a partir de": imóvel/empreendimento com valores que variam (marcado no cadastro)
+    const aPartir = c => c && c.valor_a_partir ? "a partir de " : "";
     function precoCard(c) {
-        const aluguel = c.para_aluguel !== false && c.valor_aluguel ? `${precoCurto(c.valor_aluguel)}<small>aluguel/mês</small>` : "";
-        const venda = c.para_venda && c.valor_venda ? `${precoCurto(c.valor_venda)}<small>venda</small>` : "";
+        const ap = c.valor_a_partir ? `<small class="a-partir">a partir de</small>` : "";
+        const aluguel = c.para_aluguel !== false && c.valor_aluguel ? `${ap}${precoCurto(c.valor_aluguel)}<small>aluguel/mês</small>` : "";
+        const venda = c.para_venda && c.valor_venda ? `${ap}${precoCurto(c.valor_venda)}<small>venda</small>` : "";
         if (finalidadeFiltro === "aluguel") return aluguel || "—";
         if (finalidadeFiltro === "venda") return venda || "—";
         return [ venda, aluguel ].filter(Boolean).map(p => `<span>${p}</span>`).join("") || "—";
@@ -1685,7 +1691,7 @@
         $("cadastrosLista").innerHTML = lista.map(c => {
             const q = qualidadeImovel(c);
             const mostrarNota = gerencia || c.aprovacao !== "aprovado";
-            const preco = [ c.para_venda && c.valor_venda ? "Venda " + precoCurto(c.valor_venda) : "", c.para_aluguel !== false && c.valor_aluguel ? "Aluguel " + precoCurto(c.valor_aluguel) : "" ].filter(Boolean).join(" · ");
+            const preco = [ c.para_venda && c.valor_venda ? "Venda " + aPartir(c) + precoCurto(c.valor_venda) : "", c.para_aluguel !== false && c.valor_aluguel ? "Aluguel " + aPartir(c) + precoCurto(c.valor_aluguel) : "" ].filter(Boolean).join(" · ");
             const linha2 = gerencia
                 ? `${fotoDoUsuario(c.cadastrado_por, 24)} Corretor: ${h(nomeDoUsuario(c.cadastrado_por))}${c.enviado_em ? " · enviado em " + h(formatDate(c.enviado_em)) : ""}`
                 : `Atualizado em ${h(formatDate(c.updated_at))}`;
@@ -1871,6 +1877,19 @@
     // depois de tocar em "Destravar edição". Imóvel novo e cadastro aguardando aprovação já abrem para editar.
 
     // "Proposta de negócios" → "Cadastrar na Central": abre o cadastro de imóvel novo já preenchido com os dados e as fotos da proposta
+    // cidade e UF que mais aparecem nos imóveis da carteira (padrão do imóvel novo)
+    function cidadePadrao() {
+        const conta = new Map();
+        construcoes.forEach(c => {
+            const cid = String(c.cidade || "").trim(), uf = String(c.uf || "").trim().toUpperCase();
+            if (!cid || !uf) return;
+            const k = cid.toLowerCase() + "|" + uf;
+            const r = conta.get(k) || { cidade: cid, uf, n: 0 }; r.n++; conta.set(k, r);
+        });
+        let melhor = null;
+        conta.forEach(r => { if (!melhor || r.n > melhor.n) melhor = r; });
+        return melhor && melhor.n >= 2 ? melhor : null;
+    }
     function novoImovelPreenchido(d, arquivos) {
         openConstrucaoDialog(null);
         const venda = d.finalidade !== "aluguel";
@@ -1937,6 +1956,7 @@
         $("areaUnidadeInput").value = unidadeArea;
         $("construcaoValorInput").value = construcao?.valor_aluguel != null ? formatMoney(construcao.valor_aluguel) : "";
         $("construcaoValorVendaInput").value = construcao?.valor_venda != null ? formatMoney(construcao.valor_venda) : "";
+        $("valorAPartirInput").checked = !!construcao?.valor_a_partir;
         $("construcaoCodigoInput").value = construcao?.codigo || "";
         $("construcaoEdificioInput").value = construcao?.edificio || "";
         $("condominioTipoInput").value = construcao?.condominio_tipo || "";
@@ -1956,8 +1976,13 @@
         $("numeroInput").value = construcao?.numero || "";
         $("complementoInput").value = construcao?.complemento || "";
         $("bairroInput").value = construcao?.bairro || "";
-        $("cidadeInput").value = construcao?.cidade || "";
-        $("ufInput").value = construcao?.uf || "";
+        // imóvel novo já vem com a cidade/UF mais comum da carteira (ex.: Rondonópolis/MT na Cerrado); dá para trocar
+        const padraoLocal = construcao ? null : cidadePadrao();
+        $("cidadeInput").value = construcao ? (construcao.cidade || "") : (padraoLocal ? padraoLocal.cidade : "");
+        $("ufInput").value = construcao ? (construcao.uf || "") : (padraoLocal ? padraoLocal.uf : "");
+        // a cidade/UF padrão pode ser trocada pelo CEP sem perguntar (só o que a pessoa escreveu é mantido)
+        [ "cidadeInput", "ufInput" ].forEach(id => { $(id).dataset.cepPodeTrocar = !construcao && padraoLocal ? "1" : ""; });
+        if (window.SKLCep) window.SKLCep.limpar("cepInput");
         $("construcaoDescricaoInput").value = construcao?.descricao || "";
         $("destaqueInput").checked = !!construcao?.destaque;
         $("publicarSiteInput").checked = !!construcao?.publicar_site;
@@ -2297,8 +2322,9 @@
     // Ficha só-leitura (corretor vendo imóvel aprovado), com as características em blocos como no app de prédios.
     function renderFichaLeitura(c) {
         const precos = [];
-        if (c.para_venda) precos.push(`<div class="preco-bloco"><span>Venda</span><strong>${h(formatMoney(c.valor_venda))}</strong></div>`);
-        if (c.para_aluguel !== false) precos.push(`<div class="preco-bloco"><span>Aluguel</span><strong>${h(formatMoney(c.valor_aluguel))}</strong><small>por mês</small></div>`);
+        const apT = c.valor_a_partir ? " (a partir de)" : "";
+        if (c.para_venda) precos.push(`<div class="preco-bloco"><span>Venda${apT}</span><strong>${h(formatMoney(c.valor_venda))}</strong></div>`);
+        if (c.para_aluguel !== false) precos.push(`<div class="preco-bloco"><span>Aluguel${apT}</span><strong>${h(formatMoney(c.valor_aluguel))}</strong><small>por mês</small></div>`);
         $("fichaPrecos").innerHTML = precos.join("");
         const custo = (tipo, valor, periodo) => tipo === "valor" ? `${precoCurto(valor)}${periodo}` : tipo === "incluso" ? "Incluso no valor" : tipo === "nao_tem" ? "Não tem" : "Não informado";
         const plural = (n, um, varios) => `${n ?? "—"} ${n === 1 ? um : varios}`;
@@ -2385,6 +2411,7 @@
             para_venda: venda,
             valor_aluguel: aluguel ? parseValor($("construcaoValorInput").value) : null,
             valor_venda: venda ? parseValor($("construcaoValorVendaInput").value) : null,
+            valor_a_partir: $("valorAPartirInput").checked,
             codigo: $("construcaoCodigoInput").value.trim() || null,
             edificio: rural ? null : ($("construcaoEdificioInput").value.trim() || null),
             condominio_tipo: rural ? null : (condominioTipo || null),
@@ -2491,44 +2518,13 @@
 
     // Latitude/longitude digitadas aceitam vírgula ou ponto ("-16,467108"); fora da faixa vira NaN (não salva lixo)
     function lerCoord(id) {
-        const v = parseFloat(String($(id).value || "").trim().replace(",", "."));
-        const limite = id === "construcaoLatInput" ? 90 : 180;
-        return Number.isFinite(v) && Math.abs(v) <= limite ? v : NaN;
+        return window.SKLCoordenadas.numero($(id).value, id === "construcaoLatInput" ? 90 : 180);
     }
 
-    // Reconhece a coordenada no que foi colado: link completo do Google Maps (@lat,lng, /search/lat,lng, !3d..!4d..,
-    // q=/ll=/query=/destination=), coordenada solta ("-16.467108, -54.614374" ou com vírgula decimal) ou em graus
-    // (16°28'01.6"S 54°36'51.7"W). Link curto (maps.app.goo.gl) não traz a coordenada no texto: aplicarLinkMapa
-    // pede ao servidor (função resolver-link-mapa) para seguir o link.
-    function extrairCoordenadasDeLink(texto) {
-        if (!texto) return null;
-        let t = texto;
-        try { t = decodeURIComponent(texto); } catch (e) { /* usa o texto como veio */ }
-        t = t.replace(/\+/g, " ");
-        const N = "(-?\d{1,3}(?:\.\d+)?)";
-        const padroes = [
-            new RegExp(`!3d${N}!4d${N}`),
-            new RegExp(`@${N},\s*${N}`),
-            new RegExp(`/(?:search|place|dir)/${N},\s*${N}`),
-            new RegExp(`[?&](?:q|ll|query|center|destination|daddr)=(?:loc:)?${N},\s*${N}`),
-            /^\s*(-?\d{1,3}[.,]\d+)\s*[,;\s]\s*(-?\d{1,3}[.,]\d+)\s*$/
-        ];
-        const valida = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
-        for (const padrao of padroes) {
-            const m = t.match(padrao);
-            if (!m) continue;
-            const lat = parseFloat(m[1].replace(",", ".")), lng = parseFloat(m[2].replace(",", "."));
-            if (valida(lat, lng)) return { lat, lng };
-        }
-        const gms = /(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.,]+)["″]?\s*([NS])[\s,]+(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.,]+)["″]?\s*([LOEW])/i.exec(t);
-        if (gms) {
-            const grau = (g, m, s, h) => (Number(g) + Number(m) / 60 + parseFloat(s.replace(",", ".")) / 3600) * (/[SOW]/i.test(h) ? -1 : 1);
-            const lat = grau(gms[1], gms[2], gms[3], gms[4]), lng = grau(gms[5], gms[6], gms[7], gms[8]);
-            if (valida(lat, lng)) return { lat, lng };
-        }
-        return null;
-    }
-
+    // Coordenada colada no campo "Link do Google Maps ou coordenada" (regras em coordenadas.js).
+    // Link sem o ponto do lugar no texto (link curto do botão Compartilhar, link do iPhone com ?g_st=ic, link só com
+    // @centro da tela) vai para o servidor (função resolver-link-mapa), que acha o ponto DO LUGAR no Google.
+    // Se nada confiável for achado, a localização do imóvel NÃO muda e a pessoa é avisada.
     function aplicarCoordenada(lat, lng) {
         $("construcaoLatInput").value = lat.toFixed(6);
         $("construcaoLngInput").value = lng.toFixed(6);
@@ -2538,36 +2534,53 @@
         }
         atualizarBotoesMapa();
     }
+    function avisoLink(texto, tipo) {
+        const msg = $("construcaoLinkMapaMensagem");
+        msg.textContent = texto;
+        const cores = { ok: [ "#dff4e8", "#247346" ], aviso: [ "#fff4dc", "#8a5a00" ], erro: [ "#f7e8e6", "#9a3b34" ] }[tipo] || [ "#f7e8e6", "#9a3b34" ];
+        msg.style.background = cores[0];
+        msg.style.color = cores[1];
+        msg.hidden = false;
+    }
+    const fmtCoord = c => `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+    function marcarDoLink(c, nome) {
+        aplicarCoordenada(c.lat, c.lng);
+        if (c.fonte === "centro_do_link") {
+            avisoLink(`Posição aproximada: ${fmtCoord(c)}. Esse link só traz o centro do mapa de quem compartilhou, não o ponto do imóvel. Confira no mapa e arraste o marcador até o lugar certo.`, "aviso");
+        } else {
+            avisoLink(`Localização marcada: ${fmtCoord(c)}${nome ? ` — ${nome}` : ""}. Confira o ponto no mapa.`, "ok");
+        }
+        const detalhes = document.querySelector("#construcaoDialog .coordenada-details");
+        if (detalhes && !detalhes.open) { detalhes.open = true; setTimeout(() => { if (pickerMap) { pickerMap.invalidateSize(); pickerMap.setView([ c.lat, c.lng ], 16); } }, 80); }
+    }
+    const SEM_MUDAR = " A localização do imóvel não foi alterada.";
 
     let linkMapaPedido = 0;
     async function aplicarLinkMapa() {
+        const C = window.SKLCoordenadas;
         const texto = $("construcaoLinkMapaInput").value.trim();
-        const msg = $("construcaoLinkMapaMensagem");
-        if (!texto) { msg.hidden = true; return; }
-        const coordenadas = extrairCoordenadasDeLink(texto);
-        if (coordenadas) {
-            aplicarCoordenada(coordenadas.lat, coordenadas.lng);
-            showMessage(msg, `Localização marcada: ${coordenadas.lat.toFixed(6)}, ${coordenadas.lng.toFixed(6)}`, true);
-            return;
-        }
-        const ehGoogle = /^https?:\/\/([a-z0-9-]+\.)*(goo\.gl|g\.co|google\.com(\.br)?)\//i.test(texto);
-        if (!ehGoogle) {
-            showMessage(msg, "Não achei a localização nesse texto. Cole o link do Google Maps (pode ser o link curto do botão Compartilhar), digite a latitude e a longitude abaixo ou toque no mapa.");
-            return;
-        }
         const meu = ++linkMapaPedido;
-        showMessage(msg, "Buscando a localização do link…", true);
+        if (!texto) { $("construcaoLinkMapaMensagem").hidden = true; return; }
+        const direto = C.ler(texto);
+        if (direto) { marcarDoLink(direto); return; }
+        if (!C.ehLinkGoogle(texto)) {
+            avisoLink((C.ehLink(texto) ? "Esse link não é do Google Maps." : "Não achei uma coordenada nesse texto.") +
+                " Cole o link do Google Maps (pode ser o link curto do botão Compartilhar), digite a latitude e a longitude abaixo ou toque no mapa." + SEM_MUDAR, "erro");
+            return;
+        }
+        avisoLink("Buscando a localização do link…", "ok");
+        let resposta = null;
         try {
             const { data, error } = await sb.functions.invoke("resolver-link-mapa", { body: { url: texto } });
-            if (meu !== linkMapaPedido) return;
-            const c = !error && data && Number.isFinite(data.lat) ? data : (data && data.url ? extrairCoordenadasDeLink(data.url) : null);
-            if (!c) throw new Error("sem coordenada");
-            aplicarCoordenada(c.lat, c.lng);
-            showMessage(msg, `Localização marcada: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`, true);
-        } catch (e) {
-            if (meu !== linkMapaPedido) return;
-            showMessage(msg, "Não consegui achar a localização nesse link. Digite a latitude e a longitude abaixo ou toque no mapa no ponto do imóvel.");
-        }
+            if (!error) resposta = data;
+        } catch (e) { /* sem internet ou servidor fora: trata abaixo */ }
+        if (meu !== linkMapaPedido) return;   // a pessoa já colou outro link
+        const doServidor = resposta && C.valida(resposta.lat, resposta.lng)
+            ? { lat: resposta.lat, lng: resposta.lng, fonte: resposta.fonte || "lugar" } : null;
+        const c = doServidor || (resposta && resposta.url ? C.ler(resposta.url) : null) || C.centroDoLink(texto);
+        if (c) { marcarDoLink(c, resposta && resposta.nome); return; }
+        avisoLink((resposta ? "Esse link do Google não traz o ponto do imóvel." : "Não consegui consultar o link agora (sem internet?).") +
+            " Abra o lugar no Google Maps, toque em Compartilhar e cole o link de novo, digite a latitude e a longitude abaixo ou toque no mapa no ponto do imóvel." + SEM_MUDAR, "erro");
     }
 
     function obterItensFotos() {
@@ -2784,6 +2797,12 @@
         if (!dados.nome) { showMessage(mensagem, "Informe o nome do anúncio."); return; }
         if (dados.para_aluguel && $("construcaoValorInput").value.trim() && dados.valor_aluguel == null) { showMessage(mensagem, "Valor do aluguel inválido."); return; }
         if (dados.para_venda && $("construcaoValorVendaInput").value.trim() && dados.valor_venda == null) { showMessage(mensagem, "Valor de venda inválido."); return; }
+        // localização pela metade ou fora da faixa não é gravada (nem vira só latitude ou só longitude)
+        if (($("construcaoLatInput").value.trim() || $("construcaoLngInput").value.trim()) && (dados.latitude == null || dados.longitude == null)) {
+            showMessage(mensagem, "Localização inválida: a latitude vai de -90 a 90 e a longitude de -180 a 180 (ex.: -16.476190 e -54.617013). Corrija ou apague as duas em Coordenada e mapa.");
+            const det = document.querySelector("#construcaoDialog .coordenada-details"); if (det) det.open = true;
+            return;
+        }
         const botoes = [ "saveConstrucaoButton", "enviarCadastroButton", "aprovarCadastroButton" ].map($);
         botoes.forEach(b => { b.disabled = true; });
         let salvo = false;

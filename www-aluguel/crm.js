@@ -1126,6 +1126,12 @@
         $("crmCliTelefone").value = c ? formatarTelefone(c.telefone) : "";
         $("crmCliEmail").value = c ? c.email || "" : "";
         $("crmCliCpf").value = c ? c.cpf || "" : "";
+        // endereço do cliente (10/11/2026): CEP preenche rua, bairro, cidade e UF
+        const end = (c && c.endereco) || {};
+        [ [ "crmCliCep", "cep" ], [ "crmCliRua", "logradouro" ], [ "crmCliNumero", "numero" ], [ "crmCliCompl", "complemento" ],
+          [ "crmCliBairro", "bairro" ], [ "crmCliCidade", "cidade" ], [ "crmCliUf", "uf" ] ].forEach(([ id, k ]) => { $(id).value = end[k] || ""; });
+        $("crmCliEndBox").open = Object.keys(end).length > 0;
+        if (window.SKLCep) { window.SKLCep.ligar({ cep: "crmCliCep", logradouro: "crmCliRua", numero: "crmCliNumero", bairro: "crmCliBairro", cidade: "crmCliCidade", uf: "crmCliUf", aviso: "crmCliCepAviso" }); window.SKLCep.limpar("crmCliCep"); }
         $("crmCliOrigem").value = c && c.origem && ORIGENS.includes(c.origem) ? c.origem : (c && c.origem ? "Outro" : "");
         $("crmCliObs").value = c ? c.observacoes || "" : "";
         $("crmCliLgpd").checked = !!(c && c.consentimento_lgpd);
@@ -1297,6 +1303,14 @@
         $("crmCliBarra").style.width = q.pct + "%";
         $("crmCliFalta").textContent = q.faltando.length ? "Para completar: " + q.faltando.join(", ") + "." : "Cadastro completo.";
     }
+    function lerEnderecoCliente() {
+        const v = {};
+        [ [ "crmCliCep", "cep" ], [ "crmCliRua", "logradouro" ], [ "crmCliNumero", "numero" ], [ "crmCliCompl", "complemento" ],
+          [ "crmCliBairro", "bairro" ], [ "crmCliCidade", "cidade" ], [ "crmCliUf", "uf" ] ].forEach(([ id, k ]) => {
+            const t = $(id).value.trim(); if (t) v[k] = k === "uf" ? t.toUpperCase().slice(0, 2) : t;
+        });
+        return v;
+    }
     async function salvarCliente(ignorarDuplicado) {
         const dados = coletarCliente();
         if (!dados.nome) { msg($("crmCliMsg"), "Informe o nome do cliente."); return; }
@@ -1318,6 +1332,11 @@
                     const r = await ctx.sb.rpc("crm_definir_ficha_cliente", { p_cliente: data.id, p_ficha: ficha });
                     if (r.error) ctx.toast(erro(r.error)); else data.ficha = r.data;
                 }
+            }
+            const endNovo = lerEnderecoCliente();
+            if (JSON.stringify(endNovo) !== JSON.stringify(data.endereco || {})) {
+                const r = await ctx.sb.rpc("crm_definir_endereco_cliente", { p_cliente: data.id, p_endereco: endNovo });
+                if (r.error) ctx.toast(erro(r.error)); else data.endereco = r.data;
             }
             clientes.set(data.id, data);
             const callback = aoSalvarCliente;

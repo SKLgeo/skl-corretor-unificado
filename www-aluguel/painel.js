@@ -180,6 +180,10 @@
         try { ind = await indicadores(periodo); } catch (e) { grade.innerHTML = `<p class="pg-carregando">${h(ctx.traduzErro(e.message))}</p>`; return; }
         const met = await ctx.sb.rpc("metas_painel", { p_carteira: ctx.carteiraId(), p_ano: ref.ano, p_trimestre: tri });
         if (window.SKLFinGestao && window.SKLFinGestao.carregar) await window.SKLFinGestao.carregar();
+        // contratos do Financeiro (entram no VGV, negócios fechados e gráficos): garante que estão carregados
+        if (window.SKLFinanceiro && window.SKLFinanceiro.carregar && (!ctx.pode || ctx.pode("ver_financeiro"))) {
+            try { await window.SKLFinanceiro.carregar(true); } catch (e) { /* sem o financeiro, o painel segue só com os negócios */ }
+        }
         ultimo = { ind, metas: met.data || null, tri, ano: ref.ano };
         desenhar(ultimo);
     }
@@ -198,11 +202,38 @@
         if (!I) return [];
         const regra = window.SKLComissoes && (window.SKLComissoes.regras() || []).find(r => r.padrao);
         const hon = regra && regra.honorarios_venda_pct != null ? Number(regra.honorarios_venda_pct) : 6;
-        return [ ...I.negs.values() ].filter(n => n.situacao === "ganha" && n.fechado_em).map(n => {
+        const lista = [ ...I.negs.values() ].filter(n => n.situacao === "ganha" && n.fechado_em).map(n => {
             const f = I.funil(n.funil_id), fin = f && f.finalidade;
             const vgc = n.comissao_total != null ? Number(n.comissao_total) : fin === "venda" ? Number(n.valor || 0) * hon / 100 : Number(n.valor || 0);
             return { id: n.id, fin, dia: isoLocal(n.fechado_em), valor: Number(n.valor || 0), vgc, neg: n };
         }).filter(n => n.fin === "venda" || n.fin === "locacao");
+        return lista.concat(contratosSemNegocio(hon));
+    }
+    // 10/11/2026 (Cerrado): contratos lançados direto no Financeiro (sem negócio no CRM) também contam no Painel.
+    // Venda: data do contrato, valor de venda e a comissão do contrato (R$, senão %, senão os honorários da regra).
+    // Locação: início, aluguel e o 1º aluguel × intermediação. Cancelados ficam de fora. Com negócio ligado, o negócio já conta.
+    function contratosSemNegocio(hon) {
+        const F = window.SKLFinanceiro;
+        if (!F || !F.contratos || (ctx.pode && !ctx.pode("ver_financeiro"))) return [];
+        const I = window.SKLCRM && window.SKLCRM.interno;
+        const funilDe = fin => I && (I.funis() || []).find(f => f.finalidade === fin);
+        const num = v => v == null || v === "" ? null : Number(v);
+        const out = [];
+        (F.vendas ? F.vendas() : []).forEach(c => {
+            if (c.negociacao_id || c.status === "cancelado" || !c.data_contrato) return;
+            const valor = num(c.valor_venda) || 0;
+            const vgc = num(c.comissao_valor) != null ? num(c.comissao_valor) : num(c.comissao_pct) != null ? valor * num(c.comissao_pct) / 100 : valor * hon / 100;
+            out.push({ id: "cv-" + c.id, fin: "venda", dia: String(c.data_contrato).slice(0, 10), valor, vgc, contrato: true,
+                neg: { construcao_id: c.construcao_id, valor, funil_id: (funilDe("venda") || {}).id, corretor_id: c.corretor_id } });
+        });
+        (F.contratos() || []).forEach(c => {
+            if (c.negociacao_id || c.status === "cancelado" || !c.inicio) return;
+            const valor = num(c.valor_aluguel) || 0;
+            const vgc = valor * (num(c.taxa_intermediacao_pct) != null ? num(c.taxa_intermediacao_pct) : 100) / 100;
+            out.push({ id: "cl-" + c.id, fin: "locacao", dia: String(c.inicio).slice(0, 10), valor, vgc, contrato: true,
+                neg: { construcao_id: c.construcao_id, valor, funil_id: (funilDe("locacao") || {}).id, corretor_id: c.corretor_id } });
+        });
+        return out;
     }
     function mesesDoPeriodo(ini, fim, lista) {
         let [ a, m ] = ini.split("-").map(Number);

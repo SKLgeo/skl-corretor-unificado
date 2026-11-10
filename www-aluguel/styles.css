@@ -270,7 +270,7 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .cadastro-lado{display:grid;gap:6px;justify-items:end}
 
 @media(max-width:780px){
-  .caracteristicas-grid{grid-template-columns:repeat(3,1fr)}
+  .caracteristicas-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .endereco-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .endereco-grid>label{grid-column:span 1}
   .endereco-grid>label.largo{grid-column:span 2}
@@ -297,9 +297,10 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .lote-check{flex-wrap:wrap}
 .lote-check small{color:var(--muted);font-weight:600}
 .caracteristicas-grid .area-campo{grid-column:span 2;min-width:0}
-.area-com-unidade{display:flex;gap:6px}
+.area-campo{min-width:0}
+.area-com-unidade{display:flex;gap:6px;min-width:0;max-width:100%}
 .area-com-unidade input{flex:1;min-width:0}
-.area-com-unidade select{width:auto;max-width:58%;flex:none;padding-left:8px;padding-right:8px}
+.area-com-unidade select{width:auto;max-width:58%;min-width:0;flex:0 1 auto;text-overflow:ellipsis;padding-left:8px;padding-right:8px}
 .area-conversao{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-top:3px;min-height:15px}
 .perimetro-bloco{border:1px dashed #c9a43b;background:#fffaf0;border-radius:12px;padding:10px 12px}
 .perimetro-bloco .muted-text{margin:4px 0 8px}
@@ -382,3 +383,13 @@ dialog.foto-lightbox::backdrop{background:rgba(4,16,22,.92)}
 .hero-baixar-todas{margin:6px 0 2px}
 .hero-baixar-todas[hidden]{display:none}
 .foto-lightbox-baixar{position:absolute;left:14px;bottom:14px;z-index:3;border:0;border-radius:999px;padding:10px 16px;background:rgba(255,255,255,.92);color:#12303a;font:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.a-partir{display:block;font-size:10.5px;font-weight:600;opacity:.85;line-height:1.1}
+.valor-a-partir-check{margin:-4px 0 12px}
+.zona-filtro button{padding-left:11px;padding-right:11px;white-space:nowrap}
+/* 10/11/2026 — aviso da busca do CEP */
+.cep-aviso{margin:6px 0 0;font-size:12.5px;padding:7px 10px;border-radius:8px;background:#eef4f6;color:#30505c}
+.cep-aviso.ok{background:#dff4e8;color:#247346}
+.cep-aviso.aviso{background:#fff4dc;color:#8a5a00}
+.cep-aviso.erro{background:#f7e8e6;color:#9a3b34}
+.cep-aviso .text-button{font-size:12.5px;font-weight:800}
+.crm-cli-endereco{margin:2px 0 12px}

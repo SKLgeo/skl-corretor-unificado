@@ -231,3 +231,4 @@ body.ct-sem-admin #finCtLocacaoCampos [data-admin]{display:none!important}
 body.sem-contrato_garantia_itens #finCtLocacaoCampos [data-garantia-itens]{display:none!important}
 .fin-ct-admin-aviso{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
 .fin-ct-admin-aviso[hidden]{display:none}
+.fin-com-pago{color:#247346;font-weight:700}

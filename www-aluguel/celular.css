@@ -111,3 +111,14 @@
   #crmFunilTabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));overflow-x:visible!important;gap:4px;width:100%}
   #crmFunilTabs button{padding:8px 4px!important;min-width:0;font-size:13px;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* 10/11/2026 (Cerrado, 2º vídeo: janela "Novo imóvel" ainda andava de lado no iPhone). Causa: a linha da Área com o seletor
+   "Metros quadrados (m²)" ficava mais larga que a janela (grade sem minmax(0,…)); o overflow-x:hidden do <dialog> não
+   impede o arrasto lateral no Safari. Agora: nenhum campo passa da largura, o lado sobrando é cortado (clip) e o gesto
+   na janela só rola para cima e para baixo (faixas que rolam de lado, como as fotos, têm a própria rolagem). */
+@media(max-width:780px){
+  dialog{overflow-x:clip!important}
+  dialog:not(.foto-lightbox){touch-action:pan-y}
+  dialog label,dialog .form-row>*,dialog fieldset,dialog details{min-width:0;max-width:100%}
+  dialog select{min-width:0;text-overflow:ellipsis}
+}

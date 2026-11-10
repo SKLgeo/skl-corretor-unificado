@@ -174,13 +174,14 @@ fetch("${BASE_FUNCOES}imobiliaria-leads", {
         carregar();
     }
     // usado pelo "Enviar ao cliente" do imóvel
-    async function linkPublico(codigo) {
+    // semPrevia: imóvel fora da vitrine (sem "Publicar no site") não tem a página fixa i/<código>.html; vai direto à página do imóvel
+    async function linkPublico(codigo, { semPrevia = false } = {}) {
         if (!codigo) return null;
         const { data: token } = await ctx.sb.rpc("integracao_link_publico", { p_carteira: ctx.carteiraId() });
         if (!token) return null;
         // link do cliente com prévias fixas (i/<código>.html): o WhatsApp mostra a foto e o nome do imóvel
         const M = window.SKL_MARCA || {};
-        if (M.previas && M.link && /^[A-Za-z0-9_-]+$/.test(codigo)) return `${M.link}i/${codigo}.html?f=${encodeURIComponent(token)}`;
+        if (!semPrevia && M.previas && M.link && /^[A-Za-z0-9_-]+$/.test(codigo)) return `${M.link}i/${codigo}.html?f=${encodeURIComponent(token)}`;
         return `${PAGINA_IMOVEL}?f=${encodeURIComponent(token)}&c=${encodeURIComponent(codigo)}`;
     }
 

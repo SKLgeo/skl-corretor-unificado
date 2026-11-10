@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://xigwlofqkmiibzbongkn.supabase.co wss://xigwlofqkmiibzbongkn.supabase.co; font-src 'self' data:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://xigwlofqkmiibzbongkn.supabase.co wss://xigwlofqkmiibzbongkn.supabase.co https://viacep.com.br https://brasilapi.com.br; font-src 'self' data:;" />
   <title>SKL Gestão imobiliária</title>
   <meta name="theme-color" content="#06202f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -199,7 +199,8 @@
               <button type="button" data-finalidade="todos" class="ativo">Todos</button>
             </div>
             <div id="zonaFiltro" class="segmentado zona-filtro" role="group" aria-label="Urbanos ou rurais">
-              <button type="button" data-zona="urbano" class="ativo">🏙️ Urbanos</button>
+              <button type="button" data-zona="todos" class="ativo">Todos</button>
+              <button type="button" data-zona="urbano">🏙️ Urbanos</button>
               <button type="button" data-zona="rural">🌾 Rurais<span id="zonaRuralQtd" class="zona-qtd"></span></button>
             </div>
             <input id="construcaoSearchInput" type="search" placeholder="Nome, código, endereço ou edifício" />
@@ -657,6 +658,7 @@
           <label id="valorAluguelLabel"><span>Valor do aluguel (por mês)</span><input id="construcaoValorInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
           <label id="valorVendaLabel"><span>Valor de venda</span><input id="construcaoValorVendaInput" inputmode="decimal" placeholder="R$ 0,00" /></label>
         </div>
+        <label class="check-inline valor-a-partir-check"><input id="valorAPartirInput" type="checkbox" /> Valor <b>a partir de</b> <small>— o valor varia (ex.: empreendimento com várias unidades)</small></label>
         <div class="form-row">
           <label id="codigoLabel"><span>Código do imóvel</span><input id="construcaoCodigoInput" placeholder="Gerado automaticamente" /></label>
           <label id="edificioLabel"><span>Edifício ou condomínio (se houver)</span><input id="construcaoEdificioInput" /></label>
@@ -719,6 +721,7 @@
             <label class="c-4"><span>Cidade</span><input id="cidadeInput" /></label>
             <label class="c-2"><span>UF</span><input id="ufInput" maxlength="2" /></label>
           </div>
+          <p id="cepAviso" class="cep-aviso" hidden></p>
         </div>
         <label><span>Descrição</span><textarea id="construcaoDescricaoInput" rows="4" placeholder="Detalhes do imóvel: cômodos, acabamentos, diferenciais, proximidades..."></textarea></label>
         <div id="docsImovelBloco" class="docs-imovel-bloco">
@@ -816,6 +819,19 @@
         <label><span>CPF (opcional)</span><input id="crmCliCpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" /></label>
         <label><span>Origem do contato</span><select id="crmCliOrigem"></select></label>
       </div>
+      <details id="crmCliEndBox" class="crm-perfil crm-cli-endereco">
+        <summary>📍 Endereço (opcional) — digite o CEP que o resto se preenche</summary>
+        <div class="endereco-grid">
+          <label class="c-3"><span>CEP</span><input id="crmCliCep" inputmode="numeric" placeholder="00000-000" autocomplete="off" /></label>
+          <label class="c-6 largo"><span>Rua / avenida</span><input id="crmCliRua" autocomplete="off" /></label>
+          <label class="c-3"><span>Número</span><input id="crmCliNumero" autocomplete="off" /></label>
+          <label class="c-3"><span>Complemento</span><input id="crmCliCompl" placeholder="Apto, quadra, lote" autocomplete="off" /></label>
+          <label class="c-3"><span>Bairro</span><input id="crmCliBairro" autocomplete="off" /></label>
+          <label class="c-4"><span>Cidade</span><input id="crmCliCidade" autocomplete="off" /></label>
+          <label class="c-2"><span>UF</span><input id="crmCliUf" maxlength="2" autocomplete="off" /></label>
+        </div>
+        <p id="crmCliCepAviso" class="cep-aviso" hidden></p>
+      </details>
       <label id="crmCliIndicadoLabel" hidden><span>Quem indicou (cliente da carteira)</span><select id="crmCliIndicado"></select></label>
       <div class="crm-tipos">
         <span class="crm-rotulo">Tipo de cliente</span>
@@ -1539,6 +1555,8 @@
   <script src="painel.js"></script>
   <script src="integracoes.js"></script>
   <script src="rural.js"></script>
+  <script src="cep.js"></script>
+  <script src="coordenadas.js"></script>
   <script src="perfis.js"></script>
   <script src="documentos.js"></script>
   <script src="crm-extras.js"></script>
@@ -1552,6 +1570,7 @@
   <script src="funcoes-carteira.js"></script>
   <script src="proposta.js"></script>
   <script src="config-abas.js"></script>
+  <script src="busca-sistema.js"></script>
   <script src="app.js"></script>
   <script src="../trocar-linha.js" defer></script>
 </body>

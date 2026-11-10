@@ -278,8 +278,9 @@
 
     function precoTexto(c) {
         const partes = [];
-        if (c.para_venda && c.valor_venda) partes.push(ctx.precoCurto(c.valor_venda));
-        if (c.para_aluguel !== false && c.valor_aluguel) partes.push(ctx.precoCurto(c.valor_aluguel) + "/mês");
+        const ap = c.valor_a_partir ? "a partir de " : "";
+        if (c.para_venda && c.valor_venda) partes.push(ap + ctx.precoCurto(c.valor_venda));
+        if (c.para_aluguel !== false && c.valor_aluguel) partes.push(ap + ctx.precoCurto(c.valor_aluguel) + "/mês");
         return partes.join(" · ") || "Valor a consultar";
     }
     function renderNovidades(central) {
