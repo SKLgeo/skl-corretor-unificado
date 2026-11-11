@@ -1067,7 +1067,8 @@
         $("propPdf").disabled = true;
         try {
             const html = await montarPdf(p, r);
-            ctx.imprimir(html);
+            const a = (p.alvo && p.alvo.dados) || {};
+            ctx.imprimir(html, { nome: `Proposta - ${a.nome || p.titulo || "imovel"}${p.cliente ? " - " + p.cliente : ""}` });
         } finally { const b = $("propPdf"); if (b) b.disabled = false; }
     }
 
@@ -1250,7 +1251,7 @@
 .pp-nota{font-size:9pt!important;color:#5b6c75}
 .pp-assin{margin-top:22mm;display:flex;justify-content:space-between;gap:12mm}
 .pp-assin div{flex:1;border-top:1px solid #1f2d36;padding-top:2mm;text-align:center;font-size:9.5pt}
-@media print{.pp-pg{margin:0;box-shadow:none}}
+@media print{.pp-pg{margin:0;box-shadow:none}html.imprimir-safari .pp-pg{zoom:.78;margin:0 auto}}
 @media screen and (max-width:860px){.pp-doc{zoom:.45}}
 </style>`;
 

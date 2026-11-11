@@ -188,6 +188,10 @@
             dialogosAbertos = [];
         });
         $("finImpImprimir").addEventListener("click", imprimir);
+        $("finImpPdf").addEventListener("click", () => {
+            if (!window.SKLPdf) { imprimir(); return; }
+            window.SKLPdf.baixar($("finImpConteudo"), { nome: nomeImpressao, botao: $("finImpPdf"), avisar: m => ctx && ctx.toast ? ctx.toast(m) : null });
+        });
         document.addEventListener("skl-crm-render", () => { if (ctx && $("page-financeiro").classList.contains("active-page") && aba === "resumo") render(); });
     }
 
@@ -1108,7 +1112,10 @@
     }
     // um <dialog> aberto fica na camada de cima e esconderia a impressão: fecha durante a impressão e reabre depois
     let dialogosAbertos = [];
-    function abrirImpressao(html) {
+    let nomeImpressao = "";
+    function abrirImpressao(html, op) {
+        nomeImpressao = (op && op.nome) || "";
+        const b = $("finImpPdf"); if (b && b.dataset.rotulo) { b.textContent = b.dataset.rotulo; b.disabled = false; }
         dialogosAbertos = [ ...document.querySelectorAll("dialog[open]") ];
         dialogosAbertos.forEach(d => d.close());
         $("finImpConteudo").innerHTML = html;
@@ -1116,12 +1123,13 @@
         document.body.classList.add("fin-imprimindo");
     }
     function imprimir() {
+        if (window.SKLPdf) return window.SKLPdf.imprimir();
         if (window.NativeBridge && typeof window.NativeBridge.printPage === "function") window.NativeBridge.printPage();
         else window.print();
     }
 
     window.SKLFinanceiro = { iniciar, sair, carregar, aoMostrar, desenharNaNegociacao, atrasadas: () => atrasadas().length,
-        imprimir: html => abrirImpressao(html), contratos: () => contratos, vendas: () => vendas, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
+        imprimir: (html, op) => abrirImpressao(html, op), contratos: () => contratos, vendas: () => vendas, cobrancas: () => cobrancas, repasses: () => repasses, cliente, contratoAberto: () => contrato(contratoAberto),
         clientes: () => [ ...clientes.values() ], mostrarAba, renderizar: () => render(), recarregar: () => carregar(true),
         abrirContratoId: id => abrirContrato(contrato(id)), abrirVendaId: id => { const v = venda(id); if (v) abrirContrato(v); }, abrirPagamentoId: id => abrirPagamento(cobrancas.find(x => x.id === id)) };
 })();

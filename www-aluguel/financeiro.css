@@ -51,7 +51,8 @@
 .fin-previa-repasse{border-top:1px solid #cfe8f5;padding-top:8px}
 /* impressão: recibo e demonstrativo */
 .fin-impressao:not([hidden]){position:fixed;inset:0;z-index:3000;background:#eef2f3;overflow:auto;padding:16px;display:block}
-.fin-imp-barra{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+.fin-imp-barra{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:-16px -16px 14px;padding:10px 16px;position:sticky;top:-16px;z-index:5;background:#eef2f3;box-shadow:0 2px 8px rgba(6,27,46,.08)}
+.fin-imp-barra button{white-space:nowrap}
 .fin-doc{max-width:720px;margin:0 auto;background:#fff;color:#1d2b33;padding:34px 38px;border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.08);font-size:14px;line-height:1.55}
 .fin-doc header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--navy-deep);padding-bottom:12px;margin-bottom:18px}
 .fin-doc header div{display:grid}
@@ -69,6 +70,8 @@
   body.fin-imprimindo .fin-impressao{position:static;background:#fff;padding:0;overflow:visible}
   body.fin-imprimindo .fin-imp-barra{display:none}
   body.fin-imprimindo .fin-doc{box-shadow:none;max-width:none;padding:0}
+  /* Safari (iPhone/iPad/Mac) põe margem e cabeçalho próprios na impressão: o documento corrido não pode passar da largura */
+  html.imprimir-safari body.fin-imprimindo .fin-doc{width:auto!important;max-width:100%!important}
 }
 @media(max-width:1100px){.fin-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* até tablet: cada linha vira um cartão (a tabela larga escondia os botões à direita) */
@@ -232,3 +235,4 @@ body.sem-contrato_garantia_itens #finCtLocacaoCampos [data-garantia-itens]{displ
 .fin-ct-admin-aviso{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
 .fin-ct-admin-aviso[hidden]{display:none}
 .fin-com-pago{color:#247346;font-weight:700}
+@media(max-width:780px){.fin-imp-barra{flex-wrap:nowrap}.fin-imp-barra button{flex:1 1 0;min-width:0;padding-left:6px!important;padding-right:6px!important;font-size:14px!important;overflow:hidden;text-overflow:ellipsis}}

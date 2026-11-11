@@ -1060,7 +1060,7 @@
         if (window.SKLAgendaCelular) await seguro("agenda no celular", () => window.SKLAgendaCelular.iniciar(ctxExtras));
         if (window.SKLPropostas && pode("tela_propostas")) await seguro("proposta de negócios", () => window.SKLPropostas.iniciar({ ...ctxExtras,
             fotosCapa, fotoUrl: resolveFotoUrl, novoImovel: novoImovelPreenchido,
-            imprimir: html => window.SKLFinanceiro && window.SKLFinanceiro.imprimir(html) }));
+            imprimir: (html, op) => window.SKLFinanceiro && window.SKLFinanceiro.imprimir(html, op) }));
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
