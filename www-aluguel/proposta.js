@@ -26,7 +26,15 @@
         exclusividade_ligada: true, ex_prazo: 90, ex_comissao: 6, ex_autorizacao: true,
         ex_texto: "Trabalhamos para vender o seu imóvel pelo melhor valor possível, no menor tempo, com segurança na documentação e acompanhamento em cada etapa. Com a exclusividade, concentramos o esforço de toda a equipe no seu imóvel e você tem um único responsável por cuidar de tudo.",
         ex_plano: "Fotos e descrição caprichadas do imóvel\nAnúncio no site da imobiliária e nos principais portais\nDivulgação para a nossa carteira de clientes e corretores parceiros\nPlaca no imóvel, com a sua autorização\nVisitas sempre acompanhadas por um corretor\nRetorno ao proprietário a cada 15 dias, com visitas e propostas recebidas",
-        ex_compromissos: "Atender os interessados com agilidade\nConferir o perfil dos interessados antes das visitas\nApresentar por escrito todas as propostas recebidas\nAcompanhar a documentação até a assinatura da escritura"
+        ex_compromissos: "Atender os interessados com agilidade\nConferir o perfil dos interessados antes das visitas\nApresentar por escrito todas as propostas recebidas\nAcompanhar a documentação até a assinatura da escritura",
+        // proposta de venda/locação de UM imóvel (sem comparação)
+        pv_ligada: true, pv_fotos: 8, pv_mostrar_valor: true, pv_mostrar_custos: true, pv_mostrar_endereco: false, pv_mostrar_m2: false,
+        pv_corretor: true, pv_aceite: true, pv_texto: "",
+        pv_intro: "Selecionamos este imóvel pensando no que você procura. Nas próximas páginas estão as fotos, a ficha completa, o valor e as condições, e os próximos passos para conhecê-lo de perto.",
+        pv_condicoes: "Aceita financiamento bancário e uso do FGTS, conforme análise de crédito. Entrada e demais condições a combinar com o corretor.",
+        pv_condicoes_aluguel: "Contrato de 30 meses, com reajuste anual. Garantia a combinar: caução, fiador ou seguro-fiança.",
+        pv_sobre: "Cuidamos de cada etapa: visita, negociação, documentação e assinatura, com transparência e segurança para você.",
+        pv_passos: "Agendar uma visita ao imóvel\nTirar as dúvidas e conferir as condições de pagamento\nFormalizar a proposta por escrito (folha no fim deste documento)\nConferência da documentação e assinatura do contrato"
     };
     let cfg = { ...CFG_PADRAO };
     const FAIXAS = [ [ "oportunidade", "Valor de oportunidade" ], [ "competitivo", "Valor competitivo" ], [ "mercado", "Valor de mercado" ], [ "otimista", "Valor otimista" ] ];
@@ -49,6 +57,7 @@
         if (p.incluir_corretor == null) p.incluir_corretor = p.tipo === "exclusividade";
         if (p.mostrar_pedido == null) p.mostrar_pedido = !!cfg.mostrar_pedido_pdf;
         if (!p.exclusividade) p.exclusividade = { prazo_dias: cfg.ex_prazo, comissao_pct: cfg.ex_comissao, autorizacao: !!cfg.ex_autorizacao };
+        if (!p.pv) p.pv = { valor: null, a_partir: null, mostrar_endereco: null, condicoes: null, destaques: "", corretor: null };
         return p;
     }
 
@@ -249,14 +258,23 @@
           <span class="prop-origem ${item.origem}">${item.origem === "cadastro" ? "Do cadastro" : "De fora" + (d.anunciado_por ? " · " + h(d.anunciado_por) : "")}</span></div>`;
     }
 
+    // título automático ("Estudo de mercado — X" / "Proposta de venda — X") acompanha o tipo; título escrito à mão não muda
+    function ajustarTituloAuto(p) {
+        const m = /^(Estudo de mercado|Proposta de venda|Proposta de locação) — (.*)$/.exec(p.titulo || "");
+        if (!m) return;
+        const prefixo = modoVenda(p) ? "Proposta de " + palavra(p) : "Estudo de mercado";
+        if (m[1] !== prefixo) p.titulo = prefixo + " — " + m[2];
+    }
     function renderEditor(box) {
-        const p = atual, r = calcular(p), base = r.base;
+        const p = atual;
+        ajustarTituloAuto(p);
+        const r = calcular(p), base = r.base;
         const venda = p.finalidade !== "aluguel";
         box.innerHTML = `
         <div class="prop-topo">
           <button id="propVoltar" type="button" class="secondary-button">← Propostas</button>
           <div class="prop-topo-acoes">
-            <button id="propPdf" type="button" class="primary-button">📄 Gerar PDF</button>
+            <button id="propPdf" type="button" class="primary-button">${modoVenda(p) ? "🏠 Gerar proposta de " + palavra(p) : "📄 Gerar PDF"}</button>
             <button id="propSalvar" type="button" class="secondary-button">Salvar</button>
             <button id="propExcluir" type="button" class="danger-button">Excluir</button>
           </div>
@@ -315,13 +333,13 @@
                     ${l.a.origem === "fora" ? `<button type="button" class="secondary-button" data-cadastrar="${l.i}">Cadastrar na Central</button>` : ""}
                     <button type="button" class="secondary-button" data-remover="${l.i}">Tirar</button>
                   </div></div>`;
-            }).join("")}</div>` : `<p class="muted-text">Ainda nenhum. Use "Sugerir do mesmo bairro" ou adicione um por um. O ideal é de 4 a 8 imóveis parecidos.</p>`}
+            }).join("")}</div>` : `<p class="muted-text">Ainda nenhum. Use "Sugerir do mesmo bairro" ou adicione um por um. O ideal é de 4 a 8 imóveis parecidos.${modoVenda(p) ? " Sem imóveis para comparar, você pode gerar a proposta de " + palavra(p) + " deste imóvel (abaixo)." : ""}</p>`}
         </section>
-        <section class="panel form-panel prop-bloco">
+        ${modoVenda(p) ? blocoVendaHtml(p) : `<section class="panel form-panel prop-bloco">
           <span class="eyebrow">4 · CÁLCULO E REGULAÇÃO</span>
           ${regulacaoHtml(p, r)}
           <div id="propResultado">${resultadoHtml(p, r)}</div>
-        </section>
+        </section>`}
         ${tipoHtml(p)}`;
         ligarEditor(box);
         preencherFotos(box);
@@ -393,6 +411,15 @@
         const equipe = ehCentral() || (ctx.veTudo && ctx.veTudo()) ? (ctx.equipe() || []).filter(c => c.active !== false) : [];
         const opcoesCorretor = equipe.length ? equipe : [ { id: u.id, display_name: u.display_name } ];
         if (!opcoesCorretor.some(c => c.id === (p.corretor_id || u.id))) opcoesCorretor.unshift({ id: p.corretor_id || u.id, display_name: p.corretor || u.display_name });
+        if (modoVenda(p)) return `<section class="panel form-panel prop-bloco">
+          <span class="eyebrow">5 · CORRETOR DA PROPOSTA</span>
+          <div class="prop-grade">
+            <label><span>Corretor da apresentação</span><select id="propCorretorId"${opcoesCorretor.length > 1 ? "" : " disabled"}>
+              ${opcoesCorretor.map(c => `<option value="${h(c.id)}"${c.id === (p.corretor_id || u.id) ? " selected" : ""}>${h(c.display_name || "—")}</option>`).join("")}</select></label>
+            ${cfg.pv_corretor !== false ? `<label class="prop-check"><input type="checkbox" id="propIncluirCorretorPv"${p.pv.corretor !== false ? " checked" : ""} /> Incluir a página "Seu corretor"</label>` : ""}
+          </div>
+          <p class="prop-dica" id="propPerfilAviso" hidden></p>
+        </section>`;
         return `<section class="panel form-panel prop-bloco">
           <span class="eyebrow">5 · TIPO DE PROPOSTA</span>
           <div class="prop-tipos">
@@ -418,10 +445,11 @@
         campo("propTitulo", "titulo"); campo("propCliente", "cliente"); campo("propCorretor", "corretor"); campo("propObs", "observacoes");
         campo("propValidade", "validade_dias", v => Math.max(1, Number(v) || 30));
         campo("propFinalidade", "finalidade");
-        $("propBase").addEventListener("change", e => { p.ajustes.base = e.target.value; render(); });
-        $("propCalculo").addEventListener("change", e => { p.ajustes.calculo = e.target.value; atualizarResultado(); });
-        [ [ "propFaixa", "faixa" ], [ "propOferta", "oferta" ] ].forEach(([ id, k ]) =>
-            $(id).addEventListener("change", e => { p.ajustes[k] = Math.max(0, Number(e.target.value) || 0); render(); }));
+        if ($("propBase")) $("propBase").addEventListener("change", e => { p.ajustes.base = e.target.value; render(); });
+        if ($("propCalculo")) $("propCalculo").addEventListener("change", e => { p.ajustes.calculo = e.target.value; atualizarResultado(); });
+        [ [ "propFaixa", "faixa" ], [ "propOferta", "oferta" ] ].forEach(([ id, k ]) => { const el = $(id);
+            if (el) el.addEventListener("change", e => { p.ajustes[k] = Math.max(0, Number(e.target.value) || 0); render(); }); });
+        ligarBlocoVenda(box);
         box.querySelectorAll("[data-desl]").forEach(inp => inp.addEventListener("input", () => {
             const k = inp.dataset.desl;
             p.ajustes[k] = Number(inp.value) || 0;
@@ -444,6 +472,7 @@
         }));
         const ck = (id, fn) => { const el = $(id); if (el) el.addEventListener("change", () => fn(el)); };
         ck("propIncluirCorretor", el => { p.incluir_corretor = el.checked; avisoPerfil(); });
+        ck("propIncluirCorretorPv", el => { p.pv.corretor = el.checked; });
         ck("propMostrarPedido", el => { p.mostrar_pedido = el.checked; atualizarResultado(); });
         ck("propExAutorizacao", el => { p.exclusividade.autorizacao = el.checked; });
         ck("propExPrazo", el => { p.exclusividade.prazo_dias = Math.max(1, Number(el.value) || 90); });
@@ -559,7 +588,9 @@
     const CAMPOS_CFG = [ [ "faixa", "n" ], [ "min_corte", "n" ], [ "min_amostras", "n" ], [ "calculo", "s" ], [ "oferta", "n" ], [ "arredondar", "n" ],
         [ "oportunidade", "n" ], [ "competitivo", "n" ], [ "otimista", "n" ], [ "ajuste_max", "n" ], [ "sugerido", "s" ], [ "validade", "n" ],
         [ "corretor_altera", "b" ], [ "mostrar_estatisticas", "b" ], [ "mostrar_pedido_pdf", "b" ], [ "texto_pdf", "s" ],
-        [ "exclusividade_ligada", "b" ], [ "ex_prazo", "n" ], [ "ex_comissao", "n" ], [ "ex_autorizacao", "b" ], [ "ex_texto", "s" ], [ "ex_plano", "s" ], [ "ex_compromissos", "s" ] ];
+        [ "exclusividade_ligada", "b" ], [ "ex_prazo", "n" ], [ "ex_comissao", "n" ], [ "ex_autorizacao", "b" ], [ "ex_texto", "s" ], [ "ex_plano", "s" ], [ "ex_compromissos", "s" ],
+        [ "pv_ligada", "b" ], [ "pv_fotos", "n" ], [ "pv_mostrar_valor", "b" ], [ "pv_mostrar_custos", "b" ], [ "pv_mostrar_endereco", "b" ], [ "pv_mostrar_m2", "b" ],
+        [ "pv_corretor", "b" ], [ "pv_aceite", "b" ], [ "pv_intro", "s" ], [ "pv_condicoes", "s" ], [ "pv_condicoes_aluguel", "s" ], [ "pv_sobre", "s" ], [ "pv_passos", "s" ], [ "pv_texto", "s" ] ];
     function preencherConfig(c) {
         CAMPOS_CFG.forEach(([ k, t ]) => { const el = $("cfg_" + k); if (!el) return; if (t === "b") el.checked = !!c[k]; else el.value = c[k] == null ? "" : c[k]; });
     }
@@ -635,6 +666,24 @@
               <label class="prop-largo"><span>Plano de divulgação (um item por linha)</span><textarea id="cfg_ex_plano" rows="5"></textarea></label>
               <label class="prop-largo"><span>Nossos compromissos (um item por linha)</span><textarea id="cfg_ex_compromissos" rows="4"></textarea></label>
             </div>
+            <h3 class="prop-cfg-sec">Proposta de venda de um imóvel (sem comparação)</h3>
+            <p class="muted-text">Quando a proposta tem só o imóvel escolhido, sem imóveis para comparar, o PDF vira uma apresentação do imóvel para o cliente.</p>
+            <div class="prop-grade">
+              ${ck("pv_ligada", "Oferecer a proposta de venda quando houver um imóvel só")}
+              ${n("pv_fotos", "Quantas fotos levar no PDF", 'min="1" max="24"')}
+              ${ck("pv_mostrar_valor", "Mostrar o valor (desmarcado: \"Sob consulta\")")}
+              ${ck("pv_mostrar_custos", "Mostrar condomínio e IPTU")}
+              ${ck("pv_mostrar_m2", "Mostrar o valor do m² (venda)")}
+              ${ck("pv_mostrar_endereco", "Mostrar o endereço completo (o corretor pode mudar em cada proposta)")}
+              ${ck("pv_corretor", "Incluir a página \"Seu corretor\"")}
+              ${ck("pv_aceite", "Incluir a folha de proposta para o cliente preencher e assinar")}
+              <label class="prop-largo"><span>Apresentação (primeira página do imóvel)</span><textarea id="cfg_pv_intro" rows="3"></textarea></label>
+              <label class="prop-largo"><span>Condições de pagamento padrão — venda</span><textarea id="cfg_pv_condicoes" rows="3"></textarea></label>
+              <label class="prop-largo"><span>Condições padrão — locação</span><textarea id="cfg_pv_condicoes_aluguel" rows="2"></textarea></label>
+              <label class="prop-largo"><span>Sobre a imobiliária</span><textarea id="cfg_pv_sobre" rows="3"></textarea></label>
+              <label class="prop-largo"><span>Próximos passos (um item por linha)</span><textarea id="cfg_pv_passos" rows="4"></textarea></label>
+              <label class="prop-largo"><span>Texto extra junto do valor (opcional)</span><textarea id="cfg_pv_texto" rows="2"></textarea></label>
+            </div>
             <div class="dialog-actions">
               <button id="cfgPadrao" type="button" class="secondary-button">Voltar ao padrão</button>
               <button id="cfgSalvar" type="button" class="primary-button">Salvar configuração</button>
@@ -692,7 +741,7 @@
     let salvando = false;
     async function salvar(avisar) {
         if (salvando) return false;
-        if (!atual.titulo) atual.titulo = atual.alvo ? "Estudo de mercado — " + (atual.alvo.dados.nome || "imóvel") : "Proposta sem título";
+        if (!atual.titulo) atual.titulo = atual.alvo ? (modoVenda(atual) ? "Proposta de " + palavra(atual) + " — " : "Estudo de mercado — ") + (atual.alvo.dados.nome || "imóvel") : "Proposta sem título";
         salvando = true;
         const botao = $("propSalvar");
         if (botao) { botao.disabled = true; botao.textContent = "Salvando…"; }
@@ -1061,6 +1110,17 @@
     async function gerarPdf() {
         const p = atual, r = calcular(p);
         if (!p.alvo) return ctx.toast("Escolha o imóvel avaliado.");
+        if (modoVenda(p)) {
+            if (!ctx.imprimir) return ctx.toast("Impressão indisponível.");
+            const bt = [ $("propPdf"), $("pvGerar") ].filter(Boolean);
+            bt.forEach(b => { b.disabled = true; });
+            try {
+                const html = await montarPdfVenda(p);
+                const a = p.alvo.dados || {};
+                ctx.imprimir(html, { nome: `Proposta de ${palavra(p)} - ${a.nome || p.titulo || "imovel"}${p.cliente ? " - " + p.cliente : ""}` });
+            } finally { bt.forEach(b => { b.disabled = false; }); }
+            return;
+        }
         if (!r.mercado) return ctx.toast("Ainda não dá para calcular: confira as áreas e os valores dos imóveis.");
         if (r.usadas < (Number(cfg.min_amostras) || 0)) return ctx.toast(`A imobiliária pede pelo menos ${cfg.min_amostras} imóveis no cálculo para gerar o PDF.`);
         if (!ctx.imprimir) return ctx.toast("Impressão indisponível.");
@@ -1072,61 +1132,9 @@
         } finally { const b = $("propPdf"); if (b) b.disabled = false; }
     }
 
-    async function montarPdf(p, r) {
-        const venda = p.finalidade !== "aluguel";
-        const marca = nomeMarca();
-        const azul = corVar("--navy", "#003E67"), escuro = corVar("--navy-deep", "#00263F"), destaque = corVar("--gold", "#FF7433");
-        const logo = await descobrirLogo();
-        const fotosAlvo = await urlsDe(p.alvo, 5);
-        const fotosAm = [];
-        for (const l of r.linhas) fotosAm.push((await urlsDe(l.a, 1))[0] || "");
-        const hoje = new Date();
-        const validade = new Date(hoje.getTime() + (Number(p.validade_dias) || 30) * 86400000);
-        const a = p.alvo.dados;
-        const baseTxt = BASE_TXT[r.base];
-        const usadas = r.linhas.filter(l => l.situacao === "ok");
-        const foraLista = r.linhas.filter(l => l.situacao !== "ok");
-        let pag = 0;
-        const cab = titulo => `<div class="pp-cab"><img src="${logo}" alt="" /><span>${h(titulo)}</span></div>`;
-        const rod = () => `<div class="pp-rod"><span>${h(marca)} · ${h(p.titulo)}</span><span>Página @@PAG@@ de @@TOT@@</span></div>`;
-        const ex = p.tipo === "exclusividade" && cfg.exclusividade_ligada !== false;
-        const aj = p.ajustes, ajuste = Number(aj.ajuste) || 0;
-        // perfil do corretor da apresentação (página "Seu corretor")
-        let corretor = null, fotoCorretor = "";
-        if (p.incluir_corretor) {
-            try { corretor = await perfilDe(p.corretor_id, true); } catch { corretor = null; }
-            if (corretor && corretor.foto_path && (corretor.perfil || {}).mostrar_foto !== false) {
-                try { const { data } = await ctx.sb.storage.from("fotos-perfil").createSignedUrl(corretor.foto_path, 3600); fotoCorretor = (data && data.signedUrl) || ""; } catch {}
-            }
-        }
-        const nomeCorretor = (corretor && corretor.perfil && corretor.perfil.nome_apresentacao) || p.corretor || "";
-        const linhasDe = t => String(t || "").split(/\n+/).map(s => s.trim()).filter(Boolean);
-        const fotoBox = (u, cls) => u ? `<div class="${cls}" style="background-image:url('${u}')"></div>` : `<div class="${cls} pp-semfoto">Sem foto</div>`;
-        const local = [ a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
-
-        const paginasAmostras = [];
-        for (let i = 0; i < r.linhas.length; i += 2) {
-            paginasAmostras.push(`<section class="pp-pg">${cab("Imóveis comparados")}
-              <h2>Imóveis comparados <em>${i + 1}${r.linhas[i + 1] ? "–" + (i + 2) : ""} de ${r.linhas.length}</em></h2>
-              ${r.linhas.slice(i, i + 2).map((l, k) => {
-                const d = l.a.dados;
-                return `<div class="pp-amostra${l.situacao !== "ok" ? " fora" : ""}">
-                  ${fotoBox(fotosAm[i + k], "pp-amostra-foto")}
-                  <div class="pp-amostra-dados">
-                    <span class="pp-num">Amostra ${l.i + 1}${l.situacao !== "ok" ? " · fora do cálculo" : ""}</span>
-                    <strong>${h(d.nome || "Imóvel")}</strong>
-                    <span class="pp-local">${h([ d.tipo_imovel, d.bairro ].filter(Boolean).join(" · "))}</span>
-                    <span class="pp-anun">Anunciado por: ${h(d.anunciado_por || (l.a.origem === "cadastro" ? marca : "—"))}${d.codigo ? " · Cód. " + h(d.codigo) : ""}</span>
-                    <div class="pp-faixa-valor"><small>${venda ? "Valor anunciado" : "Aluguel anunciado"}</small><b>${dinheiro(d.valor)}</b></div>
-                    <div class="pp-faixa-valor m2"><small>Valor do m² (${baseTxt})</small><b>${l.m2 ? dinheiro(l.m2, 2) : "—"}</b></div>
-                    <table class="pp-mini"><tr><th>Área construída</th><th>Área do terreno</th><th>Quartos</th><th>Vagas</th></tr>
-                      <tr><td>${numero(d.area_construida)} m²</td><td>${numero(d.area_terreno)} m²</td><td>${d.quartos ?? "—"}</td><td>${d.vagas ?? "—"}</td></tr></table>
-                    ${l.situacao !== "ok" ? `<p class="pp-motivo">Não entrou no cálculo: ${h(l.situacao === "longe" ? "valor do m² muito diferente dos demais (" + l.motivo + ")" : l.motivo.toLowerCase())}.</p>` : ""}
-                  </div></div>`;
-            }).join("")}${rod()}</section>`);
-        }
-
-        const css = `<style>
+    // estilo das folhas A4 da proposta (estudo, exclusividade e proposta de venda de um imóvel)
+    function cssPdf(azul, escuro, destaque) {
+        return `<style>
 @page{size:A4;margin:0}
 .pp-doc{--az:${azul};--esc:${escuro};--dest:${destaque};font-family:'Roboto','Segoe UI',Arial,sans-serif;color:#1f2d36}
 .pp-doc *{box-sizing:border-box}
@@ -1254,6 +1262,58 @@
 @media print{.pp-pg{margin:0;box-shadow:none}html.imprimir-safari .pp-pg{zoom:.78;margin:0 auto}}
 @media screen and (max-width:860px){.pp-doc{zoom:.45}}
 </style>`;
+    }
+
+    async function montarPdf(p, r) {
+        const venda = p.finalidade !== "aluguel";
+        const marca = nomeMarca();
+        const azul = corVar("--navy", "#003E67"), escuro = corVar("--navy-deep", "#00263F"), destaque = corVar("--gold", "#FF7433");
+        const logo = await descobrirLogo();
+        const fotosAlvo = await urlsDe(p.alvo, 5);
+        const fotosAm = [];
+        for (const l of r.linhas) fotosAm.push((await urlsDe(l.a, 1))[0] || "");
+        const hoje = new Date();
+        const validade = new Date(hoje.getTime() + (Number(p.validade_dias) || 30) * 86400000);
+        const a = p.alvo.dados;
+        const baseTxt = BASE_TXT[r.base];
+        const usadas = r.linhas.filter(l => l.situacao === "ok");
+        const foraLista = r.linhas.filter(l => l.situacao !== "ok");
+        let pag = 0;
+        const cab = titulo => `<div class="pp-cab"><img src="${logo}" alt="" /><span>${h(titulo)}</span></div>`;
+        const rod = () => `<div class="pp-rod"><span>${h(marca)} · ${h(p.titulo)}</span><span>Página @@PAG@@ de @@TOT@@</span></div>`;
+        const ex = p.tipo === "exclusividade" && cfg.exclusividade_ligada !== false;
+        const aj = p.ajustes, ajuste = Number(aj.ajuste) || 0;
+        // perfil do corretor da apresentação (página "Seu corretor")
+        let corretor = null, fotoCorretor = "";
+        if (p.incluir_corretor) ({ corretor, foto: fotoCorretor } = await carregarCorretor(p));
+        const nomeCorretor = (corretor && corretor.perfil && corretor.perfil.nome_apresentacao) || p.corretor || "";
+        const linhasDe = t => String(t || "").split(/\n+/).map(s => s.trim()).filter(Boolean);
+        const fotoBox = (u, cls) => u ? `<div class="${cls}" style="background-image:url('${u}')"></div>` : `<div class="${cls} pp-semfoto">Sem foto</div>`;
+        const local = [ a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
+
+        const paginasAmostras = [];
+        for (let i = 0; i < r.linhas.length; i += 2) {
+            paginasAmostras.push(`<section class="pp-pg">${cab("Imóveis comparados")}
+              <h2>Imóveis comparados <em>${i + 1}${r.linhas[i + 1] ? "–" + (i + 2) : ""} de ${r.linhas.length}</em></h2>
+              ${r.linhas.slice(i, i + 2).map((l, k) => {
+                const d = l.a.dados;
+                return `<div class="pp-amostra${l.situacao !== "ok" ? " fora" : ""}">
+                  ${fotoBox(fotosAm[i + k], "pp-amostra-foto")}
+                  <div class="pp-amostra-dados">
+                    <span class="pp-num">Amostra ${l.i + 1}${l.situacao !== "ok" ? " · fora do cálculo" : ""}</span>
+                    <strong>${h(d.nome || "Imóvel")}</strong>
+                    <span class="pp-local">${h([ d.tipo_imovel, d.bairro ].filter(Boolean).join(" · "))}</span>
+                    <span class="pp-anun">Anunciado por: ${h(d.anunciado_por || (l.a.origem === "cadastro" ? marca : "—"))}${d.codigo ? " · Cód. " + h(d.codigo) : ""}</span>
+                    <div class="pp-faixa-valor"><small>${venda ? "Valor anunciado" : "Aluguel anunciado"}</small><b>${dinheiro(d.valor)}</b></div>
+                    <div class="pp-faixa-valor m2"><small>Valor do m² (${baseTxt})</small><b>${l.m2 ? dinheiro(l.m2, 2) : "—"}</b></div>
+                    <table class="pp-mini"><tr><th>Área construída</th><th>Área do terreno</th><th>Quartos</th><th>Vagas</th></tr>
+                      <tr><td>${numero(d.area_construida)} m²</td><td>${numero(d.area_terreno)} m²</td><td>${d.quartos ?? "—"}</td><td>${d.vagas ?? "—"}</td></tr></table>
+                    ${l.situacao !== "ok" ? `<p class="pp-motivo">Não entrou no cálculo: ${h(l.situacao === "longe" ? "valor do m² muito diferente dos demais (" + l.motivo + ")" : l.motivo.toLowerCase())}.</p>` : ""}
+                  </div></div>`;
+            }).join("")}${rod()}</section>`);
+        }
+
+        const css = cssPdf(azul, escuro, destaque);
 
         const capa = `<section class="pp-pg pp-capa">
             <div class="pp-capa-foto" style="${fotosAlvo[0] ? `background-image:url('${fotosAlvo[0]}')` : ""}"></div>
@@ -1323,29 +1383,7 @@
             ${rod()}</section>`;
 
         // ---- página "Seu corretor" ----
-        let paginaCorretor = "";
-        if (p.incluir_corretor) {
-            const pf = (corretor && corretor.perfil) || {};
-            const nome = pf.nome_apresentacao || p.corretor || (corretor && corretor.nome) || "";
-            const anos = pf.desde ? new Date().getFullYear() - Number(pf.desde) : null;
-            const numeros = [ anos > 0 ? [ anos === 1 ? "ano de mercado" : "anos de mercado", anos ] : null,
-                pf.mostrar_negocios && corretor ? [ "negócios fechados", corretor.negocios_fechados || 0 ] : null,
-                pf.mostrar_captados && corretor ? [ "imóveis captados", corretor.imoveis_captados || 0 ] : null ].filter(Boolean);
-            const contato = pf.mostrar_contato !== false ? [ pf.whatsapp ? "WhatsApp " + pf.whatsapp : "", pf.email || "", pf.instagram ? "@" + pf.instagram : "" ].filter(Boolean) : [];
-            paginaCorretor = `<section class="pp-pg">${cab("Seu corretor")}
-              <div class="pp-corretor">
-                ${fotoCorretor ? `<div class="pp-cor-foto" style="background-image:url('${fotoCorretor}')"></div>` : `<div class="pp-cor-foto pp-cor-ini">${h(nome.split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase())}</div>`}
-                <div><small>Quem vai cuidar do seu imóvel</small><h2>${h(nome)}</h2>
-                  <span>${h([ pf.creci, marca ].filter(Boolean).join(" · "))}</span>
-                  ${pf.especialidade ? `<span class="pp-cor-esp">${h(pf.especialidade)}</span>` : ""}</div>
-              </div>
-              ${numeros.length ? `<div class="pp-cor-num">${numeros.map(([ t, v ]) => `<div><b>${h(String(v))}</b><small>${h(t)}</small></div>`).join("")}</div>` : ""}
-              ${pf.historia ? `<h3>Minha história</h3><p>${h(pf.historia)}</p>` : ""}
-              ${pf.bairros ? `<h3>Onde mais atuo</h3><p>${h(pf.bairros)}</p>` : ""}
-              ${(pf.diferenciais || []).length ? `<h3>Como eu trabalho</h3><ul class="pp-lista">${pf.diferenciais.map(d => `<li>${h(d)}</li>`).join("")}</ul>` : ""}
-              ${contato.length ? `<div class="pp-cor-contato">${contato.map(c => `<span>${h(c)}</span>`).join("")}</div>` : ""}
-              ${rod()}</section>`;
-        }
+        const paginaCorretor = p.incluir_corretor ? paginaCorretorHtml(p, corretor, fotoCorretor, cab, rod, marca, "Quem vai cuidar do seu imóvel") : "";
 
         // ---- apresentação de exclusividade ----
         let paginasEx = "";
@@ -1396,6 +1434,251 @@
         pag = 1;
         const corpoSem = `${capa}${paginaCorretor}${imovel}${paginasAmostras.join("")}${resumo}${valor}${metodo}${paginasEx}`;
         const total = (corpoSem.match(/class="pp-pg/g) || []).length;
+        const corpo = corpoSem.replace(/@@PAG@@/g, () => ++pag).replace(/@@TOT@@/g, total);
+        return `${css}<div class="pp-doc" lang="pt-BR">${corpo}</div>`;
+    }
+
+    // ---------- página "Seu corretor" (estudo, exclusividade e proposta de venda) ----------
+    async function carregarCorretor(p) {
+        let corretor = null, foto = "";
+        try { corretor = await perfilDe(p.corretor_id, true); } catch { corretor = null; }
+        if (corretor && corretor.foto_path && (corretor.perfil || {}).mostrar_foto !== false) {
+            try { const { data } = await ctx.sb.storage.from("fotos-perfil").createSignedUrl(corretor.foto_path, 3600); foto = (data && data.signedUrl) || ""; } catch {}
+        }
+        return { corretor, foto };
+    }
+    function paginaCorretorHtml(p, corretor, fotoCorretor, cab, rod, marca, subtitulo) {
+        const pf = (corretor && corretor.perfil) || {};
+        const nome = pf.nome_apresentacao || p.corretor || (corretor && corretor.nome) || "";
+        const anos = pf.desde ? new Date().getFullYear() - Number(pf.desde) : null;
+        const numeros = [ anos > 0 ? [ anos === 1 ? "ano de mercado" : "anos de mercado", anos ] : null,
+            pf.mostrar_negocios && corretor ? [ "negócios fechados", corretor.negocios_fechados || 0 ] : null,
+            pf.mostrar_captados && corretor ? [ "imóveis captados", corretor.imoveis_captados || 0 ] : null ].filter(Boolean);
+        const contato = pf.mostrar_contato !== false ? [ pf.whatsapp ? "WhatsApp " + pf.whatsapp : "", pf.email || "", pf.instagram ? "@" + pf.instagram : "" ].filter(Boolean) : [];
+        return `<section class="pp-pg">${cab("Seu corretor")}
+          <div class="pp-corretor">
+            ${fotoCorretor ? `<div class="pp-cor-foto" style="background-image:url('${fotoCorretor}')"></div>` : `<div class="pp-cor-foto pp-cor-ini">${h(nome.split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase())}</div>`}
+            <div><small>${h(subtitulo)}</small><h2>${h(nome)}</h2>
+              <span>${h([ pf.creci, marca ].filter(Boolean).join(" · "))}</span>
+              ${pf.especialidade ? `<span class="pp-cor-esp">${h(pf.especialidade)}</span>` : ""}</div>
+          </div>
+          ${numeros.length ? `<div class="pp-cor-num">${numeros.map(([ t, v ]) => `<div><b>${h(String(v))}</b><small>${h(t)}</small></div>`).join("")}</div>` : ""}
+          ${pf.historia ? `<h3>Minha história</h3><p>${h(pf.historia)}</p>` : ""}
+          ${pf.bairros ? `<h3>Onde mais atuo</h3><p>${h(pf.bairros)}</p>` : ""}
+          ${(pf.diferenciais || []).length ? `<h3>Como eu trabalho</h3><ul class="pp-lista">${pf.diferenciais.map(d => `<li>${h(d)}</li>`).join("")}</ul>` : ""}
+          ${contato.length ? `<div class="pp-cor-contato">${contato.map(c => `<span>${h(c)}</span>`).join("")}</div>` : ""}
+          ${rod()}</section>`;
+    }
+
+    // ---------- proposta de venda (ou de locação) de UM imóvel, sem comparação ----------
+    // 12/11/2026 (ideia do Yuri): com só o imóvel escolhido, o gerador não faz conta entre imóveis; monta uma
+    // apresentação do imóvel para o cliente: capa, fotos, ficha, valor e condições, corretor, próximos passos e,
+    // se ligado, a folha de proposta do cliente para assinar. O que entra e os textos ficam em
+    // "⚙ Configuração da proposta" → "Proposta de venda de um imóvel"; o corretor ajusta valor, condições e destaques.
+    const temComparacao = p => (p.amostras || []).length > 0;
+    const modoVenda = p => !!(p && p.alvo && !temComparacao(p) && cfg.pv_ligada !== false);
+    const palavra = p => p.finalidade !== "aluguel" ? "venda" : "locação";
+    function condicoesPadrao(p) { return p.finalidade !== "aluguel" ? cfg.pv_condicoes : cfg.pv_condicoes_aluguel; }
+    function cadastroDoAlvo(p) { return p.alvo && p.alvo.imovel_id ? ctx.imoveis().find(x => x.id === p.alvo.imovel_id) || null : null; }
+
+    function blocoVendaHtml(p) {
+        const venda = p.finalidade !== "aluguel", pv = p.pv, a = p.alvo.dados, c = cadastroDoAlvo(p);
+        const valor = pv.valor != null ? pv.valor : a.valor;
+        const temEnd = !!(a.logradouro || "").trim();
+        return `<section class="panel form-panel prop-bloco prop-pv">
+          <span class="eyebrow">4 · PROPOSTA DE ${venda ? "VENDA" : "LOCAÇÃO"} DESTE IMÓVEL</span>
+          <p class="prop-dica">Sem imóveis para comparar, o PDF vira uma <b>proposta de ${palavra(p)}</b> do imóvel: capa, fotos, ficha, valor e condições,
+            o corretor, os próximos passos${cfg.pv_aceite !== false ? " e a folha de proposta para o cliente assinar" : ""}. Para fazer o estudo de mercado, adicione imóveis no item 3.</p>
+          <div class="prop-grade">
+            <label><span>${venda ? "Valor de venda" : "Aluguel por mês"}</span><input id="pvValor" inputmode="decimal" value="${valor ? dinheiro(valor, 2) : ""}" placeholder="R$" /></label>
+            <label class="prop-check"><input type="checkbox" id="pvAPartir"${pv.a_partir != null ? (pv.a_partir ? " checked" : "") : (c && c.valor_a_partir ? " checked" : "")} /> Mostrar como "a partir de"</label>
+            <label class="prop-check"><input type="checkbox" id="pvEndereco"${(pv.mostrar_endereco != null ? pv.mostrar_endereco : cfg.pv_mostrar_endereco) ? " checked" : ""}${temEnd ? "" : " disabled"} /> Mostrar o endereço completo${temEnd ? "" : " (o imóvel não tem endereço)"}</label>
+            <label class="prop-largo"><span>Condições de pagamento</span><textarea id="pvCondicoes" rows="3">${h(pv.condicoes != null ? pv.condicoes : condicoesPadrao(p) || "")}</textarea></label>
+            <label class="prop-largo"><span>Destaques do imóvel (um por linha)</span><textarea id="pvDestaques" rows="4" placeholder="Ex.: Energia solar&#10;Piscina aquecida&#10;Rua tranquila, perto de escola">${h(pv.destaques || "")}</textarea></label>
+          </div>
+          <div class="prop-botoes"><button id="pvGerar" type="button" class="primary-button">🏠 Gerar proposta de ${palavra(p)}</button></div>
+        </section>`;
+    }
+    function ligarBlocoVenda(box) {
+        const p = atual;
+        const v = $("pvValor"); if (!v) return;
+        v.addEventListener("change", () => { const n = ctx.parseValor(v.value); p.pv.valor = n > 0 ? n : null; if (p.pv.valor) v.value = dinheiro(p.pv.valor, 2); });
+        $("pvAPartir").addEventListener("change", e => { p.pv.a_partir = e.target.checked; });
+        $("pvEndereco").addEventListener("change", e => { p.pv.mostrar_endereco = e.target.checked; });
+        $("pvCondicoes").addEventListener("input", e => { p.pv.condicoes = e.target.value; });
+        $("pvDestaques").addEventListener("input", e => { p.pv.destaques = e.target.value; });
+        $("pvGerar").addEventListener("click", gerarPdf);
+    }
+
+    async function montarPdfVenda(p) {
+        const venda = p.finalidade !== "aluguel", neg = palavra(p);
+        const marca = nomeMarca();
+        const azul = corVar("--navy", "#003E67"), escuro = corVar("--navy-deep", "#00263F"), destaque = corVar("--gold", "#FF7433");
+        const logo = await descobrirLogo();
+        const a = p.alvo.dados, c = cadastroDoAlvo(p), pv = p.pv || {};
+        const maxFotos = Math.min(24, Math.max(1, Number(cfg.pv_fotos) || 6));
+        const fotos = await urlsDe(p.alvo, maxFotos);
+        const hoje = new Date();
+        const validade = new Date(hoje.getTime() + (Number(p.validade_dias) || 30) * 86400000);
+        const valor = pv.valor != null ? pv.valor : a.valor;
+        const aPartir = pv.a_partir != null ? pv.a_partir : !!(c && c.valor_a_partir);
+        const mostrarEnd = (pv.mostrar_endereco != null ? pv.mostrar_endereco : cfg.pv_mostrar_endereco) && (a.logradouro || "").trim();
+        const linhasDe = t => String(t || "").split(/\n+/).map(s => s.trim()).filter(Boolean);
+        const destaques = [ ...linhasDe(pv.destaques), ...((c && c.rural && Array.isArray(c.benfeitorias)) ? c.benfeitorias.map(b => b.nome + (b.detalhe ? " (" + b.detalhe + ")" : "")) : []) ];
+        const condicoes = pv.condicoes != null ? pv.condicoes : condicoesPadrao(p);
+        const local = [ a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ");
+        const endereco = mostrarEnd ? [ [ a.logradouro, a.numero ].filter(Boolean).join(", "), a.bairro, [ a.cidade, a.uf ].filter(Boolean).join("/") ].filter(Boolean).join(" · ") : local;
+        const area = v => v ? numero(v) + " m²" : "";
+        const areaTexto = c && window.SKLRural && (c.rural || c.lote) ? window.SKLRural.areaTexto(c) : "";
+        const cond = Number(c && c.valor_condominio) || Number(a.valor_condominio) || 0, iptu = Number(c && c.valor_iptu) || 0;
+        const base = Number(a.area_construida) || Number(a.area_terreno) || 0;
+        let corretor = null, fotoCorretor = "";
+        const comCorretor = cfg.pv_corretor !== false && pv.corretor !== false;
+        if (comCorretor) ({ corretor, foto: fotoCorretor } = await carregarCorretor(p));
+        const pf = (corretor && corretor.perfil) || {};
+        const nomeCorretor = pf.nome_apresentacao || p.corretor || "";
+        const contatoCor = [ pf.whatsapp ? "WhatsApp " + pf.whatsapp : "", pf.email || "" ].filter(Boolean);
+        const cab = titulo => `<div class="pp-cab"><img src="${logo}" alt="" /><span>${h(titulo)}</span></div>`;
+        const tituloDoc = p.titulo || `Proposta de ${neg} — ${a.nome || "imóvel"}`;
+        const rod = () => `<div class="pp-rod"><span>${h(marca)} · ${h(tituloDoc)}</span><span>Página @@PAG@@ de @@TOT@@</span></div>`;
+        const ficha = [
+            [ "Tipo", a.tipo_imovel ], [ "Código", a.codigo ], [ "Bairro", a.bairro ], [ "Cidade", [ a.cidade, a.uf ].filter(Boolean).join(" / ") ],
+            areaTexto ? [ "Área", areaTexto ] : null,
+            !areaTexto && a.area_construida ? [ "Área construída", area(a.area_construida) ] : null,
+            !areaTexto && a.area_terreno ? [ "Área do terreno", area(a.area_terreno) ] : null,
+            a.quartos != null ? [ "Quartos", a.suites ? `${a.quartos} (${a.suites} suíte${a.suites > 1 ? "s" : ""})` : a.quartos ] : null,
+            a.banheiros != null ? [ "Banheiros", a.banheiros ] : null, a.vagas != null ? [ "Vagas", a.vagas ] : null,
+            a.edificio ? [ "Edifício / condomínio", a.edificio ] : null
+        ].filter(x => x && x[1] != null && x[1] !== "");
+        const rotValor = venda ? "Valor de venda" : "Aluguel por mês";
+
+        const css = cssPdf(azul, escuro, destaque) + `<style>
+.pp-pv-intro{font-size:11.5pt!important;line-height:1.6!important;color:#33454f}
+.pp-pv-galeria{display:grid;grid-template-columns:repeat(2,1fr);gap:3mm;margin:0 0 6mm}
+.pp-pv-galeria div{height:62mm;background:#e3e9ec center/cover no-repeat;border-radius:2mm}
+.pp-pv-galeria div.g0{grid-column:1/-1;height:92mm}
+.pp-pv-galeria.n1 div.g0{height:150mm}
+.pp-pv-galeria.n2 div{grid-column:1/-1;height:80mm}
+.pp-pv-passos{margin-top:6mm;padding-top:4mm;border-top:1px solid #d9e1e5}
+.pp-pv-num{display:grid;grid-template-columns:repeat(auto-fit,minmax(32mm,1fr));gap:3mm;margin:0 0 7mm}
+.pp-pv-num div{border:1.5px solid var(--az);border-radius:2.5mm;padding:3.5mm;display:grid;gap:.8mm;text-align:center}
+.pp-pv-num b{font-size:17pt;color:var(--esc)}
+.pp-pv-num small{font-size:8.5pt;text-transform:uppercase;letter-spacing:.08em;color:#5b6c75;font-weight:700}
+.pp-pv-fotos{display:grid;grid-template-columns:repeat(2,1fr);gap:3mm}
+.pp-pv-fotos div{height:74mm;background:#e3e9ec center/cover no-repeat;border-radius:2mm}
+.pp-pv-chips{display:flex;flex-wrap:wrap;gap:2.5mm;margin:2mm 0 6mm}
+.pp-pv-chips span{background:var(--az);color:#fff;border-radius:10mm;padding:1.8mm 4mm;font-size:10pt;font-weight:700}
+.pp-pv-valor{display:grid;grid-template-columns:1.3fr 1fr;gap:5mm;margin:4mm 0 7mm}
+.pp-pv-valor .principal{background:var(--esc);color:#fff;border-radius:3mm;padding:7mm 7mm;display:grid;gap:1.5mm}
+.pp-pv-valor .principal small{font-size:9pt;letter-spacing:.14em;text-transform:uppercase;color:var(--dest);font-weight:700}
+.pp-pv-valor .principal em{font-style:normal;font-size:10.5pt;opacity:.9}
+.pp-pv-valor .principal b{font-size:27pt;line-height:1.1}
+.pp-pv-valor .principal span{font-size:9.5pt;opacity:.85}
+.pp-pv-valor .lado{display:grid;gap:3mm;align-content:start}
+.pp-pv-valor .lado div{border:1.5px solid var(--az);border-radius:3mm;padding:3.5mm 4mm;display:grid;gap:1mm}
+.pp-pv-valor .lado small{font-size:8.5pt;text-transform:uppercase;letter-spacing:.08em;color:#5b6c75;font-weight:700}
+.pp-pv-valor .lado b{font-size:13pt;color:var(--esc)}
+.pp-pv-caixa{border-left:4px solid var(--dest);background:#fbf7f2;padding:4mm 5mm;margin:0 0 6mm}
+.pp-pv-caixa p{margin:0!important;white-space:pre-line}
+.pp-pv-local{display:flex;align-items:center;gap:3mm;font-size:11pt;color:var(--esc);font-weight:700;margin:0 0 6mm}
+.pp-pv-contato{display:flex;flex-wrap:wrap;gap:3mm;margin:5mm 0}
+.pp-pv-contato span{border:1px solid var(--az);color:var(--esc);border-radius:10mm;padding:1.8mm 4.5mm;font-size:10.5pt;font-weight:700}
+.pp-checks{display:flex;flex-wrap:wrap;gap:3mm 8mm;margin:2mm 0 5mm;font-size:10.5pt}
+.pp-checks span::before{content:"";display:inline-block;width:4mm;height:4mm;border:1.2px solid #4c5d66;border-radius:.8mm;margin-right:2mm;vertical-align:-0.6mm}
+</style>`;
+
+        const capa = `<section class="pp-pg pp-capa">
+            <div class="pp-capa-foto" style="${fotos[0] ? `background-image:url('${fotos[0]}')` : ""}"></div>
+            <div class="pp-capa-faixa"><small>Proposta de ${neg}</small>
+              <strong>${h(a.nome || p.titulo || "Imóvel")}</strong><span>${h(local)}</span>
+              ${cfg.pv_mostrar_valor !== false && valor ? `<span>${aPartir ? "A partir de " : ""}<b>${dinheiro(valor)}</b>${venda ? "" : " por mês"}</span>` : ""}
+              ${p.cliente ? `<span>Preparada para: <b>${h(p.cliente)}</b></span>` : ""}</div>
+            <div class="pp-capa-pe"><img src="${logo}" alt="${h(marca)}" />
+              <div><span>${h(hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }))}</span>
+              ${p.corretor ? `<span>Corretor: <b>${h(p.corretor)}</b></span>` : ""}<span>${h(marca)}</span></div></div>
+</section>`;
+
+        const imovel = `<section class="pp-pg">${cab("O imóvel")}
+            <h2>${h(a.nome || "O imóvel")}</h2>
+            ${cfg.pv_intro ? `<p class="pp-pv-intro">${h(cfg.pv_intro)}</p>` : ""}
+            ${fotos.length ? `<div class="pp-pv-galeria n${Math.min(3, fotos.length >= 4 ? 3 : fotos.length)}">${(fotos.length >= 4 ? fotos.slice(1, 4) : fotos.slice(0, 3)).map((u, i) => `<div class="g${i}" style="background-image:url('${u}')"></div>`).join("")}</div>` : ""}
+            ${destaques.length ? `<div class="pp-pv-chips">${destaques.slice(0, 12).map(d => `<span>${h(d)}</span>`).join("")}</div>` : ""}
+            ${rod()}</section>`;
+
+        const detalhes = `<section class="pp-pg">${cab("Ficha do imóvel")}
+            <h2>Ficha do imóvel</h2>
+            <p class="pp-pv-local">📍 ${h(endereco || "—")}</p>
+            <div class="pp-duas"><div><h3>Características</h3><table class="pp-ficha">${ficha.map(([ k, v ]) => `<tr><td>${h(k)}</td><td>${h(String(v))}</td></tr>`).join("")}</table></div>
+              <div><h3>Descrição</h3><p>${h(resumoDescricao(a.descricao, 1500) || "—")}</p>
+              ${p.observacoes ? `<h3>Observações</h3><p>${h(p.observacoes)}</p>` : ""}</div></div>
+            ${rod()}</section>`;
+
+        // fotos que sobraram (depois da capa e das 3 da página do imóvel), 6 por página
+        const resto = fotos.length >= 4 ? fotos.slice(4) : [];
+        const paginasFotos = [];
+        for (let i = 0; i < resto.length; i += 6) {
+            paginasFotos.push(`<section class="pp-pg">${cab("Fotos")}
+              <h2>Fotos <em>${i + 5}${resto[i + 1] ? "–" + Math.min(resto.length + 4, i + 10) : ""} de ${fotos.length}</em></h2>
+              <div class="pp-pv-fotos">${resto.slice(i, i + 6).map(u => `<div style="background-image:url('${u}')"></div>`).join("")}</div>
+              ${rod()}</section>`);
+        }
+
+        const lado = [
+            cfg.pv_mostrar_custos !== false && cond ? [ "Condomínio", dinheiro(cond) + " por mês" ] : null,
+            cfg.pv_mostrar_custos !== false && iptu ? [ "IPTU", dinheiro(iptu) + " por ano" ] : null,
+            cfg.pv_mostrar_m2 && valor && base && venda ? [ "Valor do m²", dinheiro(valor / base, 2) ] : null,
+            [ "Proposta válida até", validade.toLocaleDateString("pt-BR") ]
+        ].filter(Boolean);
+        const numerosPv = [ areaTexto ? [ areaTexto, "área" ] : a.area_construida ? [ numero(a.area_construida) + " m²", "construídos" ] : null,
+            !areaTexto && a.area_terreno ? [ numero(a.area_terreno) + " m²", "de terreno" ] : null,
+            a.quartos ? [ a.quartos, a.quartos > 1 ? "quartos" : "quarto" ] : null, a.suites ? [ a.suites, a.suites > 1 ? "suítes" : "suíte" ] : null,
+            a.banheiros ? [ a.banheiros, a.banheiros > 1 ? "banheiros" : "banheiro" ] : null, a.vagas ? [ a.vagas, a.vagas > 1 ? "vagas" : "vaga" ] : null ].filter(Boolean).slice(0, 5);
+        const passos = linhasDe(cfg.pv_passos);
+        const proximos = `<div class="pp-pv-passos"><h3>Próximos passos</h3>
+            ${passos.length ? `<ol class="pp-plano">${passos.map(x => `<li>${h(x)}</li>`).join("")}</ol>` : ""}
+            ${cfg.pv_sobre ? `<h3>Sobre a ${h(marca)}</h3><p>${h(cfg.pv_sobre)}</p>` : ""}
+            <h3>Fale com a gente</h3>
+            <p>${nomeCorretor ? `<b>${h(nomeCorretor)}</b> · ` : ""}${h(marca)}</p>
+            ${contatoCor.length ? `<div class="pp-pv-contato">${contatoCor.map(x => `<span>${h(x)}</span>`).join("")}</div>` : ""}</div>`;
+        const juntarPassos = ((condicoes || "").length + (cfg.pv_passos || "").length + (cfg.pv_sobre || "").length + (cfg.pv_texto || "").length) < 900;
+        const valorPag = `<section class="pp-pg">${cab(venda ? "Valor e condições" : "Valor e condições da locação")}
+            <h2>Valor e condições</h2>
+            <div class="pp-pv-valor">
+              <div class="principal"><small>${h(rotValor)}</small>${aPartir ? "<em>a partir de</em>" : ""}
+                <b>${cfg.pv_mostrar_valor !== false && valor ? dinheiro(valor) : "Sob consulta"}</b><span>${h(a.nome || "")}</span></div>
+              <div class="lado">${lado.map(([ k, v ]) => `<div><small>${h(k)}</small><b>${h(v)}</b></div>`).join("")}</div>
+            </div>
+            ${numerosPv.length ? `<h3>O imóvel em números</h3><div class="pp-pv-num">${numerosPv.map(([ v, t ]) => `<div><b>${h(String(v))}</b><small>${h(t)}</small></div>`).join("")}</div>` : ""}
+            ${condicoes ? `<h3>Condições de pagamento</h3><div class="pp-pv-caixa"><p>${h(condicoes)}</p></div>` : ""}
+            <h3>Localização</h3><p class="pp-pv-local">📍 ${h(endereco || "—")}</p>
+            ${aPartir ? `<p class="pp-nota">O valor “a partir de” é o menor valor disponível; o valor final depende da unidade ou das condições escolhidas.</p>` : ""}
+            <p class="pp-nota">Valores e disponibilidade sujeitos a confirmação no momento da negociação.${cfg.pv_texto ? " " + h(cfg.pv_texto) : ""}</p>
+            ${juntarPassos ? proximos : ""}
+            ${rod()}</section>`;
+        // texto longo nas condições/passos: os próximos passos ganham página própria para não passar da folha
+        const paginaPassos = juntarPassos ? "" : `<section class="pp-pg">${cab("Próximos passos")}<h2>Próximos passos</h2>${proximos}${rod()}</section>`;
+
+        const aceite = cfg.pv_aceite !== false ? `<section class="pp-pg">${cab(venda ? "Proposta de compra" : "Proposta de locação")}
+            <h2>${venda ? "Proposta de compra" : "Proposta de locação"}</h2>
+            <p>Preencha e assine para formalizar o seu interesse no imóvel <b>${h([ a.codigo, a.nome ].filter(Boolean).join(" · "))}</b>${local ? ` (${h(local)})` : ""}.</p>
+            <table class="pp-campos">
+              <tr><td>Nome completo</td><td>${h(p.cliente || "")}</td></tr><tr><td>CPF / CNPJ</td><td></td></tr>
+              <tr><td>Telefone / e-mail</td><td></td></tr><tr><td>Endereço</td><td></td></tr>
+              <tr><td>${venda ? "Valor oferecido" : "Aluguel oferecido"}</td><td></td></tr>
+              ${venda ? `<tr><td>Entrada (sinal)</td><td></td></tr>` : `<tr><td>Início desejado</td><td></td></tr>`}
+            </table>
+            <h3>${venda ? "Forma de pagamento" : "Garantia"}</h3>
+            <div class="pp-checks">${(venda ? [ "À vista", "Financiamento bancário", "FGTS", "Permuta", "Parcelado direto", "Outro" ] : [ "Caução", "Fiador", "Seguro-fiança", "Título de capitalização", "Outro" ]).map(t => `<span>${t}</span>`).join("")}</div>
+            <table class="pp-campos"><tr><td>Observações</td><td></td></tr><tr><td>Validade desta proposta</td><td>${h(validade.toLocaleDateString("pt-BR"))}</td></tr></table>
+            <p class="pp-nota">Esta proposta não obriga o proprietário a aceitar; ela é levada a ele pela ${h(marca)}, que retorna com a resposta.</p>
+            <p class="pp-local-data">${h(a.cidade || "")}, ____ de ______________ de ________.</p>
+            <div class="pp-assin"><div>${h(p.cliente || "Proponente")}<br>${venda ? "Proponente comprador(a)" : "Proponente locatário(a)"}</div><div>${h(nomeCorretor || "Corretor responsável")}<br>${h(marca)}</div></div>
+            ${rod()}</section>` : "";
+
+        const paginaCorretor = comCorretor ? paginaCorretorHtml(p, corretor, fotoCorretor, cab, rod, marca, "Quem vai te atender") : "";
+        const corpoSem = `${capa}${imovel}${detalhes}${paginasFotos.join("")}${valorPag}${paginaPassos}${paginaCorretor}${aceite}`;
+        const total = (corpoSem.match(/class="pp-pg/g) || []).length;
+        let pag = 1;
         const corpo = corpoSem.replace(/@@PAG@@/g, () => ++pag).replace(/@@TOT@@/g, total);
         return `${css}<div class="pp-doc" lang="pt-BR">${corpo}</div>`;
     }
