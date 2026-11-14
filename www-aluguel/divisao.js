@@ -75,6 +75,7 @@
             <span class="eyebrow">PARCEIRO DE FORA</span>
             <h2 id="divParcTitulo">Novo parceiro</h2>
             <label><span>Nome</span><input id="divParcNome" autocomplete="off" maxlength="120" /></label>
+            <label><span>Imobiliária (ou "Autônomo")</span><input id="divParcImob" autocomplete="off" maxlength="120" placeholder="Ex.: Correta, Re/Max, Autônomo" /></label>
             <div class="form-row">
               <label><span>CRECI</span><input id="divParcCreci" autocomplete="off" /></label>
               <label><span>% padrão do parceiro</span><input id="divParcPct" inputmode="decimal" autocomplete="off" /></label>
@@ -137,6 +138,7 @@
     // ------------------------------------------------------------------ janela
     async function abrir(n, box) {
         neg = n; boxAtual = box;
+        if (n.parceiro_id && !parceiros.some(p => p.id === n.parceiro_id)) await carregarParceiros();   // parceiro cadastrado agora no negócio
         msg("");
         $("divTitulo").textContent = "Dividir a comissão" + (n.titulo ? " — " + n.titulo : "");
         $("divRemover").hidden = !n.divisao_em;
@@ -180,7 +182,7 @@
     }
     function opcoesParceiros(atual) {
         const lista = parceiros.filter(p => p.ativo || p.id === atual);
-        return `<option value="">Escolha o parceiro</option>` + lista.map(p => `<option value="${h(p.id)}"${p.id === atual ? " selected" : ""}>${h(p.nome)}${p.creci ? " · CRECI " + h(p.creci) : ""}</option>`).join("")
+        return `<option value="">Escolha o parceiro</option>` + lista.map(p => `<option value="${h(p.id)}"${p.id === atual ? " selected" : ""}>${h(p.nome)}${p.imobiliaria ? " · " + h(p.imobiliaria) : ""}${p.creci ? " · CRECI " + h(p.creci) : ""}</option>`).join("")
             + `<option value="__novo">+ Cadastrar parceiro novo</option>`;
     }
     function desenharLinhas() {
@@ -307,6 +309,7 @@
         $("divParcTitulo").textContent = p ? "Editar parceiro" : "Novo parceiro";
         $("divParcNome").value = p ? p.nome : "";
         $("divParcCreci").value = p ? p.creci || "" : "";
+        $("divParcImob").value = p ? p.imobiliaria || "" : "";
         $("divParcPct").value = String(p ? p.percentual_padrao : 50).replace(".", ",");
         $("divParcTel").value = p ? p.telefone || "" : "";
         $("divParcEmail").value = p ? p.email || "" : "";
@@ -318,7 +321,7 @@
     }
     async function salvarParceiro() {
         const dados = {
-            nome: $("divParcNome").value, creci: $("divParcCreci").value, percentual_padrao: numero($("divParcPct").value),
+            nome: $("divParcNome").value, imobiliaria: $("divParcImob").value, creci: $("divParcCreci").value, percentual_padrao: numero($("divParcPct").value),
             telefone: $("divParcTel").value, email: $("divParcEmail").value, ativo: $("divParcAtivo").checked, observacao: $("divParcObs").value
         };
         const { data: id, error } = await ctx.sb.rpc("crm_salvar_parceiro", { p_carteira: ctx.carteiraId(), p_dados: dados, p_id: parceiroEditando ? parceiroEditando.id : null });
@@ -350,9 +353,9 @@
         art.open = parceirosAberto;
         art.innerHTML = `<summary class="panel-heading"><h2>Parceiros de fora <small class="muted-text">(${parceiros.length})</small></h2><span class="div-parc-seta" aria-hidden="true">▾</span></summary>
             <div class="div-parc-acoes"><button type="button" class="secondary-button" data-parc-novo>+ Novo parceiro</button></div>
-            <p class="muted-text">Corretores autônomos e outras imobiliárias que dividem negócios com vocês. Não entram no app: aparecem só para escolher na divisão do negócio.</p>
-            ${parceiros.length ? `<div class="table-panel"><table><thead><tr><th>Nome</th><th>CRECI</th><th>Contato</th><th>% padrão</th><th>Situação</th><th></th></tr></thead><tbody>
-              ${parceiros.map(p => `<tr><td><strong>${h(p.nome)}</strong></td><td>${h(p.creci || "—")}</td><td>${h([ p.telefone, p.email ].filter(Boolean).join(" · ") || "—")}</td>
+            <p class="muted-text">Corretores autônomos e de outras imobiliárias que trazem clientes ou dividem negócios com vocês. Não entram no app: aparecem para escolher como origem do negócio e na divisão da comissão. Os números de cada um estão em Indicadores → Parcerias.</p>
+            ${parceiros.length ? `<div class="table-panel"><table><thead><tr><th>Nome</th><th>Imobiliária</th><th>CRECI</th><th>Contato</th><th>% padrão</th><th>Situação</th><th></th></tr></thead><tbody>
+              ${parceiros.map(p => `<tr><td><strong>${h(p.nome)}</strong></td><td>${h(p.imobiliaria || "—")}</td><td>${h(p.creci || "—")}</td><td>${h([ p.telefone, p.email ].filter(Boolean).join(" · ") || "—")}</td>
                 <td>${h(pct(p.percentual_padrao))}</td><td>${p.ativo ? '<span class="status-pill disponivel">Ativo</span>' : '<span class="status-pill indisponivel">Inativo</span>'}</td>
                 <td><button type="button" class="row-button" data-parc-editar="${h(p.id)}">Editar</button></td></tr>`).join("")}
               </tbody></table></div>` : `<p class="muted-text">Nenhum parceiro cadastrado.</p>`}`;

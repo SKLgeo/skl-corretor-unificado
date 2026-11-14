@@ -302,16 +302,17 @@
             `<section class="pg-cartao pg-c-seg" id="pgSeg"><header><h2>Segmento que mais fecha</h2><small class="pg-sub">tipo de imóvel e faixa de preço</small></header>
               ${chips("pgSeg", PERIODOS_SEG, segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "mesames" : segP)}
               <input id="pgSegMes" type="month" class="pg-mes" ${segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "" : "hidden"} value="${h(mesSeg || hojeIso().slice(0, 7))}" aria-label="Mês" />
-              <div class="pg-corpo"></div></section>`
+              <div class="pg-corpo"></div></section>`,
+            cartao("pgParc", "pg-c-largo", "Parcerias que mais fecham", `<small class="pg-sub">imobiliárias e corretores parceiros</small>`, true)
         ].join("");
         const fazer = {
             pgVgv: () => kpiVgv(), pgQtd: () => kpiQtd(), pgVgcMes: () => vgcTempo(), pgCal: () => calendario(corpo("pgCal"), dadosFin()),
             pgAneis: () => aneis(), pgMeta: () => metas(d), pgPend: () => pendencias(corpo("pgPend")), pgVxl: () => vxl(),
-            pgCorr: () => corretores(d), pgFunil: () => funilConversao(), pgDesp: () => despesasCartao(), pgSeg: () => segmento()
+            pgCorr: () => corretores(d), pgFunil: () => funilConversao(), pgDesp: () => despesasCartao(), pgSeg: () => segmento(), pgParc: () => parcerias()
         };
         desenhos = fazer; tabelas = {};
         Object.keys(fazer).forEach(desenharCartao);
-        redesenhar = () => [ "pgVgv", "pgVgcMes", "pgVxl", "pgCorr" ].forEach(desenharCartao);
+        redesenhar = () => [ "pgVgv", "pgVgcMes", "pgVxl", "pgCorr", "pgParc" ].forEach(desenharCartao);
 
         grade.querySelectorAll("[data-per-card]").forEach(b => b.addEventListener("click", () => {
             const id = b.dataset.perCard, v = b.dataset.per;
@@ -505,6 +506,38 @@
         const semImovel = lista.filter(n => !porId.has(n.neg.construcao_id)).length;
         box.innerHTML = `<div class="pg-seg">${bloco("Tipo de imóvel", tipos)}${bloco("Faixa de preço", faixas)}</div>
           <p class="pg-nota">${lista.length} negócio(s) · ${h(rotuloPer(p === "mesames" ? mesSeg : p))}. Faixas de preço: Configurações → Faixas de padrão.${semImovel ? ` ${semImovel} negócio(s) sem imóvel ligado (o histórico do Power BI não traz o tipo do imóvel).` : ""}</p>`;
+    }
+
+    // 13. parcerias: negócios fechados que vieram de corretor de outra imobiliária (ou autônomo), por imobiliária e por corretor
+    function parcerias() {
+        const I = window.SKLCRM && window.SKLCRM.interno;
+        const parc = (I && I.parceiros) || new Map();
+        const { p, lista } = doCartao("pgParc");
+        const comParc = lista.filter(n => n.neg && n.neg.parceiro_id);
+        const box = corpo("pgParc");
+        if (!comParc.length) {
+            box.innerHTML = `<p class="pg-vazio">Nenhum negócio fechado com corretor parceiro ${h(rotuloPer(p))}.</p>
+              <p class="pg-nota">Para contar aqui, marque no negócio "Origem: veio de corretor parceiro?".</p>`;
+            tabelas.pgParc = null;
+            return;
+        }
+        const grupo = chave => {
+            const m = new Map();
+            comParc.forEach(n => { const k = chave(n); const r = m.get(k) || { qtd: 0, vgv: 0 }; r.qtd++; r.vgv += n.valor; m.set(k, r); });
+            return [ ...m.entries() ].sort((a, b) => b[1].qtd - a[1].qtd || b[1].vgv - a[1].vgv);
+        };
+        const imob = n => { const x = parc.get(n.neg.parceiro_id); return x && (x.imobiliaria || "").trim() ? x.imobiliaria.trim() : "Sem imobiliária informada"; };
+        const corr = n => { const x = parc.get(n.neg.parceiro_id); return x ? x.nome : "Parceiro"; };
+        const bloco = (titulo, linhasG) => {
+            const max = Math.max(1, ...linhasG.map(([ , r ]) => r.qtd));
+            return `<div class="pg-seg-bloco"><h3>${h(titulo)}</h3>${linhasG.slice(0, 8).map(([ k, r ], i) => `<div class="pg-funil-linha">
+                <span class="pg-funil-nome">${i === 0 ? "🏆 " : ""}${h(k)}</span><span class="pg-funil-barra"><i style="width:${Math.max(3, r.qtd / max * 100)}%"></i></span>
+                <b>${r.qtd}</b><small>${h(curto(r.vgv))}</small></div>`).join("")}</div>`;
+        };
+        const imobs = grupo(imob), corrs = grupo(corr);
+        box.innerHTML = `<div class="pg-seg">${bloco("Por imobiliária", imobs)}${bloco("Por corretor parceiro", corrs)}</div>
+          <p class="pg-nota">${comParc.length} de ${lista.length} negócio(s) fechado(s) vieram de parceria · ${h(rotuloPer(p))}. Detalhes em Indicadores → Parcerias.</p>`;
+        tabelas.pgParc = [ [ "Imobiliária", "Fechados", "Valor" ], ...imobs.map(([ k, r ]) => [ k, String(r.qtd), curto(r.vgv) ]) ];
     }
 
     // ------------------------------------------------------------------ Mercado (botão 📍 no menu lateral)

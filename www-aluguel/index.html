@@ -311,6 +311,7 @@
           </div>
         </article>
         <article class="panel painel-bloco"><h3>Indicações</h3><div id="painelIndicacoes"></div></article>
+        <article id="painelParceriasBloco" class="panel painel-bloco"><h3>🤝 Parcerias com outras imobiliárias</h3><div id="painelParcerias"></div></article>
         <div class="painel-grade">
           <article class="panel painel-bloco"><h3>Demanda sem estoque</h3><div id="painelDemanda"></div></article>
           <article class="panel painel-bloco"><h3>Padrão dos clientes em negociação</h3><div id="painelPadraoBloco" class="crm-resumo painel-padroes"></div></article>
@@ -935,6 +936,14 @@
         </label>
         <label><span>Funil</span><select id="crmNegFunil"></select></label>
       </div>
+      <label id="crmNegSemClienteLabel" class="crm-sem-cliente" hidden><input id="crmNegSemCliente" type="checkbox" />
+        <span><strong>Estou ciente que este negócio não possui cliente atribuído.</strong> <small>O cliente pode ser colocado depois, abrindo o negócio.</small></span></label>
+      <div class="crm-origem-parceiro">
+        <label><span>Origem: veio de corretor parceiro?</span>
+          <span class="crm-com-botao"><select id="crmNegParceiro"></select><button id="crmNegNovoParc" type="button" class="secondary-button" title="Cadastrar corretor parceiro">+ Novo</button></span>
+        </label>
+        <small id="crmNegParceiroInfo" class="muted-text"></small>
+      </div>
       <div class="form-row">
         <div class="crm-campo-imovel"><span class="crm-campo-rotulo">Imóvel de interesse</span>
           <select id="crmNegImovel" hidden></select>
@@ -1117,6 +1126,20 @@
       <p class="muted-text">O compromisso vira a próxima ação da negociação e aparece na Agenda (e no cartão do quadro).</p>
       <button id="crmCompSalvar" type="button" class="primary-button">Agendar</button>
       <div id="crmCompMsg" class="form-message" hidden></div>
+    </form>
+  </dialog>
+
+  <dialog id="crmParcRapidoDialog" class="crm-dialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" type="button" value="cancel">×</button>
+      <span class="eyebrow">CORRETOR PARCEIRO</span>
+      <h2>Novo corretor parceiro</h2>
+      <p class="muted-text">Corretor de outra imobiliária (ou autônomo) que trouxe o cliente. Só o nome é obrigatório.</p>
+      <label><span>Nome do corretor *</span><input id="crmParcRapidoNome" autocomplete="off" maxlength="120" /></label>
+      <label><span>Imobiliária (ou "Autônomo")</span><input id="crmParcRapidoImob" list="crmParcImobLista" autocomplete="off" maxlength="120" placeholder="Ex.: Correta, Re/Max, Autônomo" /></label>
+      <datalist id="crmParcImobLista"></datalist>
+      <button id="crmParcRapidoSalvar" type="button" class="primary-button">Salvar parceiro</button>
+      <div id="crmParcRapidoMsg" class="form-message" hidden></div>
     </form>
   </dialog>
 

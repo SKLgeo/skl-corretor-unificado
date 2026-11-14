@@ -6,7 +6,7 @@
     "use strict";
     const $ = id => document.getElementById(id);
     const ORIGENS = [ "Site", "Instagram", "Facebook", "WhatsApp", "Indicação", "Placa no imóvel", "Portal imobiliário",
-        "Ligação", "Visita à imobiliária", "Interesse no app", "Outro" ];
+        "Ligação", "Visita à imobiliária", "Interesse no app", "Corretor parceiro", "Outro" ];
     const TIPOS_CLIENTE = { comprador: "Comprador", inquilino: "Inquilino", vendedor: "Vendedor", investidor: "Investidor", proprietario: "Proprietário" };
     const TIPOS_ATENDIMENTO = [
         [ "ligacao", "📞", "Ligação" ], [ "whatsapp", "💬", "WhatsApp" ], [ "visita", "🏠", "Visita" ],
@@ -30,6 +30,7 @@
     let conversao = null, conversaoChave = "";
     const clientes = new Map();
     const negs = new Map();
+    const parceiros = new Map();   // corretores parceiros (outras imobiliárias/autônomos): id → { nome, imobiliaria, ativo }
     let funilAtual = null;
     let canal = null, timer = null, recarga = null;
     let ligado = false;
@@ -324,14 +325,14 @@
         if (canal) { ctx.sb.removeChannel(canal); canal = null; }
         if (timer) { clearInterval(timer); timer = null; }
         funis = []; funisTodos = []; etapas = []; motivos = [];
-        clientes.clear(); negs.clear(); visitas.clear(); lembretes.clear(); roleta = null;
+        clientes.clear(); negs.clear(); visitas.clear(); lembretes.clear(); parceiros.clear(); roleta = null;
         funilAtual = null;
     }
     async function carregar() {
         if (!ctx || !ctx.carteiraId()) return;
         const cid = ctx.carteiraId();
         const sb = ctx.sb;
-        const [ f, e, m, c, n, cfg, vis, lem, rol ] = await Promise.all([
+        const [ f, e, m, c, n, cfg, vis, lem, rol, parc ] = await Promise.all([
             sb.from("crm_funis").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_etapas").select("*").eq("carteira_id", cid).order("ordem"),
             sb.from("crm_motivos_perda").select("*").eq("carteira_id", cid).order("ordem"),
@@ -340,7 +341,8 @@
             sb.from("carteiras_aluguel").select("faixas_padrao").eq("id", cid).maybeSingle(),
             sb.from("crm_visitas").select("*").eq("carteira_id", cid).order("agendada_para", { ascending: false }).limit(3000),
             sb.from("crm_lembretes").select("*").eq("carteira_id", cid).order("quando").limit(3000),
-            gestao() ? sb.from("crm_roleta").select("*").eq("carteira_id", cid).maybeSingle() : Promise.resolve({ data: null })
+            gestao() ? sb.from("crm_roleta").select("*").eq("carteira_id", cid).maybeSingle() : Promise.resolve({ data: null }),
+            sb.rpc("crm_parceiros_lista", { p_carteira: cid })
         ]);
         const falha = [ f, e, m, c, n ].find(r => r.error);
         if (falha) { console.warn("CRM:", falha.error); return; }
@@ -353,6 +355,7 @@
         visitas.clear(); ((vis && vis.data) || []).forEach(x => visitas.set(x.id, x));
         lembretes.clear(); ((lem && lem.data) || []).forEach(x => lembretes.set(x.id, x));
         roleta = (rol && rol.data) || null;
+        parceiros.clear(); ((parc && !parc.error && parc.data) || []).forEach(x => parceiros.set(x.id, x));
         if (cfg && cfg.data && cfg.data.faixas_padrao) faixas = cfg.data.faixas_padrao;
         if (!funilAtual || (funilAtual !== TODOS && !funil(funilAtual))) funilAtual = funis.length > 1 ? TODOS : (funis[0] ? funis[0].id : null);
         if (window.SKLCRMPainel) window.SKLCRMPainel.invalidar();
@@ -451,12 +454,18 @@
         $("crmNegNovoCli").addEventListener("click", () => {
             aoSalvarCliente = cli => {
                 preencherSelectClientes(cli.id);
+                mostrarSemCliente();
                 const n = negAberta ? negs.get(negAberta) : null;
                 if (!n) aplicarClienteNaNegociacao(cli.id);
             };
             abrirCliente(null);
         });
-        $("crmNegCliente").addEventListener("change", () => { if (!negAberta) aplicarClienteNaNegociacao($("crmNegCliente").value); });
+        $("crmNegCliente").addEventListener("change", () => { if (!negAberta) aplicarClienteNaNegociacao($("crmNegCliente").value); mostrarSemCliente(); });
+        $("crmNegParceiro").addEventListener("change", mostrarSemCliente);
+        $("crmNegSemCliente").addEventListener("change", () => $("crmNegSemClienteLabel").classList.remove("destaque"));
+        $("crmNegNovoParc").addEventListener("click", abrirParceiroRapido);
+        $("crmParcRapidoSalvar").addEventListener("click", salvarParceiroRapido);
+        $("crmParcRapidoNome").addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); salvarParceiroRapido(); } });
         $("crmNegImovel").addEventListener("change", mostrarProcura);
         $("crmNegImovelBotao").addEventListener("click", abrirBuscaImovel);
         $("crmImBuscaTexto").addEventListener("input", () => { clearTimeout(buscaTimer); buscaTimer = setTimeout(desenharBuscaImovel, 180); });
@@ -541,7 +550,7 @@
         const termo = normal($("crmBuscaNeg").value.trim());
         if (!termo) return true;
         const c = clientes.get(n.cliente_id) || {};
-        const alvo = normal([ c.nome, c.email, n.titulo, imovelNome(n.construcao_id) ].join(" "));
+        const alvo = normal([ c.nome, c.email, n.titulo, imovelNome(n.construcao_id), nomeParceiro(n.parceiro_id) ].join(" "));
         const d = termo.replace(/\D/g, "");
         return alvo.includes(termo) || (d.length >= 3 && digitos(c.telefone).includes(d));
     }
@@ -702,6 +711,18 @@
         });
         return abertas.concat(fim);
     }
+    // nome do parceiro com a imobiliária: "João (Correta)"
+    function nomeParceiro(id) {
+        const p = id && parceiros.get(id);
+        return p ? p.nome + (p.imobiliaria ? " (" + p.imobiliaria + ")" : "") : "";
+    }
+    // como chamar o negócio quando não tem cliente atribuído
+    function nomeDoNegocio(n) {
+        const c = n && clientes.get(n.cliente_id);
+        if (c) return c.nome;
+        if (n && n.cliente_id) return "Cliente";
+        return n && n.parceiro_id && parceiros.get(n.parceiro_id) ? "Cliente de " + parceiros.get(n.parceiro_id).nome : "Sem cliente atribuído";
+    }
     function corDoFunil(f) { return (f && (f.cor || COR_FUNIL[f.finalidade])) || "#ffffff"; }
     function cartao(n) {
         const c = clientes.get(n.cliente_id);
@@ -716,7 +737,8 @@
         const f = funil(n.funil_id);
         const tipo = funilAtual === TODOS && f ? `<span class="crm-card-tipo">${h(f.nome)}</span>` : "";
         return `<article class="crm-card" draggable="true" data-neg="${h(n.id)}" style="--fundo:${h(corDoFunil(f))}">
-          ${tipo}<strong>${h(c ? c.nome : "Cliente")}</strong>${seloPadrao(n)}
+          ${tipo}<strong${!n.cliente_id ? ' class="crm-sem-cli"' : ""}>${h(c ? c.nome : nomeDoNegocio(n))}</strong>${seloPadrao(n)}
+          ${n.parceiro_id ? `<small class="crm-card-parceiro">🤝 ${h(nomeParceiro(n.parceiro_id))}</small>` : ""}
           ${n.titulo || n.construcao_id ? `<small>${h(n.titulo || imovelNome(n.construcao_id))}</small>` : ""}
           ${!n.construcao_id && n.imovel_procurado ? `<small class="crm-card-procura">🔎 ${h(n.imovel_procurado.descricao)}</small>` : ""}
           <div class="crm-card-linha"><span class="crm-valor">${h(dinheiro(n.valor))}</span><span class="crm-dias" title="Tempo nesta etapa">${et && et.tipo === "aberta" ? (dias ? dias + " d" : "hoje") : h(dataCurta(n.fechado_em))}</span></div>
@@ -754,7 +776,7 @@
         const perda = para.tipo === "perdido";
         const c = clientes.get(n.cliente_id);
         $("crmMotEyebrow").textContent = perda ? "NEGOCIAÇÃO PERDIDA" : "VOLTAR DE ETAPA";
-        $("crmMotTitulo").textContent = `${c ? c.nome : "Negociação"} → ${para.nome}`;
+        $("crmMotTitulo").textContent = `${c ? c.nome : nomeDoNegocio(n)} → ${para.nome}`;
         $("crmMotPerdaLabel").hidden = !perda;
         $("crmMotPerda").innerHTML = `<option value="">Escolha o motivo</option>` + motivos.filter(m => m.ativo).map(m => `<option value="${h(m.id)}">${h(m.nome)}</option>`).join("");
         $("crmMotPerda").onchange = atualizarRotuloMotivo;
@@ -837,7 +859,7 @@
                 return `<article class="crm-agenda-item" data-neg="${h(n.id)}">
                   <div class="crm-agenda-quando">${n.proxima_acao_em ? h(dataHora(n.proxima_acao_em)) : "—"}</div>
                   <div class="crm-agenda-info">
-                    <strong>${h(c ? c.nome : "Cliente")}</strong>
+                    <strong>${h(c ? c.nome : nomeDoNegocio(n))}</strong>
                     <small>${h(n.proxima_acao_texto || "Defina o próximo passo")}</small>
                     <small class="crm-agenda-meta"><span class="crm-pill" style="--cor:${h(et && et.cor || "#64748b")}">${h(et ? et.nome : "")}</span> ${h(f ? f.nome : "")}${central() ? " · " + h(corretorDe(n.corretor_id)) : ""}</small>
                   </div>
@@ -948,7 +970,7 @@
         const porCliente = new Map();
         [ ...negs.values() ].filter(n => n.situacao === "perdida" && n.fechado_em && doFoco(n.corretor_id)).forEach(n => {
             const dias = (agora - new Date(n.fechado_em).getTime()) / DIA;
-            if (dias < 60 || dias > 365 || comAberta.has(n.cliente_id)) return;
+            if (!n.cliente_id || dias < 60 || dias > 365 || comAberta.has(n.cliente_id)) return;
             const atual = porCliente.get(n.cliente_id);
             if (!atual || String(n.fechado_em) > String(atual.fechado_em)) porCliente.set(n.cliente_id, n);
         });
@@ -989,7 +1011,7 @@
                 const c = clientes.get(n.cliente_id);
                 const dias = Math.floor((agora - new Date(n.updated_at).getTime()) / DIA);
                 const et = etapa(n.etapa_id);
-                return item(`${dias} dias`, c ? c.nome : "Cliente", `${et ? et.nome : ""} · sem movimento${central() ? " · " + corretorDe(n.corretor_id) : ""}`, c,
+                return item(`${dias} dias`, c ? c.nome : nomeDoNegocio(n), `${et ? et.nome : ""} · sem movimento${central() ? " · " + corretorDe(n.corretor_id) : ""}`, c,
                     `<button type="button" class="secondary-button" data-abrir>Abrir</button>`, `data-neg="${h(n.id)}"`);
             })),
             reativar: secao("Clientes para reativar", "futura", reat.map(n => {
@@ -1007,7 +1029,7 @@
         const abertas = [ ...negs.values() ].filter(n => n.situacao === "aberta")
             .sort((a, b) => normal((clientes.get(a.cliente_id) || {}).nome).localeCompare(normal((clientes.get(b.cliente_id) || {}).nome)));
         $("crmCompNeg").innerHTML = abertas.map(n => { const c = clientes.get(n.cliente_id); const et = etapa(n.etapa_id); const f = funil(n.funil_id);
-            return `<option value="${h(n.id)}">${h(c ? c.nome : "Cliente")} — ${h(f ? f.nome : "")}, ${h(et ? et.nome : "")}${n.titulo ? " · " + h(n.titulo) : ""}</option>`; }).join("");
+            return `<option value="${h(n.id)}">${h(c ? c.nome : nomeDoNegocio(n))} — ${h(f ? f.nome : "")}, ${h(et ? et.nome : "")}${n.titulo ? " · " + h(n.titulo) : ""}</option>`; }).join("");
         $("crmCompSemNeg").hidden = abertas.length > 0;
         $("crmCompNeg").closest("label").hidden = !abertas.length;
         $("crmCompSalvar").disabled = !abertas.length;
@@ -1527,6 +1549,50 @@
         $("crmNegCliente").innerHTML = `<option value="">Escolha o cliente</option>` + lista.map(c => `<option value="${h(c.id)}">${h(c.nome)}${c.telefone ? " · " + h(formatarTelefone(c.telefone)) : ""}</option>`).join("");
         $("crmNegCliente").value = selecionado || "";
     }
+    function preencherSelectParceiros(selecionado) {
+        const lista = [ ...parceiros.values() ].filter(p => p.ativo || p.id === selecionado)
+            .sort((a, b) => normal(a.nome).localeCompare(normal(b.nome)));
+        $("crmNegParceiro").innerHTML = `<option value="">Não — cliente da casa</option>`
+            + lista.map(p => `<option value="${h(p.id)}">${h(p.nome)}${p.imobiliaria ? " · " + h(p.imobiliaria) : ""}${p.ativo ? "" : " (inativo)"}</option>`).join("");
+        $("crmNegParceiro").value = selecionado || "";
+    }
+    // a caixa "estou ciente" só aparece quando não há cliente escolhido
+    function mostrarSemCliente() {
+        const semCli = !$("crmNegCliente").value;
+        $("crmNegSemClienteLabel").hidden = !semCli;
+        const p = parceiros.get($("crmNegParceiro").value);
+        $("crmNegParceiroInfo").textContent = p
+            ? `Negócio em parceria com ${p.nome}${p.imobiliaria ? " — " + p.imobiliaria : ""}. Ao fechar, a divisão da comissão já vem com ele.`
+            : "Se o cliente veio de um corretor de outra imobiliária (ou autônomo), escolha ou cadastre aqui.";
+    }
+    function abrirParceiroRapido() {
+        $("crmParcRapidoNome").value = "";
+        $("crmParcRapidoImob").value = "";
+        $("crmParcRapidoMsg").hidden = true;
+        const imobs = [ ...new Set([ ...parceiros.values() ].map(p => (p.imobiliaria || "").trim()).filter(Boolean).concat([ "Autônomo" ])) ]
+            .sort((a, b) => normal(a).localeCompare(normal(b)));
+        $("crmParcImobLista").innerHTML = imobs.map(i => `<option value="${h(i)}"></option>`).join("");
+        $("crmParcRapidoDialog").showModal();
+        setTimeout(() => $("crmParcRapidoNome").focus(), 50);
+    }
+    async function salvarParceiroRapido() {
+        const nome = $("crmParcRapidoNome").value.trim();
+        if (!nome) { msg($("crmParcRapidoMsg"), "Informe o nome do corretor parceiro."); return; }
+        $("crmParcRapidoSalvar").disabled = true;
+        try {
+            const { data, error } = await ctx.sb.rpc("crm_parceiro_rapido", { p_carteira: ctx.carteiraId(), p_nome: nome, p_imobiliaria: $("crmParcRapidoImob").value.trim() || null });
+            if (error) throw error;
+            parceiros.set(data.id, data);
+            preencherSelectParceiros(data.id);
+            mostrarSemCliente();
+            $("crmParcRapidoDialog").close();
+            ctx.toast("Corretor parceiro salvo.");
+        } catch (e) {
+            msg($("crmParcRapidoMsg"), erro(e));
+        } finally {
+            $("crmParcRapidoSalvar").disabled = false;
+        }
+    }
     function preencherSelectImoveis(funilId, selecionado) {
         const f = funil(funilId);
         const lista = ctx.imoveis().filter(i => (i.aprovacao || "aprovado") === "aprovado"
@@ -1561,15 +1627,20 @@
         $("crmNegMsg").hidden = true;
         $("crmNegEyebrow").textContent = n ? (funil(n.funil_id) || {}).nome?.toUpperCase() || "NEGOCIAÇÃO" : "NOVA NEGOCIAÇÃO";
         const cli = clientes.get(base.cliente_id);
-        $("crmNegTitulo").textContent = n ? (cli ? cli.nome : "Negociação") : "Nova negociação";
+        $("crmNegTitulo").textContent = n ? nomeDoNegocio(n) : "Nova negociação";
         $("crmNegFunil").innerHTML = funis.map(f => `<option value="${h(f.id)}">${h(f.nome)}</option>`).join("");
         $("crmNegFunil").value = base.funil_id || (funis[0] && funis[0].id) || "";
         $("crmNegFunil").disabled = !!n;
         $("crmNegFunil").onchange = () => { preencherSelectImoveis($("crmNegFunil").value, $("crmNegImovel").value); renderCompativeis(); mostrarPrazo(); };
         $("crmNegPrazo").value = n && n.contrato_meses ? n.contrato_meses : "";
         preencherSelectClientes(base.cliente_id);
-        $("crmNegCliente").disabled = !!n;
-        $("crmNegNovoCli").hidden = !!n;
+        // negócio sem cliente: dá para colocar o cliente depois
+        $("crmNegCliente").disabled = !!(n && n.cliente_id);
+        $("crmNegNovoCli").hidden = !!(n && n.cliente_id);
+        $("crmNegSemCliente").checked = !!(n && !n.cliente_id);
+        $("crmNegSemClienteLabel").classList.remove("destaque");
+        preencherSelectParceiros(n ? n.parceiro_id : (base.parceiro_id || ""));
+        mostrarSemCliente();
         preencherSelectImoveis($("crmNegFunil").value, base.construcao_id || (n && n.imovel_procurado ? PROCURA : ""));
         preencherProcura(n && n.imovel_procurado);
         mostrarProcura();
@@ -1890,14 +1961,23 @@
             perfil_busca: perfil,
             proxima_acao_em: deInputLocal($("crmNegAcaoEm").value) || "",
             proxima_acao_texto: $("crmNegAcaoTexto").value.trim(),
-            contrato_meses: $("crmNegPrazoLabel").hidden ? "" : ($("crmNegPrazo").value || "")
+            contrato_meses: $("crmNegPrazoLabel").hidden ? "" : ($("crmNegPrazo").value || ""),
+            parceiro_id: $("crmNegParceiro").value || null,
+            sem_cliente_ciente: !$("crmNegCliente").value && $("crmNegSemCliente").checked
         };
+        // origem: a que já estava (o banco limpava ao salvar sem ela); negócio novo com parceiro = "Corretor parceiro"
+        const atual = negAberta ? negs.get(negAberta) : null;
+        dados.origem = atual ? (atual.origem || (dados.parceiro_id ? "Corretor parceiro" : "")) : (dados.parceiro_id ? "Corretor parceiro" : "");
         if (central()) dados.corretor_id = $("crmNegCorretor").value || null;
         return dados;
     }
     async function salvarNegociacao() {
         const dados = coletarNegociacao();
-        if (!dados.cliente_id) { msg($("crmNegMsg"), "Escolha o cliente (ou cadastre um novo no botão + Novo)."); return; }
+        if (!dados.cliente_id && !dados.sem_cliente_ciente) {
+            msg($("crmNegMsg"), "Escolha o cliente (ou cadastre no botão + Novo). Se o negócio ainda não tem cliente, marque \"Estou ciente que este negócio não possui cliente atribuído\".");
+            $("crmNegSemClienteLabel").classList.add("destaque");
+            return;
+        }
         if (dados.imovel_procurado && !dados.imovel_procurado.descricao) { msg($("crmNegMsg"), "Descreva o imóvel que o cliente procura."); return; }
         if ($("crmNegValor").value.trim() && dados.valor === "") { msg($("crmNegMsg"), "Valor inválido."); return; }
         const n = negAberta ? negs.get(negAberta) : null;
@@ -2214,7 +2294,8 @@
         ctx: () => ctx, negs, clientes, funis: () => funis, etapas: () => etapas, motivos: () => motivos, faixas: () => faixas,
         etapa, funil, etapasDoFunil, compatibilidade, perfilVazio, padraoDe, PADROES, situacaoAcao, corretorDe, dinheiro, dinheiroCurto,
         normal, dataCurta, dataHora, linksContato, abrirNegociacao: id => abrirNegociacao(id),
-        visitas, lembretes, abrirVisita: id => abrirVisita(id), concluirLembrete: id => concluirLembrete(id)
+        visitas, lembretes, abrirVisita: id => abrirVisita(id), concluirLembrete: id => concluirLembrete(id),
+        parceiros, nomeParceiro, nomeDoNegocio
     };
     window.SKLCRM = { interno, iniciar, sair, recarregar, aoMostrar, proprietarioPreencher, proprietarioSalvar, proprietarioUsar, abrirNegociacao, abrirCliente };
 })();

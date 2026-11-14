@@ -425,3 +425,15 @@ dialog.crm-dialog-larga{width:min(820px,calc(100% - 24px))}
 .crm-cli-equipe small{color:var(--muted);font-weight:400;font-size:12px}
 .crm-sem-imovel{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
 .crm-sem-imovel[hidden]{display:none}
+
+/* 14/11/2026 — negócio de corretor parceiro e negócio sem cliente atribuído */
+.crm-sem-cliente{display:flex!important;gap:10px;align-items:flex-start;margin:4px 0 10px;padding:10px 12px;border:1px dashed #d59a22;border-radius:10px;background:#fff8ea;cursor:pointer;font-size:13px;line-height:1.35}
+.crm-sem-cliente[hidden]{display:none!important}
+.crm-sem-cliente input{width:18px;height:18px;margin:1px 0 0;flex:0 0 auto}
+.crm-sem-cliente small{display:block;color:#7a6a4f;font-weight:400}
+.crm-sem-cliente.destaque{border-style:solid;border-color:#c0392b;background:#fdecea}
+.crm-origem-parceiro{display:grid;gap:4px;margin:0 0 10px}
+.crm-origem-parceiro small{font-size:12px}
+.crm-card-parceiro{display:block;color:#7c3aed;font-weight:600;font-size:12px;margin-top:2px}
+.crm-card strong.crm-sem-cli{color:#9a6b12;font-style:italic}
+.painel-parc-resumo{margin-bottom:10px}

@@ -247,7 +247,7 @@
             ? `<p class="muted-text">${semEstoque.length} cliente(s) em negociação procuram algo que a carteira não tem (nenhum imóvel com 75% ou mais de compatibilidade).</p>
                <div class="painel-duas"><div><h4>Bairros mais pedidos</h4>${barras([ ...pedidosBairro.entries() ].sort((a, b) => b[1] - a[1]).slice(0, 6), "#7c3aed") || "<p class=\"muted-text\">—</p>"}</div>
                <div><h4>Tipos mais pedidos</h4>${barras([ ...pedidosTipo.entries() ].sort((a, b) => b[1] - a[1]).slice(0, 6), "#d59a22") || "<p class=\"muted-text\">—</p>"}</div></div>
-               <ul class="painel-lista">${semEstoque.slice(0, 8).map(n => { const c = x.clientes.get(n.cliente_id); const p = n.perfil_busca; return `<li><a href="#" data-neg="${h(n.id)}">${h(c ? c.nome : "Cliente")}</a> — ${h([ p.tipo, (p.bairros || []).join("/"), p.valor_max ? "até " + x.dinheiro(p.valor_max) : "", p.quartos_min ? p.quartos_min + "+ quartos" : "" ].filter(Boolean).join(", "))}</li>`; }).join("")}</ul>`
+               <ul class="painel-lista">${semEstoque.slice(0, 8).map(n => { const c = x.clientes.get(n.cliente_id); const p = n.perfil_busca; return `<li><a href="#" data-neg="${h(n.id)}">${h(c ? c.nome : x.nomeDoNegocio(n))}</a> — ${h([ p.tipo, (p.bairros || []).join("/"), p.valor_max ? "até " + x.dinheiro(p.valor_max) : "", p.quartos_min ? p.quartos_min + "+ quartos" : "" ].filter(Boolean).join(", "))}</li>`; }).join("")}</ul>`
             : `<p class="muted-text">Toda a procura dos clientes em negociação tem imóvel compatível na carteira.</p>`;
         $("painelDemanda").querySelectorAll("[data-neg]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); x.abrirNegociacao(a.dataset.neg); }));
 
@@ -267,6 +267,9 @@
               + tabela([ "Quem indicou", "Indicações", "Viraram negócio" ], listaInd.map(([ id, r ]) => [ nomeCli(id), r.qtd, r.fechados ]))
             : `<p class="muted-text">Nenhum cliente marcado como indicação no período. No cadastro do cliente, escolha a origem "Indicação" e quem indicou.</p>`;
         ultimoCsv.push([ "Quem indicou", "Indicações", "Viraram negócio" ], ...listaInd.map(([ id, r ]) => [ nomeCli(id), String(r.qtd), String(r.fechados) ]), []);
+
+        // ---------- parcerias (negócios que vieram de corretor de outra imobiliária ou autônomo)
+        renderParcerias(x, todas, noPeriodo, periodo);
 
         // ---------- padrão dos clientes em negociação
         const porPadrao = { economico: [], medio: [], alto: [] };
@@ -354,6 +357,69 @@
             + (semCaptador ? `<p class="muted-text painel-nota">⚠️ ${semCaptador} imóvel(is) aprovado(s) sem captador informado não entram no ranking. Abra o imóvel e use "Informar quem captou".</p>` : "");
         ultimoCsv.push([ "Ranking de captação", "Corretor", "Captados", "Para venda", "Para aluguel", "Disponíveis hoje", "Valor de venda captado" ],
             ...lista.map(p => [ p.pos + "º", x.corretorDe(p.id), String(p.qtd), String(p.venda), String(p.aluguel), String(p.disponiveis), p.valorVenda.toFixed(2).replace(".", ",") ]), []);
+    }
+
+    // Parcerias: por imobiliária e por corretor parceiro. Conta o negócio no período em que foi criado (novos), fechado (ganhos/perdidos)
+    // e os que estão em andamento hoje. Valor ganho separado em vendas e aluguéis (somar os dois não faz sentido).
+    function renderParcerias(x, todas, noPeriodo, periodo) {
+        const box = $("painelParcerias");
+        if (!box) return;
+        const parceiros = x.parceiros || new Map();
+        const comParc = todas.filter(n => n.parceiro_id);
+        const fin = n => (x.funil(n.funil_id) || {}).finalidade;
+        const SEM = "Sem imobiliária informada";
+        const chaveImob = p => { const t = ((p && p.imobiliaria) || "").trim(); return t ? x.normal(t) : "__sem"; };
+        const novo = () => ({ novos: 0, andamento: 0, ganhos: 0, perdidos: 0, venda: 0, aluguel: 0, corretores: new Set() });
+        const porImob = new Map(), porParc = new Map(), nomeImob = new Map();
+        comParc.forEach(n => {
+            const p = parceiros.get(n.parceiro_id) || { id: n.parceiro_id, nome: "Parceiro", imobiliaria: "" };
+            const ki = chaveImob(p);
+            if (!nomeImob.has(ki)) nomeImob.set(ki, ki === "__sem" ? SEM : (p.imobiliaria || "").trim());
+            [ [ porImob, ki ], [ porParc, n.parceiro_id ] ].forEach(([ mapa, k ]) => {
+                if (!mapa.has(k)) mapa.set(k, novo());
+                const r = mapa.get(k);
+                r.corretores.add(n.parceiro_id);
+                if (noPeriodo(n.created_at)) r.novos++;
+                if (n.situacao === "aberta") r.andamento++;
+                if (n.situacao === "ganha" && noPeriodo(n.fechado_em)) {
+                    r.ganhos++;
+                    if (fin(n) === "venda") r.venda += Number(n.valor) || 0; else if (fin(n) === "locacao") r.aluguel += Number(n.valor) || 0;
+                }
+                if (n.situacao === "perdida" && noPeriodo(n.fechado_em)) r.perdidos++;
+            });
+        });
+        const ativo = r => r.novos || r.andamento || r.ganhos || r.perdidos;
+        const ordem = (a, b) => b[1].ganhos - a[1].ganhos || (b[1].venda + b[1].aluguel) - (a[1].venda + a[1].aluguel) || b[1].novos - a[1].novos || b[1].andamento - a[1].andamento;
+        const imobs = [ ...porImob.entries() ].filter(([ , r ]) => ativo(r)).sort(ordem);
+        const parcs = [ ...porParc.entries() ].filter(([ , r ]) => ativo(r)).sort(ordem);
+        const conv = r => r.ganhos + r.perdidos ? pct(r.ganhos, r.ganhos + r.perdidos) + "%" : "—";
+        const din = v => v ? x.dinheiroCurto(v) : "—";
+        const ganhosTotal = todas.filter(n => n.situacao === "ganha" && noPeriodo(n.fechado_em)).length;
+        const ganhosParc = comParc.filter(n => n.situacao === "ganha" && noPeriodo(n.fechado_em)).length;
+        const novosTotal = todas.filter(n => noPeriodo(n.created_at)).length;
+        const novosParc = comParc.filter(n => noPeriodo(n.created_at)).length;
+        const semCliente = todas.filter(n => !n.cliente_id && n.situacao === "aberta").length;
+        const medalha = i => i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1) + "º";
+        const cab = [ "", "Negócios novos", "Em andamento", "Fechados", "Perdidos", "Conversão", "Vendas fechadas", "Aluguéis fechados" ];
+        const linha = r => [ r.novos, r.andamento, { html: `<strong>${r.ganhos}</strong>` }, r.perdidos, conv(r), din(r.venda), din(r.aluguel) ];
+        if (!imobs.length) {
+            box.innerHTML = `<p class="muted-text">Nenhum negócio com corretor parceiro em ${h(rotuloPeriodo(periodo).toLowerCase())}. No negócio, use "Origem: veio de corretor parceiro?" para marcar quando o cliente veio de outra imobiliária ou de um autônomo.</p>`;
+            return;
+        }
+        box.innerHTML = `<div class="crm-resumo painel-parc-resumo">
+              <div class="crm-resumo-item"><span>Negócios novos com parceiro</span><strong>${novosParc}</strong><small>${novosTotal ? pct(novosParc, novosTotal) + "% dos negócios novos" : ""}</small></div>
+              <div class="crm-resumo-item"><span>Fechados com parceiro</span><strong>${ganhosParc}</strong><small>${ganhosTotal ? pct(ganhosParc, ganhosTotal) + "% dos fechados" : ""}</small></div>
+              <div class="crm-resumo-item"><span>Imobiliárias parceiras</span><strong>${imobs.filter(([ k ]) => k !== "__sem").length}</strong><small>${parcs.length} ${parcs.length === 1 ? "corretor parceiro" : "corretores parceiros"}</small></div>
+            </div>
+            <h4>Por imobiliária</h4>
+            ${tabela([ "Imobiliária" ].concat(cab.slice(1)), imobs.map(([ k, r ], i) => [ { html: `<span class="painel-captacao-pos">${medalha(i)}</span> <strong>${h(nomeImob.get(k))}</strong><br><small class="muted-text">${r.corretores.size} ${r.corretores.size === 1 ? "corretor" : "corretores"}</small>` } ].concat(linha(r))))}
+            <h4>Por corretor parceiro</h4>
+            ${tabela([ "Corretor parceiro" ].concat(cab.slice(1)), parcs.map(([ id, r ]) => { const p = parceiros.get(id) || {}; return [ { html: `<strong>${h(p.nome || "Parceiro")}</strong>${p.imobiliaria ? `<br><small class="muted-text">${h(p.imobiliaria)}</small>` : ""}` } ].concat(linha(r)); }))}
+            <p class="muted-text painel-nota">"Novos" = criados no período; "Fechados" e "Perdidos" = encerrados no período; "Em andamento" = abertos hoje.${semCliente ? ` · ${semCliente} negócio(s) em andamento ainda sem cliente atribuído.` : ""}</p>`;
+        ultimoCsv.push([ "Parcerias — imobiliária" ].concat(cab.slice(1)), ...imobs.map(([ k, r ]) => [ nomeImob.get(k), String(r.novos), String(r.andamento), String(r.ganhos), String(r.perdidos), conv(r),
+            r.venda.toFixed(2).replace(".", ","), r.aluguel.toFixed(2).replace(".", ",") ]), []);
+        ultimoCsv.push([ "Parcerias — corretor parceiro", "Imobiliária" ].concat(cab.slice(1)), ...parcs.map(([ id, r ]) => { const p = parceiros.get(id) || {}; return [ p.nome || "Parceiro", p.imobiliaria || "",
+            String(r.novos), String(r.andamento), String(r.ganhos), String(r.perdidos), conv(r), r.venda.toFixed(2).replace(".", ","), r.aluguel.toFixed(2).replace(".", ",") ]; }), []);
     }
 
     function tabela(cabecalho, linhas) {

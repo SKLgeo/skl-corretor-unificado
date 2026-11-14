@@ -202,7 +202,7 @@
                 .sort((a, b) => String(a.proxima_acao_em).localeCompare(String(b.proxima_acao_em)))[0];
             const c = proxima && I.clientes.get(proxima.cliente_id);
             lista.innerHTML = `<div class="hoje-vazio"><strong>Nada pendente para hoje.</strong>${proxima
-                ? `<span>Próximo: ${h(I.dataHora(proxima.proxima_acao_em))} · ${h(c ? c.nome : "Cliente")}${proxima.proxima_acao_texto ? " — " + h(proxima.proxima_acao_texto) : ""}</span>`
+                ? `<span>Próximo: ${h(I.dataHora(proxima.proxima_acao_em))} · ${h(c ? c.nome : (I.nomeDoNegocio ? I.nomeDoNegocio(proxima) : "Cliente"))}${proxima.proxima_acao_texto ? " — " + h(proxima.proxima_acao_texto) : ""}</span>`
                 : `<span>Toque em "+ Compromisso" para agendar um retorno.</span>`}</div>`;
             return;
         }
@@ -213,7 +213,7 @@
                 : new Date(n.proxima_acao_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
             return `<article class="hoje-item ${sit}" data-neg="${h(n.id)}">
               <div class="hoje-item-quando">${h(quando)}</div>
-              <div class="hoje-item-info"><strong>${h(c ? c.nome : "Cliente")}</strong><small>${h(n.proxima_acao_texto || "Definir o próximo passo")}${central ? " · " + h(I.corretorDe(n.corretor_id)) : ""}</small></div>
+              <div class="hoje-item-info"><strong>${h(c ? c.nome : (I.nomeDoNegocio ? I.nomeDoNegocio(n) : "Cliente"))}</strong><small>${h(n.proxima_acao_texto || "Definir o próximo passo")}${central ? " · " + h(I.corretorDe(n.corretor_id)) : ""}</small></div>
               <div class="hoje-item-contato">${I.linksContato(c)}</div>
             </article>`;
         }).join("") + (fazer.length > mostrar.length ? `<button type="button" class="text-button hoje-mais" data-ir="agenda">Ver mais ${fazer.length - mostrar.length}</button>` : "");
