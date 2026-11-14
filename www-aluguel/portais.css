@@ -1,0 +1,37 @@
+/* Portais imobiliários (portais.js) — painel em Configurações e bloco na ficha do imóvel */
+.ptl-painel{display:grid;gap:14px}
+.ptl-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.ptl-canais{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.ptl-canal header .ptl-selo{white-space:normal}
+.ptl-fatos{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.ptl-como summary,.ptl-portal summary,.ptl-retorno summary,.ptl-historico summary{cursor:pointer;font-weight:700;color:var(--navy-deep)}
+.ptl-como ol{margin:8px 0 0;padding-left:20px;display:grid;gap:5px;font-size:13px}
+.ptl-portal{border-top:1px dashed var(--line);padding-top:8px}
+.ptl-portal summary{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.ptl-portal summary small{color:var(--muted)}
+.ptl-portal-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px}
+.ptl-portal-campos .ptl-larga,.ptl-portal-campos .ext-int-acoes{grid-column:1/-1}
+.ptl-msg{width:100%;font-size:13px}
+.ptl-diag{grid-column:1/-1}
+.ptl-tabela-rolagem{overflow-x:auto}
+.ptl-selo{display:inline-flex;align-items:center;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:800;line-height:1.3}
+.ptl-neutro{background:#eef1f3;color:#4b5a63}
+.ptl-info{background:#e2effa;color:#1f5f8f}
+.ptl-ok{background:#dff4e8;color:#247346}
+.ptl-alerta{background:#fdf0d8;color:#8a5a00}
+.ptl-erro{background:#f7e3e0;color:#a33a2f}
+div.ptl-erro,div.ptl-aviso{background:none;font-size:12.5px;line-height:1.35}
+div.ptl-erro{color:#a33a2f}
+div.ptl-aviso{color:#6b5a2a}
+span.ptl-ok{background:none;color:#247346;font-weight:700;font-size:12.5px}
+.portais-imovel-bloco{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px;background:#fbfdfe}
+.ptl-autoriza{font-size:13px;align-items:flex-start}
+.ptl-ficha{display:grid;gap:8px}
+.ptl-ficha-linha{display:grid;gap:4px;padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--line)}
+.ptl-ficha-topo{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.ptl-id{color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+.ptl-retorno label{display:grid;gap:3px;margin-top:6px}
+.ptl-historico ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;display:grid;gap:3px}
+body.sem-portais #portaisPanel,body.sem-portais #navPortais,body.sem-portais .portais-imovel-bloco{display:none!important}
+@media (max-width:780px){.ptl-canais,.ptl-grade{grid-template-columns:minmax(0,1fr)}}
+.ptl-pagina{display:grid;gap:14px}

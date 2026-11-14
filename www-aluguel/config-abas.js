@@ -19,7 +19,7 @@
         settingsCadastroPanel: "imoveis",
         crmConfigPanel: "crm", crmMotivosPanel: "crm", crmFaixasPanel: "crm", crmRoletaPanel: "crm",
         comRegrasPanel: "comissoes",
-        integracoesPanel: "site", portalPixPanel: "site", portalPinPanel: "site",
+        integracoesPanel: "site", portaisPanel: "site", portalPixPanel: "site", portalPinPanel: "site",
         docModelosPanel: "documentos"
     };
     const POR_TEXTO = [

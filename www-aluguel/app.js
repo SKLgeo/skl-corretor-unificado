@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.19.1";
+    const APP_VERSION = "0.20.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1001,6 +1001,7 @@
         // o que aparece no menu segue as permissões do tipo de acesso (padrão: como sempre foi)
         $("navInteresses").hidden = !pode("tela_interesses");
         $("navPropostas").hidden = !pode("tela_propostas");
+        $("navPortais").hidden = !gestaoCrm();
         $("navCorretores").hidden = !pode("tela_equipe");
         $("navComissoes").hidden = !pode("tela_comissoes");
         const aprovador = pode("aprovar_cadastros");
@@ -1054,6 +1055,8 @@
         atualizarApelidoConta();
         armarVoltar();
         if (window.SKLIntegracoes) await seguro("integrações", () => window.SKLIntegracoes.iniciar(ctxExtras));
+        if (window.SKLPortais) await seguro("portais", () => window.SKLPortais.iniciar({ ...ctxExtras,
+            abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está na lista (pode ter sido vendido, alugado ou não estar aprovado)."); } }));
         if (window.SKLDocumentos) await seguro("documentos", () => window.SKLDocumentos.iniciar(ctxExtras));
         if (window.SKLExtras) await seguro("extras", () => window.SKLExtras.iniciar(ctxExtras));
         if (window.SKLPortalCliente) await seguro("portal do cliente", () => window.SKLPortalCliente.iniciar(ctxExtras));
@@ -1110,13 +1113,15 @@
         $(`page-${page}`).classList.add("active-page");
         const titles = {
             hoje: "Hoje", conta: "Minha conta", dashboard: "Visão geral", negociacoes: "Negociações", agenda: "Agenda", indicadores: "Indicadores", clientes: "Clientes", construcoes: "Imóveis", interesses: "Interesses", corretores: "Equipe", comissoes: podeGerenciar() || (currentUser && currentUser.papel === "financeiro") ? "Comissões" : "Minhas comissões",
-            settings: "Configurações", financeiro: "Financeiro", propostas: "Proposta de negócios", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
+            settings: "Configurações", financeiro: "Financeiro", propostas: "Proposta de negócios", portais: "Portais imobiliários", tutoriais: "Tutoriais", cadastros: podeGerenciar() ? "Cadastros dos corretores" : "Meus cadastros"
         };
         $("pageTitle").textContent = titles[page] || page;
         if (page === "construcoes" && mapaVisivel) setTimeout(() => { ensureMap(); map && map.invalidateSize(); }, 60);
         if (window.SKLCRM) window.SKLCRM.aoMostrar(page);
         if (page === "financeiro" && window.SKLFinanceiro) window.SKLFinanceiro.aoMostrar();
         if (page === "propostas" && window.SKLPropostas) window.SKLPropostas.aoMostrar();
+        if (page === "portais" && window.SKLPortais) window.SKLPortais.aoMostrar();
+        if (page === "tutoriais" && window.SKLTutoriais) window.SKLTutoriais.aoMostrar();
         if (window.SKLModoCorretor) window.SKLModoCorretor.aoMostrar(page);
     }
 
@@ -2014,6 +2019,7 @@
         renderAprovacaoBanner(construcao);
         renderAutoria(construcao);
         renderCaptador(construcao);
+        if (window.SKLPortais) window.SKLPortais.fichaImovel($("portaisImovelBloco"), construcao);
         definirPerimetro(construcao?.perimetro || null, construcao?.perimetro_nome || null);
         benfeitoriasAtuais = (construcao?.benfeitorias || []).map(b => ({ ...b }));
         renderBenfeitorias();

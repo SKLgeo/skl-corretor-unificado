@@ -29,8 +29,8 @@
           texto: "Aba \"Contabilidade\" no Financeiro: receitas e despesas do período em planilha e PDF para o contador." },
         { chave: "agenda_celular", nome: "Agenda no celular",
           texto: "Botão \"Agenda no celular\": os compromissos aparecem no Google Agenda ou no calendário do iPhone." },
-        { chave: "portais", nome: "Contatos do ZAP, Viva Real e OLX",
-          texto: "Quadro em Configurações → Site e portais para os contatos dos portais entrarem sozinhos no CRM." }
+        { chave: "portais", nome: "Portais imobiliários",
+          texto: "Menu Portais (OLX, ZAP, Viva Real, Chaves na Mão, Imovelweb, MF Rural), bloco Portais na ficha do imóvel e contatos dos portais no CRM." }
     ];
     const PADRAO_DESLIGADO = [ "travar_tela", "travar_tela_deitada" ];
     // as duas travas não valem juntas: ligar uma desliga a outra

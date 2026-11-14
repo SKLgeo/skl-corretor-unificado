@@ -150,6 +150,9 @@
           passos: [ "Abra Configurações → Imobiliária e acessos → Funções da imobiliária.", "Ligue ou desligue cada função." ], ir: () => irConfig("imobiliaria", "funcoesCarteiraPanel"), ver: () => pode("configurar") },
         { titulo: "Site e portais (ZAP, OLX, Canal Pro)", onde: "Configurações → Site, portal e PIX", palavras: "site portal zap olx viva real canal pro vitrine wordpress leads integracao publicar no site",
           passos: [ "Abra Configurações → Site, portal e PIX.", "Copie o link da vitrine ou a chave dos contatos." ], ir: () => irConfig("site", "integracoesPanel"), ver: () => pode("configurar"), pop: "POP-GI-04" },
+        { titulo: "Anunciar nos portais (OLX, ZAP, Viva Real, Chaves na Mão, MF Rural)", onde: "Portais (menu lateral) e ficha do imóvel", palavras: "portal portais anunciar anuncio zap olx viva real vivareal chaves na mao imovelweb mf rural canal pro xml vrsync feed diagnostico publicar",
+          passos: [ "Abra Portais no menu lateral e preencha o contato e as regras.", "Ligue \"gerar arquivo\" no portal contratado e envie o endereço ao portal.", "Na ficha de cada imóvel, marque a autorização do proprietário e os portais." ],
+          ir: () => irPagina("portais"), ver: () => gestao() && funcao("portais") },
         { titulo: "Modelos de contrato e documentos", onde: "Configurações → Documentos", palavras: "modelo de contrato documento pdf vistoria clausula",
           passos: [ "Abra Configurações → Documentos e edite o modelo." ], ir: () => irConfig("documentos", "docModelosPanel"), ver: () => pode("configurar") },
         { titulo: "Roleta de leads", onde: "Configurações → CRM", palavras: "roleta leads distribuir corretor automatico vez",
@@ -275,7 +278,9 @@
                 return `<div class="busca-sistema-item"><div class="busca-sistema-cab"><div><strong>${h(t.titulo)}</strong><small>📍 ${h(t.onde)}</small></div>
                     ${temIr ? `<button type="button" class="primary-button fin-mini" data-ir="${acoes.length - 1}">Ir ›</button>` : ""}</div>
                   <details${i === 0 ? " open" : ""}><summary>Como fazer</summary><ol>${t.passos.map(p => `<li>${h(p)}</li>`).join("")}</ol>
-                    ${t.pop ? `<p class="busca-sistema-pop">Passo a passo completo com imagens: ${h(t.pop)} (pasta Uso do sistema).</p>` : ""}</details></div>`;
+                    ${t.pop ? (window.SKLTutoriais && window.SKLTutoriais.existe(t.pop)
+                        ? (acoes.push(() => { $("buscaSistemaDialog").close(); window.SKLTutoriais.abrir(t.pop); }), `<p class="busca-sistema-pop">Passo a passo completo com imagens: <button type="button" class="text-button" data-ir="${acoes.length - 1}">📘 abrir ${h(t.pop)} na KB</button></p>`)
+                        : `<p class="busca-sistema-pop">Passo a passo completo com imagens: ${h(t.pop)} (menu Tutoriais).</p>`) : ""}</details></div>`;
             }).join("");
         }
         if (!html) html = `<p class="busca-sistema-dica">Nada encontrado para “${h(q)}”. Tente outras palavras, por exemplo: contrato, comissão, agenda, imóvel, cliente.</p>`;

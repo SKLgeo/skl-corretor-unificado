@@ -1,0 +1,76 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @media screen{ body{padding:16px 0 28px;background:#fff} .folha{padding:0 16px} }
+  @media screen and (max-width:720px){
+    body{font-size:15px} .cab{grid-template-columns:1fr} .cab img{max-height:96px}
+    .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
+    .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
+  }
+</style><meta charset="utf-8"><title>POP-GI-22 · Deixar um cliente visível para toda a equipe</title><style>
+  :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
+  @page{size:A4;margin:12mm 14mm 15mm 14mm;
+    @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
+    @bottom-right{content:"POP-GI-22  ·  página " counter(page) " de " counter(pages);font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}}
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font:9.5pt/1.5 "Segoe UI",Arial,sans-serif;color:var(--texto);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .folha{max-width:182mm;margin:0 auto}
+  .cab{display:grid;grid-template-columns:52mm 1fr 44mm;gap:10px;align-items:stretch;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+  .cab img{width:100%;height:100%;min-height:24mm;object-fit:cover;display:block}
+  .cab-txt{padding:8px 4px;display:flex;flex-direction:column;justify-content:center}
+  .tipo{font-size:7.6pt;font-weight:800;letter-spacing:.14em;color:var(--ouro)}
+  h1{margin:2px 0 2px;font-size:15pt;line-height:1.15;color:var(--navy)}
+  .modulo{margin:0;font-size:8.8pt;color:var(--azul);font-weight:600}
+  .meta{border-left:1px solid var(--linha);background:#f6f8fb;font-size:8pt;display:grid;align-content:center;padding:6px 10px;gap:2px}
+  .meta div{display:flex;justify-content:space-between;gap:8px}
+  .meta span{color:var(--suave)} .meta b{color:var(--navy)}
+  .faixa{height:3px;background:linear-gradient(90deg,var(--ouro),#f0cf74 45%,transparent);border-radius:2px;margin:9px 0 10px}
+  .ficha{display:grid;grid-template-columns:34mm 1fr;border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:9pt;margin-bottom:10px}
+  .ficha dt{background:#f4f7fb;color:var(--navy);font-weight:700;padding:5px 9px;border-bottom:1px solid var(--linha)}
+  .ficha dd{margin:0;padding:5px 10px;border-bottom:1px solid var(--linha)}
+  .ficha dt:nth-last-of-type(1),.ficha dd:last-of-type{border-bottom:0}
+  h2{font-size:11pt;color:var(--navy);margin:12px 0 5px;padding-bottom:2px;border-bottom:1.5px solid var(--linha);break-after:avoid}
+  ol.passos{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:p}
+  ol.passos > li{counter-increment:p;position:relative;padding:0 0 6px 30px;margin:0}
+  ol.passos > li::before{content:counter(p);position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:9pt;display:flex;align-items:center;justify-content:center}
+  ul{margin:3px 0 6px;padding-left:18px} li{margin:0 0 3px}
+  .figura{text-align:center;margin:7px 0 4px;break-inside:avoid}
+  .figura img{max-width:100%;max-height:96mm;border:1px solid var(--linha);border-radius:8px}
+  .figura.estreita img{max-height:110mm}
+  .duas .figura img,.duas .figura.estreita img{max-height:72mm}
+  .legenda{font-size:8pt;color:var(--suave);margin-top:2px}
+  .duas{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;align-items:start;break-inside:avoid}
+  .atencao{background:#fff8e6;border:1px solid #f0dca6;border-left:4px solid var(--ouro);border-radius:0 8px 8px 0;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .atencao p{margin:0 0 3px}
+  .bt{display:inline-block;background:#e9f1fa;border:1px solid #cddcee;border-radius:5px;padding:0 5px;font-weight:600;color:var(--navy);font-size:8.6pt;white-space:nowrap}
+  h3{font-size:10pt;color:var(--navy);margin:10px 0 4px;break-after:avoid}
+  table.tabela{width:100%;border-collapse:collapse;font-size:8.6pt;margin:4px 0 6px;break-inside:avoid}
+  table.tabela th,table.tabela td{border:1px solid var(--linha);padding:4px 7px;text-align:left;vertical-align:top}
+  table.tabela th{background:#f4f7fb;color:var(--navy)}
+  table.controle{width:100%;border-collapse:collapse;font-size:8.2pt;margin-top:4px}
+  table.controle th,table.controle td{border:1px solid var(--linha);padding:3px 7px;text-align:left}
+  table.controle th{background:#f4f7fb;color:var(--navy)}</style></head>
+<body><div class="folha">
+<header class="cab">
+  <img src="banner.jpg" alt="SKL Geo Soluções">
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Deixar um cliente visível para toda a equipe</h1><p class="modulo">SKL Gestão Imobiliária · Clientes</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-22</b></div><div><span>Versão</span><b>1.0</b></div>
+    <div><span>Vigência</span><b>09/11/2026</b></div><div><span>Sistema</span><b>0.18.6</b></div></div>
+</header>
+<div class="faixa"></div>
+<dl class="ficha"><dt>Objetivo</dt><dd>Permitir que todos os corretores vejam um cliente: ele é cliente da imobiliária, não só de quem o captou.</dd><dt>Aplicação</dt><dd>Clientes que mais de um corretor pode atender, ou que a Central quer deixar abertos para a equipe.</dd><dt>Responsáveis</dt><dd>Quem atende o cliente marca. A Central liga ou desliga a qualquer momento.</dd><dt>Pré-requisitos</dt><dd>Ser quem atende o cliente (ou quem cadastrou) ou ter acesso de Central.</dd><dt>Resultado esperado</dt><dd>O cliente aparece para toda a equipe. Os outros corretores veem, mas não alteram.</dd></dl>
+<h2>1. Procedimento</h2>
+<ol class="passos">
+      <li>Abra o cliente em <b>Clientes</b>.</li>
+      <li>Marque <b>👥 Toda a equipe pode ver este cliente</b> e toque em <span class="bt">Salvar alterações</span>.</li>
+      <li>Na lista, o cliente ganha o selo <b>👥 Equipe</b>.</li>
+      <li>Para voltar a ser só seu (e da Central), desmarque e salve.</li>
+    </ol>
+    <div class="figura estreita"><img src="img/57_marcar.jpg" alt=""><div class="legenda">A opção na ficha do cliente.</div></div>
+    <div class="figura estreita"><img src="img/58_equipe.jpg" alt=""><div class="legenda">Como os outros corretores veem: só leitura, com a faixa “Cliente da equipe”.</div></div>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p>Desmarcado: só quem atende e a Central veem o cliente (como era antes).</p>
+      <p>Ver não dá direito de alterar: só quem atende e a Central mudam o cadastro. O histórico do cliente registra quando ele foi liberado ou fechado para a equipe.</p></div>
+<h2>3. Controle do documento</h2>
+<table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
+  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>09/11/2026</td><td>Emissão inicial.</td></tr></table>
+</div></body></html>

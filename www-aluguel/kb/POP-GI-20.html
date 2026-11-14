@@ -1,0 +1,89 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @media screen{ body{padding:16px 0 28px;background:#fff} .folha{padding:0 16px} }
+  @media screen and (max-width:720px){
+    body{font-size:15px} .cab{grid-template-columns:1fr} .cab img{max-height:96px}
+    .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
+    .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
+  }
+</style><meta charset="utf-8"><title>POP-GI-20 · Ver o mercado: faixas de valor, bairros e tipos</title><style>
+  :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
+  @page{size:A4;margin:12mm 14mm 15mm 14mm;
+    @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
+    @bottom-right{content:"POP-GI-20  ·  página " counter(page) " de " counter(pages);font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}}
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font:9.5pt/1.5 "Segoe UI",Arial,sans-serif;color:var(--texto);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .folha{max-width:182mm;margin:0 auto}
+  .cab{display:grid;grid-template-columns:52mm 1fr 44mm;gap:10px;align-items:stretch;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+  .cab img{width:100%;height:100%;min-height:24mm;object-fit:cover;display:block}
+  .cab-txt{padding:8px 4px;display:flex;flex-direction:column;justify-content:center}
+  .tipo{font-size:7.6pt;font-weight:800;letter-spacing:.14em;color:var(--ouro)}
+  h1{margin:2px 0 2px;font-size:15pt;line-height:1.15;color:var(--navy)}
+  .modulo{margin:0;font-size:8.8pt;color:var(--azul);font-weight:600}
+  .meta{border-left:1px solid var(--linha);background:#f6f8fb;font-size:8pt;display:grid;align-content:center;padding:6px 10px;gap:2px}
+  .meta div{display:flex;justify-content:space-between;gap:8px}
+  .meta span{color:var(--suave)} .meta b{color:var(--navy)}
+  .faixa{height:3px;background:linear-gradient(90deg,var(--ouro),#f0cf74 45%,transparent);border-radius:2px;margin:9px 0 10px}
+  .ficha{display:grid;grid-template-columns:34mm 1fr;border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:9pt;margin-bottom:10px}
+  .ficha dt{background:#f4f7fb;color:var(--navy);font-weight:700;padding:5px 9px;border-bottom:1px solid var(--linha)}
+  .ficha dd{margin:0;padding:5px 10px;border-bottom:1px solid var(--linha)}
+  .ficha dt:nth-last-of-type(1),.ficha dd:last-of-type{border-bottom:0}
+  h2{font-size:11pt;color:var(--navy);margin:12px 0 5px;padding-bottom:2px;border-bottom:1.5px solid var(--linha);break-after:avoid}
+  ol.passos{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:p}
+  ol.passos > li{counter-increment:p;position:relative;padding:0 0 6px 30px;margin:0}
+  ol.passos > li::before{content:counter(p);position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:9pt;display:flex;align-items:center;justify-content:center}
+  ul{margin:3px 0 6px;padding-left:18px} li{margin:0 0 3px}
+  .figura{text-align:center;margin:7px 0 4px;break-inside:avoid}
+  .figura img{max-width:100%;max-height:96mm;border:1px solid var(--linha);border-radius:8px}
+  .figura.estreita img{max-height:110mm}
+  .duas .figura img,.duas .figura.estreita img{max-height:72mm}
+  .legenda{font-size:8pt;color:var(--suave);margin-top:2px}
+  .duas{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;align-items:start;break-inside:avoid}
+  .atencao{background:#fff8e6;border:1px solid #f0dca6;border-left:4px solid var(--ouro);border-radius:0 8px 8px 0;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .atencao p{margin:0 0 3px}
+  .bt{display:inline-block;background:#e9f1fa;border:1px solid #cddcee;border-radius:5px;padding:0 5px;font-weight:600;color:var(--navy);font-size:8.6pt;white-space:nowrap}
+  h3{font-size:10pt;color:var(--navy);margin:10px 0 4px;break-after:avoid}
+  table.tabela{width:100%;border-collapse:collapse;font-size:8.6pt;margin:4px 0 6px;break-inside:avoid}
+  table.tabela th,table.tabela td{border:1px solid var(--linha);padding:4px 7px;text-align:left;vertical-align:top}
+  table.tabela th{background:#f4f7fb;color:var(--navy)}
+  table.controle{width:100%;border-collapse:collapse;font-size:8.2pt;margin-top:4px}
+  table.controle th,table.controle td{border:1px solid var(--linha);padding:3px 7px;text-align:left}
+  table.controle th{background:#f4f7fb;color:var(--navy)}</style></head>
+<body><div class="folha">
+<header class="cab">
+  <img src="banner.jpg" alt="SKL Geo Soluções">
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Ver o mercado: faixas de valor, bairros e tipos</h1><p class="modulo">SKL Gestão Imobiliária · Indicadores e Painel</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-20</b></div><div><span>Versão</span><b>1.0</b></div>
+    <div><span>Vigência</span><b>08/11/2026</b></div><div><span>Sistema</span><b>0.18.4</b></div></div>
+</header>
+<div class="faixa"></div>
+<dl class="ficha"><dt>Objetivo</dt><dd>Saber em que faixa de valor, bairro, cidade e tipo de imóvel a imobiliária mais fecha negócio e o que os clientes mais procuram, para direcionar a captação.</dd><dt>Aplicação</dt><dd>Reuniões de equipe, planejamento de captação e acompanhamento do mercado.</dd><dt>Responsáveis</dt><dd>Administrador, Central e gestor.</dd><dt>Pré-requisitos</dt><dd>Acesso aos Indicadores ou ao Painel. Para os bairros, negócios com imóvel ligado, contratos com bairro ou “O que o cliente procura” preenchido.</dd><dt>Resultado esperado</dt><dd>Números e gráficos por faixa de valor, bairro, cidade rural e tipo, com quantidade e valor médio.</dd></dl>
+<h2>1. Procedimento</h2>
+<p><b>Pelos Indicadores</b></p>
+    <ol class="passos">
+      <li>Abra <b>Indicadores</b>, escolha o período (e, se quiser, um corretor) e toque em <span class="bt">📍 Mercado</span>.</li>
+      <li>Escolha <span class="bt">✅ Fechados</span> (o que fechou) ou <span class="bt">🔎 Procurados</span> (o que os clientes pediram) e <span class="bt">Locação</span> ou <span class="bt">Venda</span>.</li>
+      <li>Para ver uma faixa, toque num atalho (ex.: “Até R$ 2.500”), digite <b>De R$ … até R$ …</b> e toque em <span class="bt">Filtrar</span>, ou toque numa barra do gráfico.</li>
+      <li>Leia os quadros de bairros, cidades rurais e tipos, com a quantidade e o valor médio.</li>
+    </ol>
+    <div class="figura"><img src="img/47_ind_mercado.jpg" alt=""><div class="legenda">Indicadores → Mercado: o que mais fecha na locação.</div></div>
+    <div class="figura"><img src="img/48_ind_procurados.jpg" alt=""><div class="legenda">O que os clientes mais procuram.</div></div>
+    <p><b>Pelo Painel</b></p>
+    <ol class="passos">
+      <li>Toque em <span class="bt">📊 Painel</span> e, no menu da esquerda, em <b>📍 Mercado</b> (abaixo de Locação).</li>
+      <li>Escolha o período no topo ou nos botões do primeiro quadro, depois Fechados/Procurados, Locação/Venda e a faixa de valor.</li>
+      <li>Veja os quadros: quantidade, valor médio, valor do meio (com menor e maior), fatia do período, gráfico por faixa, evolução no tempo, bairros, tipo de imóvel e cidades rurais.</li>
+      <li>Toque numa barra das faixas para ver só aquela faixa em todos os quadros. <span class="bt">Todas</span> volta.</li>
+      <li>Use <span class="bt">≡ tabela</span> para ver os números em lista e, no tipo de imóvel, escolha pizza, barras ou tabela.</li>
+    </ol>
+    <div class="figura"><img src="img/49_painel_mercado.jpg" alt=""><div class="legenda">Painel → Mercado.</div></div>
+    <div class="figura"><img src="img/50_painel_faixa.jpg" alt=""><div class="legenda">Faixa “Até R$ 2.500” escolhida: as outras barras ficam claras e os quadros mostram só essa faixa.</div></div>
+    <div class="figura estreita"><img src="img/51_painel_celular.jpg" alt=""><div class="legenda">No celular, as faixas viram barras deitadas.</div></div>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p><b>Fechados</b> = negócios ganhos no período + contratos lançados no Financeiro sem negócio. <b>Procurados</b> = negócios abertos no período, inclusive os contatos do site e dos portais.</p>
+      <p>O histórico importado do Power BI tem valor mas não tem imóvel: entra nas faixas de valor, não nos bairros.</p>
+      <p>Para os bairros ficarem completos: ligue o imóvel no negócio, preencha <b>Bairro</b> no imóvel não cadastrado do contrato e <b>O que o cliente procura</b> nas negociações.</p></div>
+<h2>3. Controle do documento</h2>
+<table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
+  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>08/11/2026</td><td>Emissão inicial.</td></tr></table>
+</div></body></html>

@@ -77,9 +77,11 @@
                  com o imóvel que a pessoa viu, já com o <b>perfil de busca</b> parecido (bairro, tipo, faixa de valor, quartos), passa pela
                  roleta e avisa o corretor no 🔔. Se o portal mandar o mesmo contato de novo, ele não é duplicado.</p>
               <ol class="ext-int-passos">
-                <li>Ligue o <b>recebimento de contatos</b> (quadro 2) e gere a chave. Na hora aparece o <b>endereço para os portais</b>, já com a chave.</li>
-                <li>No <b>Canal Pro</b> (Grupo OLX: ZAP, Viva Real e OLX), na parte de integração de leads, cole esse endereço.</li>
-                <li>Para os imóveis aparecerem nos portais, use o endereço <b>XML VRSync</b> do quadro 1 na integração de anúncios do Canal Pro.</li>
+                <li>Ligue o <b>recebimento de contatos</b> (quadro 2). Sem ele ligado, os contatos dos portais não entram.</li>
+                <li>O envio automático de contatos do Grupo OLX depende da <b>homologação do SKL como CRM</b> no Grupo OLX (a chave é da SKL, não da imobiliária).
+                    Enquanto ela estiver pendente, os contatos chegam por e-mail no Canal Pro.</li>
+                <li>Para os imóveis irem aos portais, use o menu <b>Portais</b> (na lateral) (arquivo próprio para os portais, escolha imóvel por imóvel e autorização do proprietário).
+                    O endereço VRSync do quadro 1 é o arquivo antigo do site, sem essas travas — não use nos portais.</li>
               </ol>
               ${pode ? `<div class="ext-int-acoes"><select id="intSimPortal" aria-label="Portal"><option>ZAP Imóveis</option><option>Viva Real</option><option>OLX</option></select>
                 <button type="button" class="secondary-button" id="intSimular">Simular um contato do portal</button></div>

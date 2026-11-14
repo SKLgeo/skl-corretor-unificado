@@ -24,6 +24,8 @@
   <link rel="stylesheet" href="gestao.css" />
   <link rel="stylesheet" href="fiscal.css" />
   <link rel="stylesheet" href="proposta.css" />
+  <link rel="stylesheet" href="portais.css" />
+  <link rel="stylesheet" href="tutoriais.css" />
   <link rel="stylesheet" href="celular.css" />
 </head>
 <body>
@@ -93,11 +95,13 @@
         <button class="nav-button" data-page="construcoes"><span>⌂</span> Imóveis</button>
         <button class="nav-button" id="navCadastros" data-page="cadastros"><span>✚</span> <em id="navCadastrosTexto" class="nav-texto">Cadastros</em><b id="navCadastrosBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" id="navPropostas" data-page="propostas" hidden><span>✎</span> Proposta de negócios</button>
+        <button class="nav-button" id="navPortais" data-page="portais" hidden><span>◈</span> Portais</button>
         <button class="nav-button" id="navInteresses" data-page="interesses"><span>☎</span> Interesses</button>
         <button class="nav-button" id="navCorretores" data-page="corretores"><span>◔</span> Equipe</button>
         <button class="nav-button" id="navComissoes" data-page="comissoes"><span>%</span> Comissões</button>
         <button class="nav-button" id="navFinanceiro" data-page="financeiro" hidden><span>$</span> <em class="nav-texto">Financeiro</em><b id="navFinanceiroBadge" class="nav-badge" hidden>0</b></button>
         <button class="nav-button" data-page="settings"><span>⚙</span> Configurações</button>
+        <button class="nav-button" id="navTutoriais" data-page="tutoriais"><span>📘</span> Tutoriais</button>
       </nav>
       <div class="sidebar-user"><span id="currentUserAvatar" class="sidebar-avatar"></span><strong id="currentUserName">Usuário</strong><span id="currentUserRole">—</span><button id="logoutButton">Sair</button></div>
     </aside>
@@ -169,6 +173,7 @@
           <button type="button" id="contaIrPropostas" data-go="propostas" hidden><span>✎</span><em>Proposta de negócios</em><i>›</i></button>
           <button type="button" id="contaEuCorretor" hidden><span>👤</span><em>Eu corretor (perfil profissional)</em><i>›</i></button>
           <button type="button" data-go="settings"><span>⚙</span><em>Foto, senha e configurações</em><i>›</i></button>
+          <button type="button" data-go="tutoriais"><span>📘</span><em>Tutoriais (KB — Knowledge Base)</em><i>›</i></button>
           <button type="button" id="contaTrocarCarteira"><span>⇄</span><em>Trocar carteira</em><i>›</i></button>
           <button type="button" id="contaVoltarCentral" hidden><span>↩</span><em>Voltar para a tela da Central</em><i>›</i></button>
           <button type="button" id="contaSair" class="conta-sair"><span>⏻</span><em>Sair</em></button>
@@ -362,6 +367,12 @@
       </section>
 
       <section id="page-propostas" class="page"><div id="propostasConteudo"></div></section>
+
+      <!-- Portais imobiliários (portais.js): OLX/ZAP/Viva Real, Chaves na Mão, Imovelweb, MF Rural — só Central, administrador e gestor -->
+      <section id="page-portais" class="page"><div id="portaisPagina" class="ptl-pagina"></div></section>
+
+      <!-- Tutoriais: KB — Knowledge Base com todos os POPs (tutoriais.js + kb/, gerados por docs/unificado/pops/gerar_kb.js) -->
+      <section id="page-tutoriais" class="page"><div id="tutoriaisPagina" class="kb-pagina"></div></section>
 
       <section id="page-interesses" class="page">
         <p class="muted-text" style="margin:0 0 14px">Interesses de aluguel e de compra registrados pelos corretores, com a ficha de contato do cliente.</p>
@@ -774,6 +785,8 @@
 
       <div id="crmInteressados" class="crm-sublista crm-interessados" hidden></div>
 
+      <!-- fora do formulário: aparece também na ficha travada (só leitura); cada escolha é salva na hora pelas RPCs portais_* -->
+      <div id="portaisImovelBloco" class="portais-imovel-bloco" hidden></div>
       <div class="dialog-actions">
         <button id="deleteConstrucaoButton" type="button" class="danger-button" hidden>Excluir</button>
         <button id="recusarCadastroButton" type="button" class="danger-button" hidden>Recusar</button>
@@ -1554,6 +1567,10 @@
   <script src="periodo-fatias.js"></script>
   <script src="painel.js"></script>
   <script src="integracoes.js"></script>
+  <script src="portais-conectores.js"></script>
+  <script src="portais.js"></script>
+  <script src="kb/indice.js"></script>
+  <script src="tutoriais.js"></script>
   <script src="rural.js"></script>
   <script src="cep.js"></script>
   <script src="coordenadas.js"></script>

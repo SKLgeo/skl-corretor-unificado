@@ -1,0 +1,37 @@
+/* Tutoriais — KB · Knowledge Base (tutoriais.js) */
+.kb-pagina{display:grid;gap:16px}
+.kb-cabecalho{display:grid;gap:10px;background:linear-gradient(135deg,#fff 0%,#f3f8fc 100%)}
+.kb-cabecalho h2{margin:0}
+.kb-sub{margin:0;max-width:880px;color:var(--muted);line-height:1.5}
+.kb-numeros{display:flex;flex-wrap:wrap;gap:8px}
+.kb-numeros span{background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
+.kb-numeros b{color:var(--navy-deep)}
+.kb-busca input{width:100%;max-width:560px;font-size:15px}
+.kb-areas{display:flex;flex-wrap:wrap;gap:6px}
+.kb-chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--navy-deep);cursor:pointer}
+.kb-chip.ativo{background:var(--navy);border-color:var(--navy);color:#fff}
+.kb-lista{display:grid;gap:18px}
+.kb-grupo h3{margin:0 0 8px;font-size:15px;color:var(--navy-deep);display:flex;align-items:center;gap:8px}
+.kb-grupo h3 small{background:#eef3f7;border-radius:99px;padding:1px 8px;font-size:11px;color:var(--muted)}
+.kb-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.kb-cartao{display:grid;gap:6px;text-align:left;background:#fff;border:1px solid var(--line);border-left:4px solid #c9962c;border-radius:12px;padding:12px 14px;cursor:pointer;font:inherit;color:inherit;transition:box-shadow .15s,transform .15s}
+.kb-cartao:hover{box-shadow:0 6px 18px rgba(10,42,102,.10);transform:translateY(-1px)}
+.kb-cartao strong{color:var(--navy-deep);font-size:14.5px;line-height:1.3}
+.kb-codigo{justify-self:start;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#8a6a1c;background:#fbf3df;border-radius:5px;padding:2px 7px}
+.kb-objetivo{font-size:12.5px;color:var(--muted);line-height:1.4}
+.kb-rodape{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
+.kb-vazio{color:var(--muted)}
+dialog.kb-dialog{width:min(980px,96vw);height:92vh;max-height:92vh;padding:0;border:0;border-radius:14px;background:#fff;overflow:hidden}
+dialog.kb-dialog[open]{display:flex;flex-direction:column}
+dialog.kb-dialog::backdrop{background:rgba(6,27,46,.55)}
+.kb-dialog-barra{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:#f6f9fc}
+.kb-dialog-titulo{display:flex;align-items:center;gap:8px;min-width:0}
+.kb-dialog-titulo strong{color:var(--navy-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kb-dialog-acoes{display:flex;gap:6px;flex:none}
+#kbQuadro{flex:1;width:100%;border:0;background:#fff}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:780px){
+  .kb-cartoes{grid-template-columns:minmax(0,1fr)}
+  dialog.kb-dialog{width:100vw;max-width:100vw;height:100%;max-height:100%;border-radius:0}
+  .kb-dialog-titulo strong{font-size:13px}
+}
