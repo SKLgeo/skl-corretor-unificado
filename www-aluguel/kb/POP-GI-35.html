@@ -1,0 +1,88 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @media screen{ body{padding:16px 0 28px;background:#fff} .folha{padding:0 16px} }
+  @media screen and (max-width:720px){
+    body{font-size:15px} .cab{grid-template-columns:1fr} .cab img{max-height:96px}
+    .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
+    .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
+  }
+</style><meta charset="utf-8"><title>POP-GI-35 · Registrar negócio que veio de corretor parceiro (com ou sem cliente)</title><style>
+  :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
+  @page{size:A4;margin:12mm 14mm 15mm 14mm;
+    @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
+    @bottom-right{content:"POP-GI-35  ·  página " counter(page) " de " counter(pages);font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}}
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font:9.5pt/1.5 "Segoe UI",Arial,sans-serif;color:var(--texto);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .folha{max-width:182mm;margin:0 auto}
+  .cab{display:grid;grid-template-columns:52mm 1fr 44mm;gap:10px;align-items:stretch;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+  .cab img{width:100%;height:100%;min-height:24mm;object-fit:cover;display:block}
+  .cab-txt{padding:8px 4px;display:flex;flex-direction:column;justify-content:center}
+  .tipo{font-size:7.6pt;font-weight:800;letter-spacing:.14em;color:var(--ouro)}
+  h1{margin:2px 0 2px;font-size:15pt;line-height:1.15;color:var(--navy)}
+  .modulo{margin:0;font-size:8.8pt;color:var(--azul);font-weight:600}
+  .meta{border-left:1px solid var(--linha);background:#f6f8fb;font-size:8pt;display:grid;align-content:center;padding:6px 10px;gap:2px}
+  .meta div{display:flex;justify-content:space-between;gap:8px}
+  .meta span{color:var(--suave)} .meta b{color:var(--navy)}
+  .faixa{height:3px;background:linear-gradient(90deg,var(--ouro),#f0cf74 45%,transparent);border-radius:2px;margin:9px 0 10px}
+  .ficha{display:grid;grid-template-columns:34mm 1fr;border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:9pt;margin-bottom:10px}
+  .ficha dt{background:#f4f7fb;color:var(--navy);font-weight:700;padding:5px 9px;border-bottom:1px solid var(--linha)}
+  .ficha dd{margin:0;padding:5px 10px;border-bottom:1px solid var(--linha)}
+  .ficha dt:nth-last-of-type(1),.ficha dd:last-of-type{border-bottom:0}
+  h2{font-size:11pt;color:var(--navy);margin:12px 0 5px;padding-bottom:2px;border-bottom:1.5px solid var(--linha);break-after:avoid}
+  ol.passos{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:p}
+  ol.passos > li{counter-increment:p;position:relative;padding:0 0 6px 30px;margin:0}
+  ol.passos > li::before{content:counter(p);position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:9pt;display:flex;align-items:center;justify-content:center}
+  ul{margin:3px 0 6px;padding-left:18px} li{margin:0 0 3px}
+  .figura{text-align:center;margin:7px 0 4px;break-inside:avoid}
+  .figura img{max-width:100%;max-height:96mm;border:1px solid var(--linha);border-radius:8px}
+  .figura.estreita img{max-height:110mm}
+  .duas .figura img,.duas .figura.estreita img{max-height:72mm}
+  .legenda{font-size:8pt;color:var(--suave);margin-top:2px}
+  .duas{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;align-items:start;break-inside:avoid}
+  .atencao{background:#fff8e6;border:1px solid #f0dca6;border-left:4px solid var(--ouro);border-radius:0 8px 8px 0;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .atencao p{margin:0 0 3px}
+  .bt{display:inline-block;background:#e9f1fa;border:1px solid #cddcee;border-radius:5px;padding:0 5px;font-weight:600;color:var(--navy);font-size:8.6pt;white-space:nowrap}
+  h3{font-size:10pt;color:var(--navy);margin:10px 0 4px;break-after:avoid}
+  table.tabela{width:100%;border-collapse:collapse;font-size:8.6pt;margin:4px 0 6px;break-inside:avoid}
+  table.tabela th,table.tabela td{border:1px solid var(--linha);padding:4px 7px;text-align:left;vertical-align:top}
+  table.tabela th{background:#f4f7fb;color:var(--navy)}
+  table.controle{width:100%;border-collapse:collapse;font-size:8.2pt;margin-top:4px}
+  table.controle th,table.controle td{border:1px solid var(--linha);padding:3px 7px;text-align:left}
+  table.controle th{background:#f4f7fb;color:var(--navy)}</style></head>
+<body><div class="folha">
+<header class="cab">
+  <img src="banner.jpg" alt="SKL Geo Soluções">
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Registrar negócio que veio de corretor parceiro (com ou sem cliente)</h1><p class="modulo">SKL Gestão Imobiliária · Negociações → Nova negociação</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-35</b></div><div><span>Versão</span><b>1.0</b></div>
+    <div><span>Vigência</span><b>14/11/2026</b></div><div><span>Sistema</span><b>0.20.1</b></div></div>
+</header>
+<div class="faixa"></div>
+<dl class="ficha"><dt>Objetivo</dt><dd>Marcar quando o cliente veio de um corretor de outra imobiliária (ou autônomo) e permitir criar o negócio mesmo sem o cliente cadastrado, colocando o cliente depois.</dd><dt>Aplicação</dt><dd>Negócios em parceria com corretores de fora, inclusive quando o cliente é do parceiro e ainda não está no sistema.</dd><dt>Responsáveis</dt><dd>Corretores, Central, gestor e administrador (o financeiro só consulta).</dd><dt>Pré-requisitos</dt><dd>Nenhum. O corretor parceiro pode ser cadastrado na hora: só o nome é obrigatório.</dd><dt>Resultado esperado</dt><dd>Negócio com a origem “Corretor parceiro”, parceiro e imobiliária registrados; quando ganho, a divisão da comissão já sugere o parceiro.</dd></dl>
+<h2>1. Procedimento</h2>
+<ol class="passos">
+      <li>Abra <b>Negociações</b> e toque em <span class="bt">+ Nova negociação</span>.</li>
+      <li><b>Cliente:</b> escolha o cliente ou cadastre em <span class="bt">+ Novo</span>. Se ainda não tem o cliente (por exemplo, o cliente é do parceiro), deixe em branco e marque <b>“Estou ciente que este negócio não possui cliente atribuído”</b>. Sem cliente e sem essa marcação, o sistema não salva.</li>
+      <li>Em <b>Origem: veio de corretor parceiro?</b>, escolha o parceiro na lista. Se ele ainda não existe, toque em <span class="bt">+ Novo</span> ao lado.</li>
+      <li>No cadastro rápido, escreva o <b>nome do corretor</b> (obrigatório) e a <b>imobiliária</b> dele (opcional: Correta, Re/Max, Pantanal… ou “Autônomo”). Toque em <span class="bt">Salvar parceiro</span>.</li>
+      <li>Preencha imóvel, valor, corretor responsável e a próxima ação, e toque em <span class="bt">Criar negociação</span>.</li>
+    </ol>
+    <div class="figura estreita"><img src="img/84_parc_nova.jpg" alt=""><div class="legenda">Negócio novo sem cliente (marcado “Estou ciente”) e com o corretor parceiro.</div></div>
+    <div class="figura"><img src="img/85_parc_rapido.jpg" alt=""><div class="legenda">Cadastro rápido do corretor parceiro: só o nome é obrigatório.</div></div>
+    <h3>Colocar o cliente depois</h3>
+    <ol class="passos">
+      <li>No quadro, o negócio sem cliente aparece como <b>“Cliente de &lt;parceiro&gt;”</b> (ou “Sem cliente atribuído”), com o 🤝 do parceiro.</li>
+      <li>Abra o negócio, escolha o cliente no campo <b>Cliente</b> (ou <span class="bt">+ Novo</span>) e toque em <span class="bt">Salvar alterações</span>. A marcação de ciência some e o histórico registra “Cliente atribuído ao negócio”.</li>
+    </ol>
+    <div class="duas"><div class="figura"><img src="img/86_parc_quadro.jpg" alt=""><div class="legenda">Cartão sem cliente no quadro, com o parceiro.</div></div><div class="figura"><img src="img/87_parc_depois.jpg" alt=""><div class="legenda">Cliente escolhido depois, no próprio negócio.</div></div></div>
+    <h3>Na hora de fechar</h3>
+    <p>Ao marcar o negócio como <b>Fechado</b>, a Central abre <span class="bt">Dividir comissão</span> e o parceiro de origem já vem na divisão, com o % padrão dele. Ajuste e salve.</p>
+    <div class="figura estreita"><img src="img/88_parc_divisao.jpg" alt=""><div class="legenda">Divisão da comissão com o parceiro de origem já preenchido.</div></div>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p>Negócio sem cliente não gera os lembretes de pós-venda e renovação (eles são do cliente). Quando o cliente for colocado, os lembretes saem na hora, mesmo que o negócio já esteja fechado.</p>
+      <p>O cadastro rápido cria o parceiro com 50% padrão. A Central ajusta o %, o CRECI e os contatos em <b>Equipe → Parceiros de fora</b>, onde também aparece a coluna Imobiliária.</p>
+      <p>O corretor vê só o nome e a imobiliária dos parceiros; telefone, e-mail e % ficam só para a Central e o financeiro.</p>
+      <div class="figura"><img src="img/91_parc_equipe.jpg" alt=""><div class="legenda">Equipe → Parceiros de fora, com a coluna Imobiliária.</div></div></div>
+<h2>3. Controle do documento</h2>
+<table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
+  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>14/11/2026</td><td>Emissão inicial.</td></tr></table>
+</div></body></html>

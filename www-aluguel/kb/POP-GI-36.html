@@ -1,0 +1,78 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @media screen{ body{padding:16px 0 28px;background:#fff} .folha{padding:0 16px} }
+  @media screen and (max-width:720px){
+    body{font-size:15px} .cab{grid-template-columns:1fr} .cab img{max-height:96px}
+    .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
+    .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
+  }
+</style><meta charset="utf-8"><title>POP-GI-36 · Ver quais imobiliárias e corretores parceiros mais trazem negócios</title><style>
+  :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
+  @page{size:A4;margin:12mm 14mm 15mm 14mm;
+    @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
+    @bottom-right{content:"POP-GI-36  ·  página " counter(page) " de " counter(pages);font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}}
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font:9.5pt/1.5 "Segoe UI",Arial,sans-serif;color:var(--texto);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .folha{max-width:182mm;margin:0 auto}
+  .cab{display:grid;grid-template-columns:52mm 1fr 44mm;gap:10px;align-items:stretch;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+  .cab img{width:100%;height:100%;min-height:24mm;object-fit:cover;display:block}
+  .cab-txt{padding:8px 4px;display:flex;flex-direction:column;justify-content:center}
+  .tipo{font-size:7.6pt;font-weight:800;letter-spacing:.14em;color:var(--ouro)}
+  h1{margin:2px 0 2px;font-size:15pt;line-height:1.15;color:var(--navy)}
+  .modulo{margin:0;font-size:8.8pt;color:var(--azul);font-weight:600}
+  .meta{border-left:1px solid var(--linha);background:#f6f8fb;font-size:8pt;display:grid;align-content:center;padding:6px 10px;gap:2px}
+  .meta div{display:flex;justify-content:space-between;gap:8px}
+  .meta span{color:var(--suave)} .meta b{color:var(--navy)}
+  .faixa{height:3px;background:linear-gradient(90deg,var(--ouro),#f0cf74 45%,transparent);border-radius:2px;margin:9px 0 10px}
+  .ficha{display:grid;grid-template-columns:34mm 1fr;border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:9pt;margin-bottom:10px}
+  .ficha dt{background:#f4f7fb;color:var(--navy);font-weight:700;padding:5px 9px;border-bottom:1px solid var(--linha)}
+  .ficha dd{margin:0;padding:5px 10px;border-bottom:1px solid var(--linha)}
+  .ficha dt:nth-last-of-type(1),.ficha dd:last-of-type{border-bottom:0}
+  h2{font-size:11pt;color:var(--navy);margin:12px 0 5px;padding-bottom:2px;border-bottom:1.5px solid var(--linha);break-after:avoid}
+  ol.passos{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:p}
+  ol.passos > li{counter-increment:p;position:relative;padding:0 0 6px 30px;margin:0}
+  ol.passos > li::before{content:counter(p);position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:9pt;display:flex;align-items:center;justify-content:center}
+  ul{margin:3px 0 6px;padding-left:18px} li{margin:0 0 3px}
+  .figura{text-align:center;margin:7px 0 4px;break-inside:avoid}
+  .figura img{max-width:100%;max-height:96mm;border:1px solid var(--linha);border-radius:8px}
+  .figura.estreita img{max-height:110mm}
+  .duas .figura img,.duas .figura.estreita img{max-height:72mm}
+  .legenda{font-size:8pt;color:var(--suave);margin-top:2px}
+  .duas{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;align-items:start;break-inside:avoid}
+  .atencao{background:#fff8e6;border:1px solid #f0dca6;border-left:4px solid var(--ouro);border-radius:0 8px 8px 0;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .atencao p{margin:0 0 3px}
+  .bt{display:inline-block;background:#e9f1fa;border:1px solid #cddcee;border-radius:5px;padding:0 5px;font-weight:600;color:var(--navy);font-size:8.6pt;white-space:nowrap}
+  h3{font-size:10pt;color:var(--navy);margin:10px 0 4px;break-after:avoid}
+  table.tabela{width:100%;border-collapse:collapse;font-size:8.6pt;margin:4px 0 6px;break-inside:avoid}
+  table.tabela th,table.tabela td{border:1px solid var(--linha);padding:4px 7px;text-align:left;vertical-align:top}
+  table.tabela th{background:#f4f7fb;color:var(--navy)}
+  table.controle{width:100%;border-collapse:collapse;font-size:8.2pt;margin-top:4px}
+  table.controle th,table.controle td{border:1px solid var(--linha);padding:3px 7px;text-align:left}
+  table.controle th{background:#f4f7fb;color:var(--navy)}</style></head>
+<body><div class="folha">
+<header class="cab">
+  <img src="banner.jpg" alt="SKL Geo Soluções">
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Ver quais imobiliárias e corretores parceiros mais trazem negócios</h1><p class="modulo">SKL Gestão Imobiliária · Indicadores → Parcerias · Painel → Parcerias que mais fecham</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-36</b></div><div><span>Versão</span><b>1.0</b></div>
+    <div><span>Vigência</span><b>14/11/2026</b></div><div><span>Sistema</span><b>0.20.1</b></div></div>
+</header>
+<div class="faixa"></div>
+<dl class="ficha"><dt>Objetivo</dt><dd>Saber com quais imobiliárias e corretores de fora a imobiliária mais faz negócio, para decidir onde investir em parcerias e eventos.</dd><dt>Aplicação</dt><dd>Acompanhamento mensal, trimestral ou anual das parcerias.</dd><dt>Responsáveis</dt><dd>Central, gestor e administrador (o corretor vê só os próprios negócios).</dd><dt>Pré-requisitos</dt><dd>Negócios marcados com “Origem: veio de corretor parceiro?” (POP-GI-35).</dd><dt>Resultado esperado</dt><dd>Ranking por imobiliária e por corretor parceiro, com negócios novos, em andamento, fechados, perdidos, conversão e valores.</dd></dl>
+<h2>1. Procedimento</h2>
+<ol class="passos">
+      <li>Abra <b>Indicadores</b> e escolha o período (ano, trimestre, mês ou “Tudo”) e, se quiser, o corretor.</li>
+      <li>Desça até <b>🤝 Parcerias com outras imobiliárias</b>. No topo: quantos negócios novos e fechados vieram de parceria e quantas imobiliárias parceiras há.</li>
+      <li><b>Por imobiliária:</b> ranking (🥇🥈🥉) pelos negócios fechados, com novos, em andamento, perdidos, conversão, vendas e aluguéis fechados.</li>
+      <li><b>Por corretor parceiro:</b> os mesmos números para cada corretor, com a imobiliária dele.</li>
+      <li>Para levar a uma reunião, use <span class="bt">Imprimir / PDF</span> ou <span class="bt">CSV</span>: o quadro de parcerias vai junto.</li>
+      <li>No <b>Painel</b>, o quadro <b>Parcerias que mais fecham</b> mostra o mesmo ranking em barras, com os botões de período (semana, mês, trimestre, ano, 12 meses, tudo).</li>
+    </ol>
+    <div class="figura"><img src="img/89_parc_indicadores.jpg" alt=""><div class="legenda">Indicadores → Parcerias: por imobiliária e por corretor parceiro.</div></div>
+    <div class="figura"><img src="img/90_parc_painel.jpg" alt=""><div class="legenda">Painel → Parcerias que mais fecham.</div></div>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p>“Novos” = negócios criados no período; “Fechados” e “Perdidos” = encerrados no período; “Em andamento” = abertos hoje. Vendas e aluguéis ficam em colunas separadas, porque somar os dois não faz sentido.</p>
+      <p>Escreva o nome da imobiliária sempre igual (a lista sugere as que já existem): “Pantanal Imóveis” e “Pantanal” contariam como duas.</p></div>
+<h2>3. Controle do documento</h2>
+<table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
+  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>14/11/2026</td><td>Emissão inicial.</td></tr></table>
+</div></body></html>
