@@ -236,3 +236,15 @@ body.sem-contrato_garantia_itens #finCtLocacaoCampos [data-garantia-itens]{displ
 .fin-ct-admin-aviso[hidden]{display:none}
 .fin-com-pago{color:#247346;font-weight:700}
 @media(max-width:780px){.fin-imp-barra{flex-wrap:nowrap}.fin-imp-barra button{flex:1 1 0;min-width:0;padding-left:6px!important;padding-right:6px!important;font-size:14px!important;overflow:hidden;text-overflow:ellipsis}}
+
+/* 16/11/2026 — como o negócio do contrato conta nas metas (corretor principal + participantes) */
+.fin-ct-divisao{display:grid;gap:6px;margin-top:10px;padding:10px 12px;border:1px dashed #b9c7d6;border-radius:10px;background:#f7fafd}
+.fin-ct-divisao[hidden]{display:none}
+.fin-ct-div-lista{display:grid;gap:6px}
+.fin-ct-div-linha{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px}
+.fin-ct-div-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.fin-ct-div-pct{white-space:nowrap;font-weight:700;color:#0a2a66;display:inline-flex!important;align-items:center;gap:4px;margin:0}
+.fin-ct-div-pct input{width:70px;padding:6px 8px;text-align:right}
+.fin-ct-div-valor{white-space:nowrap;color:#5b6675;font-size:12px;min-width:92px;text-align:right}
+.fin-ct-div-igual{justify-self:start;font-size:13px}
+@media (max-width:560px){.fin-ct-div-linha{grid-template-columns:auto minmax(0,1fr) auto}.fin-ct-div-valor{grid-column:2/-1;text-align:left;min-width:0}}

@@ -1419,6 +1419,17 @@
           <button id="finCtAddCorretor" type="button" class="secondary-button fin-mini">+ Corretor da equipe</button>
           <button id="finCtAddParceiro" type="button" class="secondary-button fin-mini">+ Parceiro de fora</button>
         </div>
+        <div id="finCtDivisao" class="fin-ct-divisao" hidden>
+          <span class="crm-rotulo">Como este negócio conta nas metas</span>
+          <select id="finCtDivModo">
+            <option value="padrao">Padrão da imobiliária</option>
+            <option value="casa">Partes iguais só entre os corretores da casa</option>
+            <option value="todos">Partes iguais entre todos (o parceiro de fora conta como um)</option>
+            <option value="manual">Definir o % de cada um</option>
+          </select>
+          <div id="finCtDivLista" class="fin-ct-div-lista"></div>
+          <small id="finCtDivInfo" class="muted-text"></small>
+        </div>
       </div>
       <div class="form-row">
         <label><span id="finCtInquilinoRot">Inquilino</span><select id="finCtInquilino"></select>

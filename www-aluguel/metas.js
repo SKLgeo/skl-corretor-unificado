@@ -56,6 +56,9 @@
               <label><span>Bateu a super meta: + %</span><input id="metasAddSuper" inputmode="decimal" autocomplete="off" /></label>
             </div>
             <label><span>Sem adicional em negócio com quantos corretores ou mais? (0 = sempre tem)</span><input id="metasSemAdd" type="number" min="0" max="10" /></label>
+            <label><span>Contrato com mais de um envolvido: como conta nas metas (padrão; cada contrato pode mudar)</span><select id="metasDivContrato">
+              <option value="casa">Partes iguais só entre os corretores da casa (parceiro de fora não reduz)</option>
+              <option value="todos">Partes iguais entre todos (o parceiro de fora conta como um)</option></select></label>
             <button id="metasSalvar" type="button" class="primary-button">Salvar</button>
             <div id="metasMsg" class="form-message" hidden></div>
           </form>`;
@@ -160,6 +163,7 @@
         $("metasAddMeta").value = String(dados.config.adicional_meta).replace(".", ",");
         $("metasAddSuper").value = String(dados.config.adicional_super).replace(".", ",");
         $("metasSemAdd").value = dados.config.sem_adicional_com_corretores;
+        $("metasDivContrato").value = dados.config.divisao_contrato || "casa";
         $("metasMsg").hidden = true;
         $("metasDialog").showModal();
     }
@@ -169,7 +173,7 @@
         const r1 = await ctx.sb.rpc("metas_salvar", { p_carteira: cart, p_ano: a, p_trimestre: t, p_meta: numero($("metasMeta").value), p_super: numero($("metasSuper").value) });
         if (r1.error) { falha("metasMsg", r1.error); return; }
         const r2 = await ctx.sb.rpc("metas_configurar", { p_carteira: cart, p_config: {
-            adicional_meta: numero($("metasAddMeta").value), adicional_super: numero($("metasAddSuper").value), sem_adicional_com_corretores: $("metasSemAdd").value } });
+            adicional_meta: numero($("metasAddMeta").value), adicional_super: numero($("metasAddSuper").value), sem_adicional_com_corretores: $("metasSemAdd").value, divisao_contrato: $("metasDivContrato").value } });
         if (r2.error) { falha("metasMsg", r2.error); return; }
         $("metasDialog").close();
         atual = { ano: a, trimestre: t };

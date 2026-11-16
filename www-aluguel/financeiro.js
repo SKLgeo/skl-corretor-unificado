@@ -19,6 +19,7 @@
     let contratos = [], vendas = [], cobrancas = [], repasses = [], clientes = new Map(), eventos = [];
     let resumo = null, carregando = null, canal = null, recarregarTimer = null;
     let contratoAberto = null, itens = [], cobrancaAberta = null;
+    let divCt = { modo: "padrao", pcts: {} }, divPadrao = null; // divisão do negócio para as metas (contrato aberto) e o padrão da imobiliária
     let parceiros = [], equipeCt = []; // parceiros de fora (crm_parceiros) e quem trabalhou junto no contrato aberto
     const ESCREVER = "__escrever"; // opção "escrever o nome" (pessoa sem cadastro)
     let ctTipo = "locacao", vendaAberta = null; // tipo do contrato aberto na janela: locação ou compra e venda
@@ -159,6 +160,13 @@
         }));
         $("finCtAddCorretor").addEventListener("click", () => { equipeCt.push({ tipo: "corretor", usuario_id: null }); desenharEquipeCt(); });
         $("finCtAddParceiro").addEventListener("click", () => { equipeCt.push({ tipo: "parceiro", parceiro_id: null, nome: "" }); desenharEquipeCt(); });
+        $("finCtDivModo").addEventListener("change", () => {
+            divCt.modo = $("finCtDivModo").value;
+            if (divCt.modo === "manual" && !Object.keys(divCt.pcts).length) dividirIgualCt();
+            desenharDivisaoCt();
+        });
+        $("finCtCorretor").addEventListener("change", desenharDivisaoCt);
+        [ "finCvComValor", "finCvComPct", "finCvValor", "finCtValor", "finCtInter" ].forEach(id => $(id).addEventListener("input", desenharDivisaoCt));
         [ "finCvValor", "finCvComPct" ].forEach(id => $(id).addEventListener("input", calcularComissaoVenda));
         $("finCvConcluir").addEventListener("click", () => situacaoVenda("concluido"));
         $("finCvCancelar").addEventListener("click", () => situacaoVenda("cancelado"));
@@ -522,6 +530,9 @@
         pessoa("finCtProprietario", tipo === "venda" ? base.vendedor_id : base.proprietario_id, tipo === "venda" ? base.vendedor_nome : base.proprietario_nome, "finCtProprietarioNome");
         mostrarNomesLivres();
         equipeCt = JSON.parse(JSON.stringify(base.participantes || []));
+        divCt = { modo: (base.divisao_meta && base.divisao_meta.modo) || "padrao", pcts: {} };
+        ((base.divisao_meta && base.divisao_meta.pcts) || []).forEach(p => { divCt.pcts[p.chave] = p.pct; });
+        divPadrao = null; carregarDivisaoPadrao();   // relê: o padrão pode ter mudado em Metas
         const equipe = ctx.equipe().filter(u => u.active !== false);
         $("finCtCorretor").innerHTML = `<option value="">Sem corretor</option>` + equipe.map(u => `<option value="${h(u.id)}"${u.id === base.corretor_id ? " selected" : ""}>${h(u.display_name)}</option>`).join("");
         // locação
@@ -646,7 +657,109 @@
                 if (el.dataset.k === "parceiro_id") { if (el.value) p.nome = null; desenharEquipeCt(); }
             }));
             row.querySelector("[data-remover]").addEventListener("click", () => { equipeCt.splice(Number(row.dataset.i), 1); desenharEquipeCt(); });
+            row.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", desenharDivisaoCt));
         });
+        desenharDivisaoCt();
+    }
+    // ------------------------------------------------------------------ divisão do negócio para as metas
+    // 16/11/2026 (Cerrado): o valor do contrato ia inteiro para o corretor principal. Agora cada contrato escolhe:
+    // padrão da imobiliária | partes iguais só entre os corretores da casa | partes iguais entre todos (parceiro conta) | % de cada um.
+    // A parte do parceiro de fora nunca vai para a meta de ninguém. O cálculo de verdade é do banco (_divisao_cotas).
+    const NOMES_DIV = { casa: "partes iguais só entre os corretores da casa", todos: "partes iguais entre todos (o parceiro de fora conta como um)" };
+    async function carregarDivisaoPadrao() {
+        if (divPadrao) return;
+        try {
+            const { data } = await ctx.sb.from("carteiras_aluguel").select("metas_config").eq("id", ctx.carteiraId()).maybeSingle();
+            divPadrao = (data && data.metas_config && data.metas_config.divisao_contrato) || "casa";
+        } catch (e) { divPadrao = "casa"; }
+        desenharDivisaoCt();
+    }
+    function chaveEnvolvido(p) {
+        if (p.tipo === "corretor" && p.usuario_id) return "c:" + p.usuario_id;
+        if (p.parceiro_id) return "p:" + p.parceiro_id;
+        const n = (p.nome || "").trim().toLowerCase();
+        return n ? "n:" + n : null;
+    }
+    // corretor principal + participantes (sem repetir), na mesma ordem e com a mesma chave do banco
+    function envolvidosCt() {
+        const equipe = ctx.equipe();
+        const lista = [], vistos = new Set();
+        const add = p => {
+            const chave = chaveEnvolvido(p);
+            if (!chave || vistos.has(chave)) return;
+            vistos.add(chave);
+            const casa = p.tipo === "corretor";
+            const nome = casa ? ((equipe.find(u => u.id === p.usuario_id) || {}).display_name || "Corretor")
+                : p.parceiro_id ? ((parceiros.find(x => x.id === p.parceiro_id) || {}).nome || "Parceiro") : p.nome.trim();
+            lista.push({ chave, nome, casa });
+        };
+        if ($("finCtCorretor").value) add({ tipo: "corretor", usuario_id: $("finCtCorretor").value });
+        participantesCt().forEach(add);
+        return lista;
+    }
+    function baseMetaCt() {
+        const v = ctTipo === "venda" ? totalComissaoVenda() : totalComissaoLocacao();
+        return Number(v) || 0;
+    }
+    function dividirIgualCt() {
+        const env = envolvidosCt();
+        divCt.pcts = {};
+        if (!env.length) return;
+        const parte = Math.floor(10000 / env.length) / 100;
+        env.forEach((e, i) => { divCt.pcts[e.chave] = i === env.length - 1 ? Math.round((100 - parte * (env.length - 1)) * 100) / 100 : parte; });
+    }
+    function modoEfetivoCt() { return divCt.modo === "padrao" ? (divPadrao || "casa") : divCt.modo; }
+    // % de cada envolvido no modo escolhido (o que vai para a meta)
+    function pctsCt(env) {
+        const modo = modoEfetivoCt(), casa = env.filter(e => e.casa).length;
+        return env.map(e => modo === "manual" ? Number(divCt.pcts[e.chave]) || 0
+            : modo === "todos" ? 100 / env.length : (e.casa && casa ? 100 / casa : 0));
+    }
+    function desenharDivisaoCt() {
+        const box = $("finCtDivisao");
+        if (!box) return;
+        const env = envolvidosCt();
+        box.hidden = env.length < 2;
+        if (box.hidden) return;
+        const pode = podeGerir();
+        $("finCtDivModo").value = divCt.modo;
+        $("finCtDivModo").options[0].textContent = "Padrão da imobiliária (" + (NOMES_DIV[divPadrao || "casa"] || "") + ")";
+        $("finCtDivModo").disabled = !pode;
+        const manual = divCt.modo === "manual", base = baseMetaCt(), pcs = pctsCt(env);
+        const fmt = v => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+        $("finCtDivLista").innerHTML = env.map((e, i) => `<div class="fin-ct-div-linha">
+            <span class="fin-ct-tag${e.casa ? "" : " fin-ct-tag-parceiro"}">${e.casa ? "Corretor" : "Parceiro"}</span>
+            <span class="fin-ct-div-nome">${h(e.nome)}</span>
+            ${manual ? `<label class="fin-ct-div-pct"><input data-div="${h(e.chave)}" inputmode="decimal" value="${h(fmt(pcs[i]))}"${pode ? "" : " disabled"} /> %</label>`
+                : `<span class="fin-ct-div-pct">${fmt(pcs[i])}%</span>`}
+            <span class="fin-ct-div-valor">${e.casa ? (base ? dinheiro(base * pcs[i] / 100) : "") : (pcs[i] ? "não entra na meta" : "—")}</span>
+          </div>`).join("")
+          + (manual && pode ? `<button type="button" class="text-button fin-ct-div-igual" data-div-igual>Dividir igual</button>` : "");
+        const soma = pcs.reduce((s, x) => s + x, 0);
+        $("finCtDivInfo").textContent = manual
+            ? (Math.abs(soma - 100) > 0.05 ? `A soma está em ${fmt(soma)}%: precisa fechar 100%.` : "Soma 100%. A parte do parceiro de fora não entra na meta de ninguém.")
+            : (base ? `Valor que conta nas metas: ${dinheiro(base)} (comissão do contrato).` : "Informe o valor do contrato para ver quanto conta para cada um.");
+        $("finCtDivInfo").classList.toggle("fin-txt-alerta", manual && Math.abs(soma - 100) > 0.05);
+        $("finCtDivLista").querySelectorAll("[data-div]").forEach(inp => inp.addEventListener("change", () => {
+            divCt.pcts[inp.dataset.div] = num(inp.value) || 0; desenharDivisaoCt();
+        }));
+        const ig = $("finCtDivLista").querySelector("[data-div-igual]");
+        if (ig) ig.addEventListener("click", () => { dividirIgualCt(); desenharDivisaoCt(); });
+    }
+    function divisaoInvalidaCt() {
+        if (divCt.modo !== "manual") return null;
+        const env = envolvidosCt();
+        if (env.length < 2) return null;
+        const soma = pctsCt(env).reduce((s, x) => s + x, 0);
+        return Math.abs(soma - 100) > 0.05 ? "Como o negócio conta nas metas: os % precisam somar 100%." : null;
+    }
+    async function salvarDivisaoCt(tipo, id) {
+        const env = envolvidosCt();
+        const divisao = divCt.modo === "manual" && env.length >= 2
+            ? { modo: "manual", pcts: env.map(e => ({ chave: e.chave, pct: Number(divCt.pcts[e.chave]) || 0 })) }
+            : { modo: env.length >= 2 ? divCt.modo : "padrao" };
+        const { error } = await ctx.sb.rpc("contrato_definir_divisao_meta", { p_tipo: tipo, p_id: id, p_divisao: divisao });
+        if (error) ctx.toast("O contrato foi salvo, mas a divisão nas metas não: " + erro(error));
     }
     function participantesCt() {
         return equipeCt.map(p => p.tipo === "corretor" ? (p.usuario_id ? { tipo: "corretor", usuario_id: p.usuario_id } : null)
@@ -908,12 +1021,14 @@
         if (!d.comprador_id && !d.comprador_nome) { msg($("finCtMsg"), "Escolha o comprador ou escreva o nome dele."); return; }
         if (!d.valor_venda) { msg($("finCtMsg"), "Informe o valor da venda."); return; }
         if (!d.data_contrato) { msg($("finCtMsg"), "Informe a data do contrato."); return; }
+        if (divisaoInvalidaCt()) { msg($("finCtMsg"), divisaoInvalidaCt()); return; }
         if (!(await confirmarPessoas(d, true))) return;
         $("finCtSalvar").disabled = true;
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato_venda", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: vendaAberta });
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
         await salvarPagamentoCt("venda", data.id);
+        await salvarDivisaoCt("venda", data.id);
         if (window.SKLComissaoContrato) await window.SKLComissaoContrato.salvar(data.id);
         $("finContratoDialog").close();
         ctx.toast(vendaAberta ? "Contrato de compra e venda atualizado." : `Contrato de compra e venda nº ${data.numero} criado.`);
@@ -943,12 +1058,14 @@
         if (!d.inquilino_id && !d.inquilino_nome) { msg($("finCtMsg"), "Escolha o inquilino ou escreva o nome dele."); return; }
         if (!d.valor_aluguel) { msg($("finCtMsg"), "Informe o valor do aluguel."); return; }
         if (!d.inicio) { msg($("finCtMsg"), "Informe o início do contrato."); return; }
+        if (divisaoInvalidaCt()) { msg($("finCtMsg"), divisaoInvalidaCt()); return; }
         if (!(await confirmarPessoas(d, false))) return;
         $("finCtSalvar").disabled = true;
         const { data, error } = await ctx.sb.rpc("fin_salvar_contrato", { p_carteira: ctx.carteiraId(), p_dados: d, p_id: contratoAberto });
         $("finCtSalvar").disabled = false;
         if (error) { msg($("finCtMsg"), erro(error)); return; }
         await salvarPagamentoCt("locacao", data.id);
+        await salvarDivisaoCt("locacao", data.id);
         if (window.SKLComissaoContrato) await window.SKLComissaoContrato.salvar(data.id);
         $("finContratoDialog").close();
         ctx.toast(contratoAberto ? (data.administrado === false ? "Contrato atualizado." : "Contrato atualizado. As cobranças em aberto acompanham as mudanças.")
