@@ -187,5 +187,13 @@ fetch("${BASE_FUNCOES}imobiliaria-leads", {
         return `${PAGINA_IMOVEL}?f=${encodeURIComponent(token)}&c=${encodeURIComponent(codigo)}`;
     }
 
-    window.SKLIntegracoes = { iniciar, linkPublico };
+    // link de uma seleção (vários imóveis): a mesma página do imóvel, sem código, com a chave do link
+    async function linkSelecao(chave) {
+        if (!chave || !ctx) return null;
+        const { data: token } = await ctx.sb.rpc("integracao_link_publico", { p_carteira: ctx.carteiraId() });
+        if (!token) return null;
+        return `${PAGINA_IMOVEL}?f=${encodeURIComponent(token)}&e=${encodeURIComponent(chave)}`;
+    }
+
+    window.SKLIntegracoes = { iniciar, linkPublico, linkSelecao };
 })();

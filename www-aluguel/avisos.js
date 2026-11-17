@@ -178,6 +178,9 @@
         if (!n || !ctx) return;
         if ($("avisosDialog").open) $("avisosDialog").close();
         const d = n.dados || {};
+        // "links que avisam": o cliente abriu o link ou gostou de um imóvel → lista dos links enviados; campanha → quadro de campanhas
+        if (n.tipo === "link" && d.link_id && window.SKLLinks) return window.SKLLinks.abrirEnviados(d.link_id);
+        if (n.tipo === "campanha" && window.SKLLinks) return window.SKLLinks.irCampanhas();
         if (d.construcao_id && ctx.abrirImovel) return ctx.abrirImovel(d.construcao_id);
         if (n.tipo === "procura") return mostrarProcurados();
         if (d.negociacao_id && window.SKLCRM) return window.SKLCRM.abrirNegociacao(d.negociacao_id);

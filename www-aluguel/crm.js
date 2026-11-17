@@ -1858,6 +1858,7 @@
         box.innerHTML = `<button type="button" class="crm-compat-topo" aria-expanded="${compatAberto ? "true" : "false"}">
               <span class="eyebrow">IMÓVEIS QUE COMBINAM <em>${lista.length ? lista.length : "nenhum"}</em></span>
               <span class="crm-compat-seta">${compatAberto ? "Esconder ▲" : "Ver lista ▼"}</span></button><div class="crm-compat-corpo">`
+            + (lista.length && window.SKLLinks ? `<div class="crm-compat-sel"><button type="button" class="secondary-button" data-sel-todos>🧺 Enviar ${lista.length === 1 ? "este imóvel" : "estes " + lista.length + " imóveis"} ao cliente num link só</button></div>` : "")
             + (lista.length ? `<p class="crm-compat-aviso">A % mostra o quanto cada imóvel combina com o que o cliente procura. Para uma % mais precisa, preencha melhor o que o cliente procura (bairros, tipo, valor, quartos e vagas).</p>` : "")
             + (lista.length ? lista.map(({ i, r }) => `<div class="crm-compat-item${i.id === atual ? " escolhido" : ""}">
                 <span class="crm-compat-foto" data-foto-id="${h(i.id)}"><span class="sem-foto">sem foto</span><span class="crm-compat-pct ${r.pct === 100 ? "total" : ""}">${r.pct}%</span></span>
@@ -1877,6 +1878,9 @@
         box.querySelector(".crm-compat-topo").addEventListener("click", () => { compatAberto = !compatAberto; renderCompativeis(); });
         preencherFotos(box, lista.map(x => x.i));
         box.querySelectorAll("[data-ver]").forEach(b => b.addEventListener("click", () => ctx.abrirImovel(b.dataset.ver)));
+        const selTodos = box.querySelector("[data-sel-todos]");
+        if (selTodos) selTodos.addEventListener("click", () => window.SKLLinks.abrirSelecao(lista.map(x => x.i.id),
+            { clienteId: cli && cli.id, clienteNome: cli && cli.nome, telefone: cli && cli.telefone, negociacaoId: negAberta || null }));
         box.querySelectorAll("[data-usar]").forEach(b => b.addEventListener("click", () => {
             const i = ctx.imoveis().find(x => x.id === b.dataset.usar);
             $("crmNegImovel").value = b.dataset.usar; mostrarProcura();

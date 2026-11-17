@@ -49,13 +49,33 @@
     .tela .t-ant{left:10px;top:50%;transform:translateY(-50%)}.tela .t-prox{right:10px;top:50%;transform:translateY(-50%)}
     .tela .t-cont{position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.5);border-radius:99px;padding:3px 12px;font-size:14px}
     body.tela-aberta{overflow:hidden}
+    /* seleção (vários imóveis num link) e "Gostei" */
+    .sel-topo{background:var(--escuro);color:#fff;padding:22px 18px 18px}
+    .sel-topo small{display:block;opacity:.75;font-size:13px}.sel-topo h1{color:#fff;margin:6px 0 4px;font-size:22px}
+    .sel-lista{display:grid;gap:12px;padding:12px}
+    .sel-card{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 20px rgba(6,27,46,.06);cursor:pointer;border:0;padding:0;text-align:left;font:inherit;color:inherit;position:relative}
+    .sel-card img,.sel-card .sem-foto{width:120px;height:100%;min-height:96px;object-fit:cover;display:block;background:#dfe7ec}
+    .sel-card .info{padding:10px 44px 10px 0;min-width:0}
+    .sel-card strong{display:block;color:var(--escuro)}.sel-card small{display:block;color:var(--muted);margin-top:3px;font-size:13px}
+    .sel-card .valor{color:var(--escuro);font-weight:800;margin-top:6px}
+    .gostei{position:absolute;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:1px solid #f0c9d3;background:#fff;font-size:18px;cursor:pointer;line-height:1}
+    .gostei.ativo{background:#e0245e;border-color:#e0245e;color:#fff}
+    .voltar{display:inline-block;margin:10px 12px 0;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:inherit;font-weight:700;color:var(--escuro);cursor:pointer;box-shadow:0 2px 8px rgba(6,27,46,.08)}
+    .gostei-grande{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;border:2px solid #e0245e;background:#fff;color:#e0245e;border-radius:12px;padding:12px;font:inherit;font-weight:800;cursor:pointer}
+    .gostei-grande.ativo{background:#e0245e;color:#fff}
     [hidden]{display:none!important}
   </style>
 </head>
 <body>
   <main>
     <p id="carregando" class="aviso">Carregando o imóvel…</p>
+    <div id="selecao" hidden>
+      <header class="sel-topo"><small id="selCarteira"></small><h1 id="selTitulo">Imóveis selecionados para você</h1><small id="selQtd"></small></header>
+      <div class="sel-lista" id="selLista"></div>
+      <p class="rodape" id="selRodape"></p>
+    </div>
     <div id="conteudo" hidden>
+      <button class="voltar" id="voltarSelecao" type="button" hidden>‹ Ver todos os imóveis</button>
       <div class="galeria"><img id="foto" alt="Foto do imóvel" /><button class="ant" id="ant" type="button" aria-label="Foto anterior">‹</button><button class="prox" id="prox" type="button" aria-label="Próxima foto">›</button><span class="contador" id="contador"></span><span class="ampliar" aria-hidden="true">⤢ toque para ampliar</span></div>
       <div class="miniaturas" id="miniaturas"></div>
       <section class="cartao">
@@ -64,6 +84,7 @@
         <p class="local" id="local"></p>
         <div class="precos" id="precos"></div>
         <p class="extras" id="extras"></p>
+        <button class="gostei-grande" id="gosteiGrande" type="button" hidden>♡ Gostei deste imóvel</button>
       </section>
       <section class="cartao"><div class="carac" id="carac"></div></section>
       <section class="cartao" id="descBox"><div class="descricao" id="descricao"></div></section>

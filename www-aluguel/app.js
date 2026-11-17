@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.20.2";
+    const APP_VERSION = "0.21.0";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -1064,6 +1064,8 @@
         if (window.SKLPropostas && pode("tela_propostas")) await seguro("proposta de negócios", () => window.SKLPropostas.iniciar({ ...ctxExtras,
             fotosCapa, fotoUrl: resolveFotoUrl, novoImovel: novoImovelPreenchido,
             imprimir: (html, op) => window.SKLFinanceiro && window.SKLFinanceiro.imprimir(html, op) }));
+        if (window.SKLLinks) await seguro("links que avisam", () => window.SKLLinks.iniciar({ ...ctxExtras, fotosCapa, irPara: showPage,
+            abrirImovel: id => { const c = construcoes.get(id); if (c) openConstrucaoDialog(c); else toast("Este imóvel não está mais na lista (pode ter sido vendido ou alugado)."); } }));
         showPage(window.SKLModoCorretor ? window.SKLModoCorretor.iniciar(contextoTela()) : "dashboard");
     }
 
@@ -1079,6 +1081,7 @@
         if (window.SKLContabil) window.SKLContabil.sair();
         if (window.SKLModoCorretor) window.SKLModoCorretor.sair();
         if (window.SKLAvisos) window.SKLAvisos.sair();
+        if (window.SKLLinks) window.SKLLinks.sair();
         // "scope: local": sai só deste aparelho; o celular e o computador da mesma pessoa continuam conectados
         sb.auth.signOut({ scope: "local" });
         document.querySelectorAll("#loginView .ver-senha").forEach(b => b.previousElementSibling && (b.previousElementSibling.type = "password"));
@@ -1224,6 +1227,7 @@
         connectRealtime();
         if (window.SKLCRM) window.SKLCRM.recarregar();
         if (window.SKLExtras && window.SKLExtras.recarregarChaves) window.SKLExtras.recarregarChaves();
+        if (window.SKLLinks) window.SKLLinks.recarregarCampanhas();
     }
 
     function connectRealtime() {

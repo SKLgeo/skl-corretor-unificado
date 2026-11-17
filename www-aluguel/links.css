@@ -1,0 +1,53 @@
+/* Links que avisam: seleção para o cliente, links enviados, campanhas da equipe (links-cliente.js) */
+.lnk-dialog .dialog-card{max-width:640px;width:100%}
+.lnk-dialog-largo .dialog-card{max-width:820px}
+.lnk-resultados{display:grid;gap:6px;margin:4px 0 10px}
+.lnk-res{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid #dfe7ec;border-radius:10px;background:#fff;padding:6px 10px 6px 6px;cursor:pointer;font:inherit;color:inherit}
+.lnk-res:hover{border-color:var(--navy,#1583B7)}
+.lnk-res small,.lnk-item small{display:block;color:#6b7c85;font-size:12px;margin-top:2px}
+.lnk-res b{font-size:12px;color:var(--navy,#1583B7);white-space:nowrap}
+.lnk-foto{display:block;width:56px;height:42px;border-radius:7px;background:#e8eef2 center/cover no-repeat}
+.lnk-sel-topo{margin:4px 0 6px}
+.lnk-lista{display:grid;gap:6px;margin-bottom:12px}
+.lnk-item{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #e2e8eb;border-radius:10px;padding:6px;background:#f8fbfc}
+.lnk-item-info{min-width:0}.lnk-item-info strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnk-item-acoes{display:flex;gap:2px}.lnk-item-acoes .text-button{padding:4px 8px;font-size:16px;min-width:34px}
+.lnk-tirar{color:#b3261e}
+.lnk-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px}
+.lnk-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.lnk-filtros select{width:auto;min-width:0}
+.lnk-resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.lnk-resumo div{background:#f1f6f9;border-radius:10px;padding:8px;text-align:center}
+.lnk-resumo strong{display:block;font-size:20px;color:var(--navy-deep,#061B2E)}.lnk-resumo span{font-size:12px;color:#6b7c85}
+.lnk-ranking{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:14px;min-width:0}
+.lnk-ranking th,.lnk-ranking td{padding:6px 8px;border-bottom:1px solid #e8eef2;text-align:left}
+.lnk-env-lista{display:grid;gap:8px}
+.lnk-env{border:1px solid #e2e8eb;border-radius:12px;padding:10px 12px;background:#fff}
+.lnk-env.destaque{border-color:var(--navy,#1583B7);box-shadow:0 0 0 3px rgba(21,131,183,.18)}
+.lnk-env header{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.lnk-env header small{color:#6b7c85}
+.lnk-env p{margin:4px 0}
+.lnk-env-st{display:flex;flex-wrap:wrap;gap:6px}
+.lnk-st{font-size:12px;border-radius:99px;padding:3px 10px;background:#eef1f3;color:#55636f}
+.lnk-st.aberto{background:#e3f4ea;color:#13774a}.lnk-st.gostei{background:#fde8ec;color:#a3264b}
+.lnk-env-acoes{display:flex;gap:8px;margin-top:6px;align-items:center}
+.lnk-camp-quadro{background:#fff;border:1px solid #e2e8eb;border-left:4px solid #D9A21B;border-radius:12px;padding:10px 14px;margin:0 0 14px}
+.lnk-camp-quadro>header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lnk-camp{padding:8px 0;border-top:1px solid #eef1f3}.lnk-camp:first-of-type{border-top:0}
+.lnk-camp.futura{opacity:.7}
+.lnk-camp-topo{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.lnk-camp-topo small{color:#6b7c85}.lnk-camp-topo .text-button{margin-left:auto}
+.lnk-camp p{margin:4px 0;white-space:pre-wrap}
+.lnk-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.lnk-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid #cfe0ea;background:#f1f8fc;border-radius:99px;padding:4px 10px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.lnk-chip button{border:0;background:none;font-size:16px;cursor:pointer;color:#b3261e;padding:0 2px}
+.crm-compat-sel{margin:8px 0}
+.ext-env-sel{margin:4px 0 0}
+body.sem-campanhas .lnk-camp-quadro{display:none!important}
+@media (max-width:780px){
+  .lnk-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lnk-res,.lnk-item{grid-template-columns:48px minmax(0,1fr)}
+  .lnk-res b{grid-column:2}
+  .lnk-item-acoes{grid-column:1/-1;justify-content:flex-end}
+  .lnk-foto{width:48px;height:38px}
+}

@@ -56,6 +56,7 @@
   <p id="extEnvLocalDica" class="muted-text ext-env-local-dica"></p>
   <label><span>Mensagem</span><textarea id="extEnvTexto" rows="9"></textarea></label>
   <p id="extEnvAviso" class="muted-text"></p>
+  <p class="ext-env-sel"><button id="extEnvSelecao" type="button" class="text-button">🧺 Juntar com outros imóveis num link só</button></p>
   <div class="dialog-actions"><button id="extEnvFicha" type="button" class="secondary-button">Ficha em PDF</button><button id="extEnvCopiar" type="button" class="secondary-button">Copiar texto</button><button id="extEnvFotos" type="button" class="secondary-button" hidden>📷 Enviar com as fotos</button><button id="extEnvWhats" type="button" class="primary-button">Abrir WhatsApp</button></div>
   <p id="extEnvFotosDica" class="muted-text ext-env-dica-tel" hidden>“Enviar com as fotos” manda as fotos de verdade junto com o texto: escolha o WhatsApp e depois o contato. O texto também fica copiado, para colar se o WhatsApp não trouxer.</p>
 </form></dialog>
@@ -73,12 +74,19 @@
         document.querySelectorAll("#extPropostaDialog [data-fechar], #extEnviarDialog [data-fechar], #extChaveDialog [data-fechar]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
         $("extPropSalvar").addEventListener("click", salvarProposta);
         $("extEnvWhats").addEventListener("click", abrirWhats);
+        $("extEnvSelecao").addEventListener("click", () => {
+            const e = envioAtual;
+            if (!e || !window.SKLLinks) return;
+            $("extEnviarDialog").close();
+            const cli = clientesEnvio.find(x => rotCli(x) === $("extEnvCliente").value);
+            window.SKLLinks.abrirSelecao([ e.c.id ], { telefone: $("extEnvTel").value, clienteId: cli && cli.id, clienteNome: cli && cli.nome });
+        });
         $("extEnvFotos").addEventListener("click", enviarComFotos);
         $("extEnvAgenda").addEventListener("click", buscarNaAgenda);
         $("extEnvCliente").addEventListener("change", usarClienteCadastrado);
         $("extEnvTel").addEventListener("input", rotuloWhats);
         $("extEnvLocal").addEventListener("change", alternarLocalizacao);
-        $("extEnvCopiar").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("extEnvTexto").value); ctx.toast("Texto copiado."); } catch { ctx.toast("Selecione o texto e copie."); } });
+        $("extEnvCopiar").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("extEnvTexto").value); ctx.toast("Texto copiado."); } catch { ctx.toast("Selecione o texto e copie."); } marcarEnviado(); });
         $("extEnvFicha").addEventListener("click", () => fichaPdf(imovelAberto));
         $("extChaveQuem").addEventListener("change", () => { $("extChaveNomeLabel").hidden = $("extChaveQuem").value !== "__fora"; });
         $("extChaveSalvar").addEventListener("click", salvarChave);
@@ -400,15 +408,20 @@
         rotuloWhats();
         preparandoEnvio(true);
         $("extEnviarDialog").showModal();
-        let link = null;
+        let link = null, linkId = null;
         try {
             link = await comLimite((async () => {
-                // 10/11/2026: o link vai mesmo sem "Publicar no site". Nesse caso leva uma chave do envio (imovel_envios), que abre
-                // a página só deste imóvel para quem recebeu; a vitrine do site e os portais continuam só com os publicados.
+                // 10/11/2026: o link vai mesmo sem "Publicar no site" (a chave abre a página só deste imóvel para quem recebeu).
+                // 17/11/2026: a chave é de um "link que avisa" (imovel_links): o corretor recebe aviso quando o cliente abre e
+                // quando toca em ❤. Se o banco ainda não tiver isso, cai na chave antiga (imovel_envios).
                 let chave = null;
-                if (!c.publicar_site && c.codigo) {
-                    const r = await ctx.sb.rpc("imovel_link_envio", { p_construcao: c.id, p_localizacao: false });
-                    chave = r.error ? null : r.data;
+                if (c.codigo) {
+                    const r = await ctx.sb.rpc("imovel_link_criar", { p_carteira: ctx.carteiraId(), p_itens: [ c.id ], p_dados: {} });
+                    if (!r.error && r.data && r.data.chave) { chave = r.data.chave; linkId = r.data.id; }
+                    else if (!c.publicar_site) {
+                        const r2 = await ctx.sb.rpc("imovel_link_envio", { p_construcao: c.id, p_localizacao: false });
+                        chave = r2.error ? null : r2.data;
+                    }
                 }
                 let l = window.SKLIntegracoes && (c.publicar_site || chave)
                     ? await window.SKLIntegracoes.linkPublico(c.codigo, { semPrevia: !c.publicar_site }) : null;
@@ -422,7 +435,7 @@
                 return l;
             })(), 8000);
         } catch { link = null; }
-        envioAtual = { c, link, chave: null };
+        envioAtual = { c, link, chave: null, linkId };
         const temLocal = (c.latitude != null && c.longitude != null) || !!(c.logradouro || "").trim();
         $("extEnvLocal").checked = false;
         $("extEnvLocal").disabled = !temLocal;
@@ -444,6 +457,15 @@
         if (!e) return;
         const com = $("extEnvLocal").checked;
         let link = e.link;
+        // link que avisa: a localização é liberada (ou tirada) no próprio link, sem trocar o endereço
+        if (e.linkId && link) {
+            preparandoEnvio(true);
+            const { error } = await ctx.sb.rpc("imovel_link_atualizar", { p_link: e.linkId, p_dados: { com_localizacao: com } });
+            if (error) { ctx.toast(ctx.traduzErro(error.message)); $("extEnvLocal").checked = !com; }
+            $("extEnvTexto").value = textoImovel(e.c, link, error ? !com : com);
+            preparandoEnvio(false);
+            return;
+        }
         if (com && link) {
             if (!e.chave) {
                 preparandoEnvio(true);
@@ -462,6 +484,16 @@
         const texto = encodeURIComponent($("extEnvTexto").value);
         const url = d.length >= 10 ? `https://wa.me/55${d}?text=${texto}` : `https://wa.me/?text=${texto}`;
         window.open(url, "_blank", "noopener");
+        marcarEnviado();
+    }
+    // o link entra em "Links enviados" quando sai de verdade (WhatsApp, copiar ou fotos), com o nome do cliente se foi escolhido
+    function marcarEnviado() {
+        const e = envioAtual;
+        if (!e || !e.linkId) return;
+        const cli = clientesEnvio.find(x => rotCli(x) === $("extEnvCliente").value);
+        const dados = { enviado: true };
+        if (cli) dados.cliente_nome = cli.nome;
+        ctx.sb.rpc("imovel_link_atualizar", { p_link: e.linkId, p_dados: dados }).then(() => {}, () => {});
     }
     function rotuloWhats() {
         const d = $("extEnvTel").value.replace(/\D/g, "");
@@ -527,6 +559,7 @@
             botao.disabled = false; botao.textContent = rotulo;
             try { await navigator.clipboard.writeText(texto); } catch { /* sem permissão de copiar: segue */ }
             await navigator.share({ files: fotosEnvio.arquivos, text: texto });
+            marcarEnviado();
         } catch (err) {
             botao.disabled = false;
             if (err && err.name === "AbortError") { botao.textContent = rotulo; return; }

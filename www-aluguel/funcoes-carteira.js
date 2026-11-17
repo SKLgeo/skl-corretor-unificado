@@ -17,6 +17,8 @@
           texto: "Ligado: o contrato de locação gera as cobranças de todo mês, com vencimento, taxa de administração, multa, juros e repasse ao proprietário. Desligado (só intermediação): o contrato registra a locação e a comissão da imobiliária, sem cobranças mensais. As cobranças já lançadas continuam como estão." },
         { chave: "contrato_garantia_itens", nome: "Garantia e itens cobrados com o aluguel no contrato",
           texto: "Campos de garantia (caução, fiador, seguro…) e de itens cobrados junto com o aluguel todo mês (condomínio, IPTU…) no contrato de locação." },
+        { chave: "campanhas", nome: "Campanhas para a equipe",
+          texto: "A Central e o gestor publicam campanhas (meta, bônus, imóveis em destaque) que aparecem no topo do Hoje e da Visão geral e chegam como aviso para toda a equipe." },
         { chave: "repasses", nome: "Repasses aos proprietários",
           texto: "A aba Repasses do Financeiro e o valor \"A repassar\" no Resumo. Ligue se a imobiliária recebe o aluguel e repassa ao proprietário." },
         { chave: "manutencao", nome: "Manutenção e chamados de defeito",
