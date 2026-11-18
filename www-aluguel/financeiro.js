@@ -737,7 +737,7 @@
           + (manual && pode ? `<button type="button" class="text-button fin-ct-div-igual" data-div-igual>Dividir igual</button>` : "");
         const soma = pcs.reduce((s, x) => s + x, 0);
         $("finCtDivInfo").textContent = manual
-            ? (Math.abs(soma - 100) > 0.05 ? `A soma está em ${fmt(soma)}%: precisa fechar 100%.` : "Soma 100%. A parte do parceiro de fora não entra na meta de ninguém.")
+            ? (Math.abs(soma - 100) > 0.05 ? `A soma está em ${fmt(soma)}%: aqui precisa fechar 100%, porque é a divisão da meta. O % que cada um recebe em dinheiro vai no bloco 💰 Comissão.` : "Soma 100%. A parte do parceiro de fora não entra na meta de ninguém.")
             : (base ? `Valor que conta nas metas: ${dinheiro(base)} (comissão do contrato).` : "Informe o valor do contrato para ver quanto conta para cada um.");
         $("finCtDivInfo").classList.toggle("fin-txt-alerta", manual && Math.abs(soma - 100) > 0.05);
         $("finCtDivLista").querySelectorAll("[data-div]").forEach(inp => inp.addEventListener("change", () => {

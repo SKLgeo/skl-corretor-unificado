@@ -62,7 +62,7 @@
         document.querySelectorAll("input[name=finComModo]").forEach(r => r.addEventListener("change", mostrarModo));
         $("finComMontar").addEventListener("click", montarDatas);
         $("finComAddRec").addEventListener("click", () => { rec.push({ vencimento: dataBase(), valor: "", observacao: "" }); mexeu = true; desenhar(); });
-        $("finComAddPessoa").addEventListener("click", () => { regras.push({ tipo: "corretor", usuario_id: "", pct: "", valor: "", quando: "recebimento", dias: 0 }); mexeu = true; desenhar(); });
+        $("finComAddPessoa").addEventListener("click", () => { regras.push({ tipo: "corretor", usuario_id: "", pct: "", valor: "", sobre: "sobra", quando: "recebimento", dias: 0 }); mexeu = true; desenhar(); });
         $("finComTrazer").addEventListener("click", trazerEquipe);
         $("finComSalvar").addEventListener("click", async () => {
             if (!op || !op.contrato) return;
@@ -159,7 +159,7 @@
         ps.forEach(p => {
             const chave = p.usuario_id || p.parceiro_id || p.nome;
             if (!chave || ja.has(chave)) return;
-            regras.push({ tipo: p.tipo, usuario_id: p.usuario_id || "", parceiro_id: p.parceiro_id || "", nome: p.nome || "", pct: "", valor: "", quando: "recebimento", dias: 0 });
+            regras.push({ tipo: p.tipo, usuario_id: p.usuario_id || "", parceiro_id: p.parceiro_id || "", nome: p.nome || "", pct: "", valor: "", sobre: p.tipo === "corretor" ? "sobra" : "total", quando: "recebimento", dias: 0 });
             ja.add(chave);
         });
         if (!ps.length) op.ctx.toast("O contrato ainda não tem corretor nem parceiros. Use \"+ Pessoa\".");
@@ -171,13 +171,27 @@
         if (r.parceiro_id) { const p = (op.parceiros || []).find(x => x.id === r.parceiro_id); return p ? p.nome : "Parceiro"; }
         return (r.nome || "").trim() || "Parceiro";
     };
+    // 18/11/2026 (Cerrado: "o parceiro fica com 50% do total e o % do corretor é sobre o que sobra"): cada linha diz sobre o que
+    // o % é calculado. "total" = a comissão inteira; "sobra" = a comissão menos o que vai para os parceiros de fora.
+    // Parceiro é sempre sobre o total. Linha antiga sem "sobre" continua sobre o total (o valor gravado não muda sozinho).
+    const sobreDe = r => r.tipo === "corretor" && r.sobre === "sobra" ? "sobra" : "total";
+    function parteParceiros() {
+        const t = total();
+        return regras.filter(r => r.tipo !== "corretor").reduce((s, r) => s + (num(r.valor) || (num(r.pct) ? t * num(r.pct) / 100 : 0)), 0);
+    }
+    const sobra = () => Math.max(0, total() - parteParceiros());
+    function valorDa(r) {
+        if (num(r.valor)) return num(r.valor);
+        if (!num(r.pct)) return 0;
+        return (sobreDe(r) === "sobra" ? sobra() : total()) * num(r.pct) / 100;
+    }
     // transforma as regras em repasses com data e valor (é isto que vai para o banco)
     function expandir() {
-        const t = total(), saida = [];
+        const saida = [];
         const recs = rec.filter(r => r.vencimento && num(r.valor) > 0).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
         const somaRec = recs.reduce((s, r) => s + num(r.valor), 0);
         regras.forEach(r => {
-            const base = num(r.valor) || (num(r.pct) ? t * num(r.pct) / 100 : 0);
+            const base = valorDa(r);
             if (!base || (r.tipo === "corretor" && !r.usuario_id) || (r.tipo !== "corretor" && !nomePessoa(r))) return;
             const quem = r.tipo === "corretor" ? { tipo: "corretor", usuario_id: r.usuario_id } : { tipo: "parceiro", nome: nomePessoa(r) };
             const pct = num(r.pct) || null;
@@ -229,11 +243,14 @@
             + (travado ? "" : regras.map((r, i) => `<div class="fin-com-regra" data-regra="${i}">
               <label class="fin-com-pessoa"><span>Quem recebe</span><select data-k="pessoa"${editar ? "" : " disabled"}><option value="">Escolha…</option>${optsPessoa(r)}</select>
                 <input data-k="nome" placeholder="Nome do parceiro" autocomplete="off" value="${h(r.nome || "")}"${r.tipo !== "corretor" && !r.parceiro_id ? "" : " hidden"}${editar ? "" : " disabled"} /></label>
-              <label><span>% da comissão</span><input data-k="pct" inputmode="decimal" autocomplete="off" value="${h(r.pct || "")}"${editar ? "" : " disabled"} /></label>
-              <label><span>ou valor (R$)</span><input data-k="valor" inputmode="decimal" autocomplete="off" value="${h(r.valor || "")}"${editar ? "" : " disabled"} /></label>
-              <label><span>Quando paga</span><select data-k="quando"${editar ? "" : " disabled"}><option value="recebimento"${r.quando !== "data" ? " selected" : ""}>Junto com cada recebimento</option><option value="data"${r.quando === "data" ? " selected" : ""}>Numa data</option></select></label>
-              <label${r.quando === "data" ? " hidden" : ""}><span>Dias depois de receber</span><input data-k="dias" type="number" min="0" max="365" value="${h(r.dias || 0)}"${editar ? "" : " disabled"} /></label>
-              <label${r.quando === "data" ? "" : " hidden"}><span>Data do pagamento</span><input data-k="vencimento" type="date" value="${h(r.vencimento || "")}"${editar ? "" : " disabled"} /></label>
+              <label class="fcr-pct"><span>%</span><input data-k="pct" inputmode="decimal" autocomplete="off" value="${h(r.pct || "")}"${editar ? "" : " disabled"} /></label>
+              <label class="fin-com-sobre"><span>% calculado sobre</span>${r.tipo === "corretor"
+                ? `<select data-k="sobre"${editar ? "" : " disabled"}><option value="sobra"${sobreDe(r) === "sobra" ? " selected" : ""}>Sobra depois dos parceiros</option><option value="total"${sobreDe(r) === "total" ? " selected" : ""}>Comissão total</option></select>`
+                : `<em class="fin-com-fixo">Comissão total</em>`}<small class="fin-com-calc" data-calc="${i}"></small></label>
+              <label class="fcr-valor"><span>ou valor (R$)</span><input data-k="valor" inputmode="decimal" autocomplete="off" value="${h(r.valor || "")}"${editar ? "" : " disabled"} /></label>
+              <label class="fcr-quando"><span>Quando paga</span><select data-k="quando"${editar ? "" : " disabled"}><option value="recebimento"${r.quando !== "data" ? " selected" : ""}>Junto com cada recebimento</option><option value="data"${r.quando === "data" ? " selected" : ""}>Numa data</option></select></label>
+              <label class="fcr-dia"${r.quando === "data" ? " hidden" : ""}><span>Dias depois de receber</span><input data-k="dias" type="number" min="0" max="365" value="${h(r.dias || 0)}"${editar ? "" : " disabled"} /></label>
+              <label class="fcr-dia"${r.quando === "data" ? "" : " hidden"}><span>Data do pagamento</span><input data-k="vencimento" type="date" value="${h(r.vencimento || "")}"${editar ? "" : " disabled"} /></label>
               ${editar ? `<button type="button" class="text-button fin-pg-del" data-tirar-regra="${i}" title="Tirar">✕</button>` : ""}
             </div>`).join(""))
             + (!travado && !regras.length ? `<p class="muted-text">Ninguém ainda. Toque em "Trazer quem trabalhou neste contrato" ou "+ Pessoa" e informe o % ou o valor de cada um.</p>` : "");
@@ -245,13 +262,14 @@
                     const [ t, id ] = inp.value.split(":");
                     r.tipo = t === "c" ? "corretor" : "parceiro"; r.usuario_id = t === "c" ? id : ""; r.parceiro_id = t === "p" ? id : "";
                     if (t !== "n") r.nome = "";
+                    if (r.tipo === "corretor" && !r.sobre) r.sobre = "sobra";
                     mexeu = true; desenhar(); return;
                 }
                 r[k] = inp.value;
                 if (k === "pct" && inp.value) { r.valor = ""; const v = linha.querySelector("[data-k=valor]"); if (v) v.value = ""; }
                 if (k === "valor" && inp.value) { r.pct = ""; const v = linha.querySelector("[data-k=pct]"); if (v) v.value = ""; }
                 mexeu = true;
-                if (k === "quando") { desenhar(); return; }
+                if (k === "quando" || k === "sobre") { desenhar(); return; }
                 previa();
             }));
         });
@@ -301,7 +319,15 @@
               <td>${h(dinheiro(Number(x.valor)))}</td><td>${h(dataBr(x.competencia))}</td><td>${x.status === "paga" ? `<span class="fin-com-pago">✓ Paga${x.pago_em ? " em " + h(dataBr(String(x.pago_em).slice(0, 10))) : ""}</span>`
                 : h(STATUS[x.status] || x.status)}${x.id && podePagar && (x.status === "pendente" || x.status === "aprovada") ? ` <button type="button" class="secondary-button fin-mini" data-com-pagar="${h(x.id)}">✓ Paguei</button>` : ""}</td></tr>`).join("")}</tbody></table>
             ${mexeu && linhas.some(l => l.status === "pendente") ? `<p class="muted-text fin-pg-nota">Salve o contrato para marcar os repasses como pagos.</p>` : ""}
-            <p class="muted-text fin-pg-nota">Total repassado: ${h(dinheiro(somaRep))}${total() ? ` · fica com a imobiliária: ${h(dinheiro(total() - somaRep))}` : ""}</p>` : "";
+            <p class="muted-text fin-pg-nota">Total repassado: ${h(dinheiro(somaRep))}${total() ? ` · fica com a imobiliária: <b>${h(dinheiro(total() - somaRep))}</b>` : ""}</p>
+            ${total() && total() - somaRep < -0.009 ? `<p class="fin-com-aviso fin-com-negativo">A soma dos repasses passou da comissão (${h(dinheiro(total()))}) e a parte da imobiliária ficou negativa. Confira os %: o % do corretor normalmente é sobre <b>o que sobra depois dos parceiros</b>, não sobre a comissão total.</p>` : ""}` : "";
+        // ao lado de cada %, quanto ele dá em reais e sobre qual base
+        document.querySelectorAll("#finComRegras [data-calc]").forEach(el => {
+            const r = regras[Number(el.dataset.calc)];
+            if (!r || num(r.valor) || !num(r.pct)) { el.textContent = ""; return; }
+            const base = sobreDe(r) === "sobra" ? sobra() : total();
+            el.textContent = base ? `${String(r.pct).replace(".", ",")}% de ${dinheiro(base)} = ${dinheiro(valorDa(r))}` : "";
+        });
         box.querySelectorAll("[data-com-pagar]").forEach(b => b.addEventListener("click", () => marcarPago(b.dataset.comPagar, b)));
         resumo();
     }
@@ -322,7 +348,7 @@
         const dados = {
             recebimentos: abertos.map(r => ({ vencimento: r.vencimento, valor: num(r.valor), observacao: (r.observacao || "").trim() })),
             config: { modo: modo(), dias: Number($("finComDias").value) || 0, qtd: Number($("finComQtd").value) || 3, primeira: Number($("finComPrimeira").value) || 0,
-                intervalo: $("finComIntervalo").value, repasses: regras.map(r => ({ tipo: r.tipo, usuario_id: r.usuario_id || "", parceiro_id: r.parceiro_id || "", nome: r.nome || "", pct: r.pct || "", valor: r.valor || "", quando: r.quando || "recebimento", dias: Number(r.dias) || 0, vencimento: r.vencimento || "" })) }
+                intervalo: $("finComIntervalo").value, repasses: regras.map(r => ({ tipo: r.tipo, usuario_id: r.usuario_id || "", parceiro_id: r.parceiro_id || "", nome: r.nome || "", pct: r.pct || "", valor: r.valor || "", sobre: r.tipo === "corretor" ? sobreDe(r) : "total", quando: r.quando || "recebimento", dias: Number(r.dias) || 0, vencimento: r.vencimento || "" })) }
         };
         if (!travado) dados.repasses = expandir();
         const { error } = await op.ctx.sb.rpc(op.tipo === "venda" ? "contrato_venda_salvar_comissao" : "contrato_aluguel_salvar_comissao", { p_contrato: contratoId, p_dados: dados });

@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.21.0";
+    const APP_VERSION = "0.21.1";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -106,6 +106,21 @@
 
     let editandoId = null;
     let fotosExistentes = [];
+    let fotosAoAbrir = [];         // lista de fotos como estava ao abrir o imóvel (para saber se a pessoa mexeu nas fotos)
+    let descricaoAoAbrir = "";
+    const mesmasFotos = (a, b) => (a || []).length === (b || []).length && (a || []).every((f, i) => f.path === (b[i] || {}).path);
+    // o imóvel aberto foi relido do banco: se a pessoa ainda não mexeu nas fotos/descrição, mostra a versão completa
+    function atualizarFotosDoDialogo(data) {
+        const intocadas = !fotosNovas.length && !fotosRemovidas.length && capaNova == null && mesmasFotos(fotosExistentes, fotosAoAbrir);
+        if (intocadas && !mesmasFotos(fotosExistentes, data.fotos || [])) {
+            fotosExistentes = [ ...(data.fotos || []) ];
+            fotosAoAbrir = [ ...fotosExistentes ];
+            heroIndex = 0;
+            renderGaleria();
+        }
+        const d = $("construcaoDescricaoInput");
+        if (d.value === descricaoAoAbrir && (data.descricao || "") !== d.value) { d.value = data.descricao || ""; descricaoAoAbrir = d.value; }
+    }
     let fotosNovas = [];
     let fotosRemovidas = [];
     let capaNova = null;          // índice de uma foto nova escolhida como capa (ainda não enviada)
@@ -1238,12 +1253,34 @@
                 if (payload.eventType === "DELETE") {
                     construcoes.delete(payload.old.id);
                 } else {
-                    avisarMudancaDoMeuCadastro(construcoes.get(payload.new.id), payload.new);
-                    construcoes.set(payload.new.id, payload.new);
+                    // 18/11/2026 (Cerrado: "aprovou e as fotos sumiram"): em imóvel com muitas fotos ou descrição longa o banco guarda
+                    // esses campos à parte (TOAST) e o aviso em tempo real de uma alteração que não mexeu neles chega SEM eles.
+                    // Trocar o imóvel inteiro pelo aviso deixava a lista de fotos vazia na tela — e quem salvasse assim apagava as
+                    // fotos de verdade. Agora o aviso só completa o que veio e o imóvel é relido inteiro do banco logo em seguida.
+                    const antes = construcoes.get(payload.new.id);
+                    const veio = Object.fromEntries(Object.entries(payload.new).filter(([ , v ]) => v !== undefined));
+                    const junto = antes && payload.eventType === "UPDATE" ? { ...antes, ...veio } : payload.new;
+                    if (antes && payload.eventType === "UPDATE") [ "fotos", "descricao", "perimetro", "benfeitorias" ].forEach(k => { if (junto[k] == null && antes[k] != null) junto[k] = antes[k]; });
+                    avisarMudancaDoMeuCadastro(antes, junto);
+                    construcoes.set(payload.new.id, junto);
+                    relerImovel(payload.new.id);
                 }
                 atualizarTudo();
             })
             .subscribe();
+    }
+    // relê um imóvel inteiro do banco (vários avisos seguidos do mesmo imóvel viram uma leitura só)
+    const releituras = new Map();
+    function relerImovel(id) {
+        clearTimeout(releituras.get(id));
+        releituras.set(id, setTimeout(async () => {
+            releituras.delete(id);
+            const { data, error } = await sb.from("construcoes").select("*").eq("id", id).maybeSingle();
+            if (error || !data || Array.isArray(data) || data.id !== id || (data.fotos != null && !Array.isArray(data.fotos))) return;
+            construcoes.set(id, data);
+            if (editandoId === id && $("construcaoDialog").open) atualizarFotosDoDialogo(data);
+            atualizarTudo();
+        }, 400));
     }
 
     function avisarMudancaDoMeuCadastro(antes, depois) {
@@ -1926,6 +1963,7 @@
     function openConstrucaoDialog(construcao, opcoes = {}) {
         editandoId = construcao ? construcao.id : null;
         fotosExistentes = construcao ? [ ...(construcao.fotos || []) ] : [];
+        fotosAoAbrir = [ ...fotosExistentes ];
         fotosNovas = [];
         fotosRemovidas = [];
         heroIndex = 0;
@@ -2046,6 +2084,9 @@
         if (window.SKLCRM) window.SKLCRM.proprietarioPreencher(construcao, modoDialogo, { central: centralTravada });
         if (window.SKLExtras) window.SKLExtras.aoAbrirImovel(construcao);
         renderGaleria();
+        descricaoAoAbrir = $("construcaoDescricaoInput").value;
+        // confere no banco a versão completa do imóvel (fotos e descrição longa podem ter chegado incompletas pelo tempo real)
+        if (construcao && construcao.id) relerImovel(construcao.id);
         // destravar reabre o mesmo diálogo já aberto, agora com os campos de edição
         if ($("construcaoDialog").open) $("construcaoDialog").scrollTop = 0;
         else $("construcaoDialog").showModal();
@@ -2781,10 +2822,14 @@
     async function uploadFotosNovas(construcaoIdAlvo) {
         const enviados = [];
         for (const item of fotosNovas) {
+            // 18/11/2026: se o envio cair no meio e a pessoa tentar de novo, a foto que já subiu não sobe outra vez
+            // (antes cada tentativa reenviava todas — um cadastro chegou a 91 arquivos para 25 fotos)
+            if (item.enviada && item.enviada.startsWith(`${carteiraId}/${construcaoIdAlvo}/`)) { enviados.push({ path: item.enviada }); continue; }
             const arquivo = window.SKLMarcaDagua ? await window.SKLMarcaDagua.preparar(item.file) : item.file;
             const path = `${carteiraId}/${construcaoIdAlvo}/${Date.now()}_${sanitizarNomeArquivo(arquivo.name)}`;
             const { error } = await sb.storage.from(FOTOS_BUCKET).upload(path, arquivo, { upsert: false, contentType: arquivo.type || undefined });
             if (error) throw error;
+            item.enviada = path;
             enviados.push({ path });
         }
         return enviados;
@@ -2823,7 +2868,10 @@
                 await removerFotosMarcadas();
                 const novasEnviadas = await uploadFotosNovas(editandoId);
                 const capaEnviada = capaNova != null ? novasEnviadas.splice(capaNova, 1) : [];
-                dados.fotos = [ ...capaEnviada, ...fotosExistentes, ...novasEnviadas ];
+                // sem foto nova, tirada ou trocada de ordem, a lista nem vai: o banco mantém as fotos que já tem
+                // (assim uma tela com a lista desatualizada nunca apaga fotos ao salvar)
+                if (!novasEnviadas.length && !capaEnviada.length && !fotosRemovidas.length && mesmasFotos(fotosExistentes, fotosAoAbrir)) delete dados.fotos;
+                else dados.fotos = [ ...capaEnviada, ...fotosExistentes, ...novasEnviadas ];
                 const { data, error } = await sb.rpc("salvar_imovel", {
                     p_carteira_id: carteiraId, p_dados: dados, p_id: editandoId, p_expected_version: atual?.version ?? null
                 });
@@ -2847,6 +2895,7 @@
             }
             construcoes.set(imovel.id, imovel);
             fotosExistentes = [ ...(imovel.fotos || []) ];
+            fotosAoAbrir = [ ...fotosExistentes ];
             fotosNovas = [];
             fotosRemovidas = [];
             salvo = true;

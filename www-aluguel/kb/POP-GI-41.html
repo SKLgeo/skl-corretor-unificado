@@ -1,0 +1,138 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @media screen{ body{padding:16px 0 28px;background:#fff} .folha{padding:0 16px} }
+  @media screen and (max-width:720px){
+    body{font-size:15px} .cab{grid-template-columns:1fr} .cab img{max-height:96px}
+    .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
+    .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
+  }
+</style><meta charset="utf-8"><title>POP-GI-41 · Orientação: comissão com parceiro, metas e fotos do imóvel</title><style>
+  :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
+  @page{size:A4;margin:12mm 14mm 15mm 14mm;
+    @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
+    @bottom-right{content:"POP-GI-41  ·  página " counter(page) " de " counter(pages);font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}}
+  *{box-sizing:border-box} html,body{margin:0;background:#fff}
+  body{font:9.5pt/1.5 "Segoe UI",Arial,sans-serif;color:var(--texto);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .folha{max-width:182mm;margin:0 auto}
+  .cab{display:grid;grid-template-columns:52mm 1fr 44mm;gap:10px;align-items:stretch;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+  .cab img{width:100%;height:100%;min-height:24mm;object-fit:cover;display:block}
+  .cab-txt{padding:8px 4px;display:flex;flex-direction:column;justify-content:center}
+  .tipo{font-size:7.6pt;font-weight:800;letter-spacing:.14em;color:var(--ouro)}
+  h1{margin:2px 0 2px;font-size:15pt;line-height:1.15;color:var(--navy)}
+  .modulo{margin:0;font-size:8.8pt;color:var(--azul);font-weight:600}
+  .meta{border-left:1px solid var(--linha);background:#f6f8fb;font-size:8pt;display:grid;align-content:center;padding:6px 10px;gap:2px}
+  .meta div{display:flex;justify-content:space-between;gap:8px}
+  .meta span{color:var(--suave)} .meta b{color:var(--navy)}
+  .faixa{height:3px;background:linear-gradient(90deg,var(--ouro),#f0cf74 45%,transparent);border-radius:2px;margin:9px 0 10px}
+  .ficha{display:grid;grid-template-columns:34mm 1fr;border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:9pt;margin-bottom:10px}
+  .ficha dt{background:#f4f7fb;color:var(--navy);font-weight:700;padding:5px 9px;border-bottom:1px solid var(--linha)}
+  .ficha dd{margin:0;padding:5px 10px;border-bottom:1px solid var(--linha)}
+  .ficha dt:nth-last-of-type(1),.ficha dd:last-of-type{border-bottom:0}
+  h2{font-size:11pt;color:var(--navy);margin:12px 0 5px;padding-bottom:2px;border-bottom:1.5px solid var(--linha);break-after:avoid}
+  ol.passos{margin:4px 0 6px;padding-left:0;list-style:none;counter-reset:p}
+  ol.passos > li{counter-increment:p;position:relative;padding:0 0 6px 30px;margin:0}
+  ol.passos > li::before{content:counter(p);position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:var(--navy);color:#fff;font-weight:800;font-size:9pt;display:flex;align-items:center;justify-content:center}
+  ul{margin:3px 0 6px;padding-left:18px} li{margin:0 0 3px}
+  .figura{text-align:center;margin:7px 0 4px;break-inside:avoid}
+  .figura img{max-width:100%;max-height:96mm;border:1px solid var(--linha);border-radius:8px}
+  .figura.estreita img{max-height:110mm}
+  .duas .figura img,.duas .figura.estreita img{max-height:72mm}
+  .legenda{font-size:8pt;color:var(--suave);margin-top:2px}
+  .duas{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;align-items:start;break-inside:avoid}
+  .atencao{background:#fff8e6;border:1px solid #f0dca6;border-left:4px solid var(--ouro);border-radius:0 8px 8px 0;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .atencao p{margin:0 0 3px}
+  .bt{display:inline-block;background:#e9f1fa;border:1px solid #cddcee;border-radius:5px;padding:0 5px;font-weight:600;color:var(--navy);font-size:8.6pt;white-space:nowrap}
+  h3{font-size:10pt;color:var(--navy);margin:10px 0 4px;break-after:avoid}
+  table.tabela{width:100%;border-collapse:collapse;font-size:8.6pt;margin:4px 0 6px;break-inside:avoid}
+  table.tabela th,table.tabela td{border:1px solid var(--linha);padding:4px 7px;text-align:left;vertical-align:top}
+  table.tabela th{background:#f4f7fb;color:var(--navy)}
+  .errado,.certo,.porque{border-radius:8px;padding:6px 11px;margin:6px 0;break-inside:avoid}
+  .errado{background:#fdeeee;border:1px solid #f2c4c4;border-left:4px solid #c62828}
+  .certo{background:#ecf7ef;border:1px solid #bfe0c8;border-left:4px solid #2e7d32}
+  .porque{background:#eef4fb;border:1px solid #cddcee;border-left:4px solid var(--azul)}
+  .errado b.tag,.certo b.tag,.porque b.tag{display:block;font-size:8pt;letter-spacing:.08em;margin-bottom:2px}
+  .errado b.tag{color:#c62828} .certo b.tag{color:#2e7d32} .porque b.tag{color:var(--azul)}
+  .errado p,.certo p,.porque p{margin:0 0 3px}
+  table.conta{border-collapse:collapse;font-size:9pt;margin:4px 0;break-inside:avoid}
+  table.conta td{padding:2px 10px 2px 0} table.conta td.v{text-align:right;font-weight:700} table.conta tr.tot td{border-top:1px solid #9aa6b5;font-weight:800}
+  table.controle{width:100%;border-collapse:collapse;font-size:8.2pt;margin-top:4px}
+  table.controle th,table.controle td{border:1px solid var(--linha);padding:3px 7px;text-align:left}
+  table.controle th{background:#f4f7fb;color:var(--navy)}</style></head>
+<body><div class="folha">
+<header class="cab">
+  <img src="banner.jpg" alt="SKL Geo Soluções">
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Orientação: comissão com parceiro, metas e fotos do imóvel</h1><p class="modulo">SKL Gestão Imobiliária · Financeiro → Contratos → 💰 Comissão e “Como este negócio conta nas metas” · Imóveis → fotos</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-41</b></div><div><span>Versão</span><b>1.0</b></div>
+    <div><span>Vigência</span><b>18/11/2026</b></div><div><span>Sistema</span><b>0.21.1</b></div></div>
+</header>
+<div class="faixa"></div>
+<dl class="ficha"><dt>Objetivo</dt><dd>Mostrar, com os exemplos que a própria equipe enviou, o que estava sendo feito, o jeito certo e o motivo de cada erro, para não acontecer de novo.</dd><dt>Aplicação</dt><dd>Contrato com corretor e parceiro de fora; conferência das metas no Painel; aprovação de imóvel cadastrado pelo corretor.</dd><dt>Responsáveis</dt><dd>Financeiro e Central (contratos e aprovação). Corretores (cadastro de imóvel com fotos).</dd><dt>Pré-requisitos</dt><dd>Sistema na versão 0.21.1 ou mais nova (no celular, feche e abra o app; no computador, recarregue a página).</dd><dt>Resultado esperado</dt><dd>Repasse do corretor calculado sobre o que sobra depois do parceiro, sem conta na calculadora; metas entendidas; nenhuma foto perdida por reenvio.</dd></dl>
+<h2>1. Procedimento</h2>
+<h3>Parte A · Comissão com parceiro: o % do corretor</h3>
+    <p>Exemplo que vocês enviaram: comissão de <b>R$ 9.100,00</b>. O parceiro de fora fica com <b>50% do total</b>, e o corretor fica com <b>60% do que sobra</b>; o resto é da imobiliária.</p>
+    <div class="errado"><b class="tag">❌ O QUE ESTAVA ACONTECENDO</b>
+      <p>No bloco <b>💰 Comissão</b>, o % de cada pessoa era calculado sobre a <b>comissão inteira</b>. Os 60% do corretor viravam 60% de R$ 9.100,00:</p>
+      <table class="conta"><tr><td>Parceiro: 50% de R$ 9.100,00</td><td class="v">R$ 4.550,00</td></tr>
+        <tr><td>Corretor: 60% de R$ 9.100,00</td><td class="v">R$ 5.460,00</td></tr>
+        <tr class="tot"><td>Fica com a imobiliária</td><td class="v" style="color:#c62828">− R$ 910,00</td></tr></table>
+      <p>Por isso a parte da imobiliária ficava negativa e vocês precisavam fazer a conta na calculadora e digitar o valor em reais.</p></div>
+    <div class="figura"><img src="img/112_orient_com_errado.jpg" alt=""><div class="legenda">Corretor com 60% sobre a comissão total: a imobiliária fica com −R$ 910,00 e o sistema agora mostra o aviso em vermelho.</div></div>
+    <div class="certo"><b class="tag">✅ O CORRETO (a partir da versão 0.21.1)</b>
+      <p>Cada linha de repasse tem o campo <b>“% calculado sobre”</b>. Para corretor da equipe, o padrão é <b>“Sobra depois dos parceiros”</b>:</p>
+      <table class="conta"><tr><td>Comissão total</td><td class="v">R$ 9.100,00</td></tr>
+        <tr><td>Parceiro: 50% de R$ 9.100,00</td><td class="v">R$ 4.550,00</td></tr>
+        <tr><td>Sobra depois do parceiro</td><td class="v">R$ 4.550,00</td></tr>
+        <tr><td>Corretor: 60% de R$ 4.550,00</td><td class="v">R$ 2.730,00</td></tr>
+        <tr class="tot"><td>Fica com a imobiliária (os outros 40%)</td><td class="v" style="color:#2e7d32">R$ 1.820,00</td></tr></table>
+      <p>Embaixo de cada %, o sistema mostra a conta pronta (ex.: “60% de R$ 4.550,00 = R$ 2.730,00”). Corretor com 70%: é só escrever 70 (70% de R$ 4.550,00 = R$ 3.185,00).</p></div>
+    <ol class="passos">
+      <li>Abra o contrato em <b>Financeiro → Contratos</b> e o bloco <b>💰 Comissão — recebimento e repasses</b>.</li>
+      <li>Toque em <span class="bt">Trazer quem trabalhou neste contrato</span> (ou <span class="bt">+ Pessoa</span>).</li>
+      <li>No <b>parceiro</b>, escreva o % dele (ex.: 50). Parceiro é sempre sobre a <b>comissão total</b>.</li>
+      <li>No <b>corretor</b>, escreva o % dele (ex.: 60) e deixe <b>“% calculado sobre: Sobra depois dos parceiros”</b>.</li>
+      <li>Confira a linha <b>“fica com a imobiliária”</b> embaixo da lista. Se aparecer o aviso vermelho, algum % está sobre a base errada.</li>
+      <li>Salve o contrato (<span class="bt">Criar contrato</span> ou <span class="bt">Salvar alterações</span>).</li>
+    </ol>
+    <div class="duas"><div class="figura"><img src="img/113_orient_com_certo.jpg" alt=""><div class="legenda">O certo: corretor com 60% da sobra = R$ 2.730,00; imobiliária com R$ 1.820,00.</div></div><div class="figura estreita"><img src="img/114_orient_com_celular.jpg" alt=""><div class="legenda">O mesmo bloco no celular.</div></div></div>
+
+    <h3>Parte B · “Como este negócio conta nas metas” não é a comissão</h3>
+    <div class="errado"><b class="tag">❌ O QUE ESTAVA SENDO FEITO</b>
+      <p>O quadro <b>“Como este negócio conta nas metas”</b> era preenchido com os % do dinheiro (corretor 60% + parceiro 50% = 110%). O sistema não deixa salvar, porque ali a soma tem que fechar 100%.</p></div>
+    <div class="figura"><img src="img/110_orient_metas_errado.jpg" alt=""><div class="legenda">Os % da comissão colocados no quadro das metas: a soma dá 110% e o sistema avisa.</div></div>
+    <div class="porque"><b class="tag">💡 POR QUE SÃO DOIS LUGARES</b>
+      <p><b>💰 Comissão</b> = quanto cada pessoa <b>recebe em dinheiro</b>. <b>Como este negócio conta nas metas</b> = quanto do contrato entra na <b>meta (VGC)</b> de cada corretor no Painel e na tela de Metas. Os dois números podem ser diferentes.</p></div>
+    <div class="certo"><b class="tag">✅ O CORRETO</b>
+      <p>Na maioria dos contratos, deixe em <b>“Padrão da imobiliária”</b>: o parceiro de fora não entra em meta de ninguém e o corretor conta a comissão do contrato.</p>
+      <p>Se a imobiliária quer que a meta do corretor conte só a parte que ficou com a casa (no exemplo, R$ 4.550,00 em vez de R$ 9.100,00), escolha <b>“Partes iguais entre todos (o parceiro de fora conta como um)”</b>. Para deixar isso como regra para todos os contratos: <b>Comissões → Editar metas → “Contrato com mais de um envolvido”</b>.</p>
+      <p>Use <b>“Definir o % de cada um”</b> só quando a divisão da meta for diferente; aí a soma precisa fechar 100%.</p></div>
+    <div class="figura"><img src="img/111_orient_metas_certo.jpg" alt=""><div class="legenda">Padrão da imobiliária: o corretor conta R$ 9.100,00 na meta; o parceiro não entra.</div></div>
+    <div class="porque"><b class="tag">💡 POR QUE O VALOR DE UM CORRETOR MUDOU NO PAINEL</b>
+      <p>Exemplo enviado: um corretor tinha <b>R$ 2.500,00</b> no trimestre e passou a <b>R$ 2.850,00</b>. Desde 16/11 o contrato é dividido entre quem está em “Trabalharam junto neste negócio”:</p>
+      <table class="conta"><tr><td>Locação dele (R$ 2.500,00), com mais um corretor junto: metade</td><td class="v">R$ 1.250,00</td></tr>
+        <tr><td>Locação de outro corretor (R$ 3.200,00), em que ele está como participante: metade</td><td class="v">R$ 1.600,00</td></tr>
+        <tr class="tot"><td>Total na meta</td><td class="v">R$ 2.850,00</td></tr></table>
+      <p>Antes, cada contrato contava 100% só para quem fechou. Se alguém não trabalhou no contrato, tire o nome dele de “Trabalharam junto” ou ajuste o quadro das metas.</p></div>
+
+    <h3>Parte C · Fotos que “sumiram” depois de aprovar o imóvel</h3>
+    <div class="porque"><b class="tag">💡 O QUE ACONTECIA</b>
+      <p>As fotos <b>não eram apagadas</b>: continuavam guardadas. Em imóvel com muitas fotos, o aviso automático que atualiza a tela de quem está com o sistema aberto chegava, na aprovação, <b>sem a lista de fotos</b>, e a tela mostrava o imóvel vazio. Por isso acontecia “às vezes”: só em imóvel com muitas fotos ou descrição longa.</p>
+      <p>O risco era o passo seguinte: quem via o imóvel sem fotos e subia as fotos de novo trocava a lista original pela nova. Foi o que aconteceu num imóvel aprovado em 11/11: as 16 fotos do corretor deram lugar a 13 enviadas de novo.</p>
+      <p><b>Corrigido na versão 0.21.1</b>: a tela agora confere o imóvel completo no sistema, e salvar sem mexer nas fotos nunca altera a lista de fotos.</p></div>
+    <div class="errado"><b class="tag">❌ NÃO FAÇA</b>
+      <ul><li>Ver o imóvel sem fotos e subir as fotos de novo.</li>
+        <li>Corretor: fechar o app, trocar de tela ou bloquear o celular enquanto as fotos estão subindo, ou tocar várias vezes em “Enviar para aprovação”. Num cadastro de 18/11, as mesmas fotos subiram 4 vezes (91 arquivos para 25 fotos).</li></ul></div>
+    <div class="certo"><b class="tag">✅ O CORRETO</b>
+      <ol class="passos">
+        <li>Imóvel apareceu sem fotos? <b>Recarregue</b>: no computador, tecla F5; no celular, feche e abra o app. As fotos voltam.</li>
+        <li>Continuou sem fotos? <b>Não suba de novo</b>: mande o <b>código do imóvel</b> para a SKL. Os arquivos ficam guardados e dá para recolocar.</li>
+        <li>Corretor, ao cadastrar: use Wi-Fi ou sinal bom, toque <b>uma vez</b> em <span class="bt">Enviar para aprovação</span> e espere a mensagem <b>“Cadastro enviado”</b> antes de sair da tela.</li>
+        <li>Se aparecer erro no envio, toque de novo <b>uma vez</b>. O cadastro já fica salvo e, desde a versão 0.21.1, as fotos que já tinham subido não sobem de novo.</li>
+      </ol></div>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p>Contratos já salvos antes da versão 0.21.1 continuam com os valores gravados. Para refazer a conta de um repasse ainda não pago, abra o contrato, troque “% calculado sobre” para <b>Sobra depois dos parceiros</b> e salve.</p>
+      <p>Repasse já aprovado ou pago não muda pelo contrato: ajuste na tela <b>Comissões</b>.</p>
+      <p>Se o parceiro receber valor fixo (R$) em vez de %, preencha “ou valor (R$)” no parceiro; a sobra do corretor já desconta esse valor.</p></div>
+<h2>3. Controle do documento</h2>
+<table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
+  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>18/11/2026</td><td>Emissão inicial.</td></tr></table>
+</div></body></html>
