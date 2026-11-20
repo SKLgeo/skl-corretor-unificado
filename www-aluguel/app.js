@@ -58,7 +58,7 @@
     const MARCA = window.SKL_MARCA || {};
     const SUPABASE_URL = MARCA.supabase_url || "https://xigwlofqkmiibzbongkn.supabase.co";
     const SUPABASE_ANON_KEY = MARCA.supabase_anon_key || "sb_publishable_mqppAm9n79xl6rYafzXyNQ_mGVoX3Vd";
-    const APP_VERSION = "0.21.1";
+    const APP_VERSION = "0.21.2";
     const FOTOS_BUCKET = "fotos-construcoes";
     const CARTEIRA_ESCOLHIDA_KEY = "sklu_alugueis_carteira_escolhida";
     const CENTRO_PADRAO = [ -15.793889, -47.882778 ];
@@ -694,7 +694,10 @@
     async function editarCelular(usuarioId) {
         const user = corretores.find(u => u.id === usuarioId);
         if (!user) return;
-        const novo = window.prompt(`Celular / WhatsApp de ${user.display_name} (com DDD):`, formatarCelular(user.telefone));
+        // com agenda (Chrome no Android) abre uma janela com o botão 📇; sem agenda, o prompt de sempre
+        const novo = window.SKLAgenda
+            ? await window.SKLAgenda.pedirTelefone({ titulo: `Celular / WhatsApp de ${user.display_name}`, valor: formatarCelular(user.telefone) })
+            : window.prompt(`Celular / WhatsApp de ${user.display_name} (com DDD):`, formatarCelular(user.telefone));
         if (novo === null) return;
         try {
             await salvarCelularEquipe(usuarioId, novo.trim());

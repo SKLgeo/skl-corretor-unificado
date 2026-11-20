@@ -315,3 +315,14 @@ dialog.busca-sistema::backdrop{background:rgba(6,27,46,.45)}
 .busca-sistema-cab .primary-button{min-width:56px;width:auto;padding-left:12px;padding-right:12px}
 .valor-a-partir-check span{display:inline}
 .busca-sistema-cab .primary-button{flex:0 0 auto!important;width:auto!important;white-space:nowrap!important}
+/* 20/11/2026: 📇 buscar telefone na agenda do celular (agenda-contato.js; só aparece no Chrome do Android) */
+.agenda-campo{display:flex;align-items:stretch;gap:6px;min-width:0;width:100%}
+.agenda-campo>input{flex:1 1 auto;min-width:0;width:auto!important}
+.agenda-btn{flex:0 0 auto;min-width:58px;padding:2px 8px;border:1px solid var(--line,#d9e1ec);border-radius:10px;background:#eef6fc;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1}
+.agenda-btn span{font-size:18px}
+.agenda-btn small{font-size:10.5px;font-weight:700;color:#1b5e86}
+.agenda-btn:active{background:#d7ebf8}
+.agenda-aviso{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:2147483000;background:#0f2a3a;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);transition:opacity .2s,transform .2s}
+.agenda-aviso.visivel{opacity:1;transform:translate(-50%,0)}
+.agenda-tel-dialog .dialog-card{max-width:420px;display:grid;gap:12px}
+.agenda-tel-dialog label{display:grid;gap:4px}
