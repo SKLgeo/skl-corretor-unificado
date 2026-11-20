@@ -7,7 +7,7 @@
     .meta{border-left:0;border-top:1px solid var(--linha)} .ficha{grid-template-columns:1fr} .ficha dt{border-bottom:0}
     .duas{grid-template-columns:1fr} .figura img,.duas .figura img{max-height:none} h1{font-size:20px}
   }
-</style><meta charset="utf-8"><title>POP-GI-42 · Puxar o telefone da agenda do celular</title><style>
+</style><meta charset="utf-8"><title>POP-GI-42 · Puxar o telefone da agenda do celular (Android e iPhone)</title><style>
   :root{--navy:#0a2a66;--azul:#1e8fd6;--ouro:#c9962c;--texto:#1d2633;--suave:#5b6675;--linha:#d9e1ec}
   @page{size:A4;margin:12mm 14mm 15mm 14mm;
     @bottom-left{content:"SKL Geo Soluções  ·  contato@sklgeosolucoes.com.br  ·  (66) 9.9273-7646";font:7.8pt "Segoe UI",Arial,sans-serif;color:#5b6675}
@@ -62,24 +62,47 @@
 <body><div class="folha">
 <header class="cab">
   <img src="banner.jpg" alt="SKL Geo Soluções">
-  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Puxar o telefone da agenda do celular</h1><p class="modulo">SKL Gestão Imobiliária · Clientes → Novo cliente (e todo campo de telefone) → 📇 Agenda</p></div>
-  <div class="meta"><div><span>Código</span><b>POP-GI-42</b></div><div><span>Versão</span><b>1.0</b></div>
-    <div><span>Vigência</span><b>20/11/2026</b></div><div><span>Sistema</span><b>0.21.2</b></div></div>
+  <div class="cab-txt"><span class="tipo">PROCEDIMENTO OPERACIONAL PADRÃO</span><h1>Puxar o telefone da agenda do celular (Android e iPhone)</h1><p class="modulo">SKL Gestão Imobiliária · Todo campo de telefone → 📇 Agenda (Android) ou 📋 Colar (iPhone)</p></div>
+  <div class="meta"><div><span>Código</span><b>POP-GI-42</b></div><div><span>Versão</span><b>2.0</b></div>
+    <div><span>Vigência</span><b>20/11/2026</b></div><div><span>Sistema</span><b>0.21.3</b></div></div>
 </header>
 <div class="faixa"></div>
-<dl class="ficha"><dt>Objetivo</dt><dd>Preencher o telefone escolhendo o contato na agenda do celular, sem digitar o número.</dd><dt>Aplicação</dt><dd>Cliente novo (inclusive o “+ Novo cliente” de dentro do negócio), proprietário no cadastro do imóvel, interesse, acesso da equipe, celular da equipe, parceiro, seleção para cliente, contrato e “Eu corretor”.</dd><dt>Responsáveis</dt><dd>Todos que cadastram contatos (corretores, Central e administradores).</dd><dt>Pré-requisitos</dt><dd>Celular Android, com o sistema aberto pelo Chrome (link ou app instalado pelo Chrome). O iPhone e o computador não deixam site nenhum ler a agenda: neles o botão não aparece.</dd><dt>Resultado esperado</dt><dd>Celular preenchido no formato (66) 99999-9999. No cadastro de cliente, proprietário e interesse, o nome e o e-mail do contato também entram, se os campos estiverem vazios.</dd></dl>
+<dl class="ficha"><dt>Objetivo</dt><dd>Preencher o telefone sem digitar o número: escolhendo o contato na agenda (Android) ou colando o número copiado (iPhone).</dd><dt>Aplicação</dt><dd>Cliente novo (inclusive o “+ Novo cliente” de dentro do negócio), proprietário no cadastro do imóvel, interesse, acesso da equipe, celular da equipe, parceiro, seleção para cliente, contrato e “Eu corretor”.</dd><dt>Responsáveis</dt><dd>Todos que cadastram contatos (corretores, Central e administradores).</dd><dt>Pré-requisitos</dt><dd>Android: sistema aberto pelo Chrome (link ou app instalado pelo Chrome). iPhone: Safari ou app da tela de início. No computador não aparece botão (lá é só copiar e colar).</dd><dt>Resultado esperado</dt><dd>Celular preenchido no formato (66) 99999-9999. No Android, o nome e o e-mail do contato também entram no cadastro de cliente, proprietário e interesse, se os campos estiverem vazios.</dd></dl>
 <h2>1. Procedimento</h2>
-<ol class="passos">
+<h3>Parte A · Android: 📇 Agenda</h3>
+    <ol class="passos">
       <li>Abra o cadastro. Ex.: <b>Negócios → + Novo negócio → + Novo cliente</b> ou <b>Clientes → + Novo cliente</b>.</li>
       <li>Ao lado do campo <b>Celular / WhatsApp</b>, toque em <span class="bt">📇 Agenda</span>.</li>
       <li>A agenda do celular abre. Toque no contato: o número volta preenchido; se o contato tiver celular e fixo, o sistema escolhe o celular.</li>
       <li>Confira o nome e o e-mail (preenchidos só se estavam vazios), complete o resto e salve.</li>
     </ol>
-    <div class="figura estreita"><img src="img/115_agenda_cliente.jpg" alt=""><div class="legenda">Cliente novo depois de tocar em 📇 Agenda: nome, celular e e-mail vindos da agenda.</div></div>
-<h2>2. Pontos de atenção</h2><div class="atencao"><p>O sistema só lê o contato que você escolher, na hora que tocar no botão. A agenda inteira nunca é enviada.</p>
-      <p>No iPhone: toque e segure o número no app Contatos, copie, e cole no campo de telefone.</p>
-      <p>Se o contato tem só telefone fixo, ele entra assim mesmo. Se não tem telefone, o sistema avisa e o número fica para digitar.</p></div>
+    <div class="figura estreita"><img src="img/115_agenda_cliente.jpg" alt=""><div class="legenda">Android: cliente novo depois de tocar em 📇 Agenda (nome, celular e e-mail vindos da agenda).</div></div>
+
+    <h3>Parte B · iPhone: 📋 Colar</h3>
+    <div class="porque"><b class="tag">💡 POR QUE É DIFERENTE NO IPHONE</b>
+      <p>A Apple não deixa nenhum site abrir a agenda do iPhone. Por isso, no iPhone o botão ao lado do telefone é <span class="bt">📋 Colar</span>: você copia o número no app Contatos e o sistema cola já arrumado (tira +55, espaços e traços).</p></div>
+    <ol class="passos">
+      <li>Abra o app <b>Contatos</b> (ou o contato no app <b>Telefone</b>).</li>
+      <li>Toque e segure o número do contato e escolha <b>Copiar</b>.</li>
+      <li>Volte ao sistema e toque em <span class="bt">📋 Colar</span> ao lado do campo de telefone.</li>
+      <li>Se o iPhone mostrar o balão <b>Colar</b>, toque nele. O número entra no formato (66) 99999-9999.</li>
+      <li>Escreva o nome e complete o cadastro.</li>
+    </ol>
+    <div class="figura estreita"><img src="img/116_agenda_colar_iphone.jpg" alt=""><div class="legenda">iPhone: o botão vira 📋 Colar e o número copiado entra arrumado.</div></div>
+
+    <h3>Parte C · iPhone: ligar a agenda no Safari (opcional)</h3>
+    <p>O Safari tem a mesma função de agenda do Android, mas ela vem desligada, entre os recursos experimentais. Quem ligar passa a ter o <span class="bt">📇 Agenda</span> também no iPhone.</p>
+    <ol class="passos">
+      <li>Abra <b>Ajustes</b>.</li>
+      <li>iOS 18 ou mais novo: <b>Apps → Safari → Avançado → Feature Flags</b>. iOS 17 ou mais antigo: <b>Safari → Avançado → Feature Flags</b> (ou “Recursos Experimentais”).</li>
+      <li>Na lista, procure <b>Contact Picker API</b> e ligue a chave.</li>
+      <li>Feche o sistema por completo (arraste para cima na troca de apps) e abra de novo.</li>
+      <li>Abra um cadastro: se o botão ao lado do telefone virou <span class="bt">📇 Agenda</span>, está funcionando. Se continuar <span class="bt">📋 Colar</span>, use o Colar (Parte B).</li>
+    </ol>
+<h2>2. Pontos de atenção</h2><div class="atencao"><p>O sistema só lê o contato que você escolher (ou o que você copiou), na hora que tocar no botão. A agenda inteira nunca é enviada.</p>
+      <p>A chave do Safari (Parte C) é um recurso experimental da Apple: pode mudar de nome ou de lugar numa atualização do iOS. Se sumir, o Colar continua funcionando.</p>
+      <p>Se o que foi copiado não tiver número, o sistema avisa e nada muda no campo.</p></div>
 <h2>3. Controle do documento</h2>
 <table class="controle"><tr><th>Elaborado por</th><th>Versão</th><th>Data</th><th>Alteração</th></tr>
-  <tr><td>SKL Geo Soluções</td><td>1.0</td><td>20/11/2026</td><td>Emissão inicial.</td></tr></table>
+  <tr><td>SKL Geo Soluções</td><td>2.0</td><td>20/11/2026</td><td>Incluído o iPhone: botão 📋 Colar e como ligar a agenda no Safari.</td></tr></table>
 </div></body></html>

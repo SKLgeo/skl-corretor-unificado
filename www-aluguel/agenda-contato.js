@@ -1,5 +1,5 @@
 // 20/11/2026 (Cerrado: "todo lugar onde pedir número de telefone ter opção de buscar da agenda do telefone").
-// Coloca o botão 📇 ao lado de TODO campo de telefone do sistema (input com inputmode="tel" ou type="tel", inclusive os que
+// Coloca o botão 📇 (ou 📋 Colar, no iPhone) ao lado de TODO campo de telefone do sistema (input com inputmode="tel" ou type="tel", inclusive os que
 // aparecem depois na tela) e preenche o número com o contato escolhido na agenda do celular. Onde o formulário tem nome e
 // e-mail (VINCULOS), eles vêm junto, mas só se ainda estiverem vazios.
 // Usa a API de contatos do navegador: existe no Chrome do Android (link e app instalado pelo Chrome). O iPhone e o computador
@@ -8,6 +8,12 @@
 (function () {
     "use strict";
     const temAgenda = () => !!(navigator.contacts && navigator.contacts.select);
+    // 20/11/2026: iPhone (e qualquer tela de toque sem a agenda): botão "📋 Colar" — a pessoa copia o número no app Contatos
+    // (toca e segura → Copiar) e o sistema cola já arrumado. No Safari, quem ligar o recurso experimental "Contact Picker API"
+    // passa a ter o 📇 Agenda (temAgenda fica verdadeiro sozinho).
+    const temColar = () => !!(navigator.clipboard && navigator.clipboard.readText)
+        && ((navigator.maxTouchPoints || 0) > 0 || (window.matchMedia && matchMedia("(pointer: coarse)").matches));
+    const modo = () => temAgenda() ? "agenda" : (temColar() ? "colar" : null);
     // campo de telefone → campos do mesmo formulário que o contato também preenche
     const VINCULOS = {
         crmCliTelefone: { nome: "crmCliNome", email: "crmCliEmail" },
@@ -73,6 +79,32 @@
         avisar(nome ? `Contato de ${nome} preenchido.` : "Número preenchido.");
     }
 
+    // texto copiado → contato: cartão de contato (vCard) ou qualquer texto com um número de telefone
+    function lerTexto(txt) {
+        const s = String(txt || "");
+        if (/BEGIN:VCARD/i.test(s)) {
+            const campo = re => ((s.match(re) || [])[1] || "").trim();
+            const tels = [ ...s.matchAll(/^TEL[^:\n]*:(.+)$/gim) ].map(m => digitos(m[1])).filter(d => d.length >= 10);
+            return { nome: campo(/^FN[^:\n]*:(.+)$/im), email: campo(/^EMAIL[^:\n]*:(.+)$/im), tel: tels.find(d => d.length === 11) || tels[0] || "" };
+        }
+        const tels = (s.match(/\+?\d[\d \t ().\-]{7,}\d/g) || []).map(digitos).filter(d => d.length === 10 || d.length === 11);
+        return { nome: "", email: "", tel: tels.find(d => d.length === 11) || tels[0] || "" };
+    }
+    async function colar(input) {
+        let txt;
+        try { txt = await navigator.clipboard.readText(); }
+        catch (e) { input.focus(); avisar("Toque e segure o campo do telefone e escolha Colar."); return; }
+        const c = lerTexto(txt);
+        if (!c.tel) { avisar("Não achei um número no que foi copiado. No app Contatos, toque e segure o número e escolha Copiar."); return; }
+        preencher(input, formatar(c.tel));
+        const v = VINCULOS[input.id] || {};
+        const campoNome = v.nome && document.getElementById(v.nome);
+        if (c.nome && campoNome && !campoNome.value.trim()) preencher(campoNome, c.nome);
+        const campoEmail = v.email && document.getElementById(v.email);
+        if (c.email && campoEmail && !campoEmail.value.trim()) preencher(campoEmail, c.email);
+        avisar("Número colado.");
+    }
+
     function ligar(input) {
         if (input.dataset.agendaLigada || input.dataset.agenda === "nao" || PULAR.has(input.id) || input.type === "hidden") return;
         input.dataset.agendaLigada = "1";
@@ -83,10 +115,11 @@
         const b = document.createElement("button");
         b.type = "button";
         b.className = "agenda-btn";
-        b.title = "Buscar na agenda do celular";
-        b.setAttribute("aria-label", "Buscar na agenda do celular");
-        b.innerHTML = "<span>📇</span><small>Agenda</small>";
-        b.addEventListener("click", ev => { ev.preventDefault(); if (!input.disabled && !input.readOnly) escolher(input); });
+        const ag = modo() === "agenda";
+        b.title = ag ? "Buscar na agenda do celular" : "Colar o número copiado";
+        b.setAttribute("aria-label", b.title);
+        b.innerHTML = ag ? "<span>📇</span><small>Agenda</small>" : "<span>📋</span><small>Colar</small>";
+        b.addEventListener("click", ev => { ev.preventDefault(); if (input.disabled || input.readOnly) return; if (ag) escolher(input); else colar(input); });
         caixa.appendChild(b);
     }
     const SELETOR = 'input[inputmode="tel"], input[type="tel"]';
@@ -98,7 +131,7 @@
 
     // janela própria no lugar do prompt() (o prompt do navegador não tem como ganhar o botão da agenda)
     function pedirTelefone({ titulo, valor } = {}) {
-        if (!temAgenda()) {
+        if (!modo()) {
             const r = window.prompt(titulo || "Celular / WhatsApp (com DDD):", valor || "");
             return Promise.resolve(r);
         }
@@ -127,8 +160,8 @@
         });
     }
 
-    window.SKLAgenda = { temAgenda, pedirTelefone, digitos, formatar };
-    if (!temAgenda()) return;
+    window.SKLAgenda = { temAgenda, temColar, pedirTelefone, digitos, formatar, lerTexto };
+    if (!modo()) return;
     document.documentElement.classList.add("tem-agenda");
     const iniciar = () => {
         varrer(document.body);
