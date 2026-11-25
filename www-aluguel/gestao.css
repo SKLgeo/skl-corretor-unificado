@@ -268,3 +268,27 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
   .pg-funil-linha small{grid-column:2/-1;margin-top:-4px}
   .pg-funil-linha small:empty{display:none}
 }
+
+/* 25/11/2026: Painel em telas separadas (menu lateral) — Completo | VGV | VGC | Contas a pagar | Comissões | Mercado */
+.pg-ico span{text-align:center;line-height:1.15;max-width:64px}
+.pg-fin{flex:none;flex-wrap:nowrap}
+.pg-fin button{font-size:12.5px;padding:5px 12px;white-space:nowrap}
+.pg-fin[hidden]{display:none}
+#pgComCor{grid-column:span 6}
+@media(min-width:1181px){
+  .pg-grade[data-tela="vgc"] #pgCorr{grid-column:span 12}
+  .pg-grade[data-tela="pagar"] #pgPend{grid-column:span 8}
+  .pg-grade[data-tela="pagar"] #pgCal{grid-column:span 4}
+  .pg-grade[data-tela="pagar"] #pgDesp{grid-column:span 12}
+  .pg-grade[data-tela="comissoes"] #pgAneis{grid-column:span 4}
+  .pg-grade[data-tela="comissoes"] #pgPend{grid-column:span 8}
+  .pg-grade[data-tela="comissoes"] #pgComCor{grid-column:span 12}
+}
+@media(max-width:1180px){ #pgComCor{grid-column:span 12} }
+@media(max-width:700px){
+  .pg-lateral{overflow-x:auto;scrollbar-width:none}
+  .pg-lateral::-webkit-scrollbar{display:none}
+  .pg-ico{flex:none}
+  .pg-ico span{max-width:none;white-space:nowrap}
+  .pg-topo-acoes{flex-wrap:wrap}
+}

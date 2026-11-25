@@ -28,6 +28,37 @@
     let mk = { fonte: "fechados", fin: "locacao", vMin: null, vMax: null, tipos: "pizza" };   // escolhas do Mercado
     const PERIODOS = [ [ "semana", "Semana" ], [ "mes", "Mês" ], [ "trimestre", "Trim." ], [ "ano", "Ano" ], [ "12m", "12 m" ], [ "tudo", "Tudo" ] ];
     const PERIODOS_SEG = [ [ "12m", "12 meses" ], [ "24m", "24 meses" ], [ "tudo", "Tudo" ], [ "mesames", "Mês a mês" ] ];
+    // 25/11/2026 (Cerrado: "telas separadas na lateral, menos poluído; deixar a opção completa"): cada botão do menu lateral
+    // mostra só os quadros daquele assunto. "Completo" = todos, como era antes. A escolha fica guardada no aparelho.
+    const TELAS = [
+        { id: "completo", ico: "⌂", nome: "Completo", dica: "Todos os quadros juntos", quadros: null },
+        { id: "vgv", ico: "📈", nome: "VGV", dica: "Valor geral de vendas e negócios fechados", quadros: [ "pgVgv", "pgQtd", "pgVxl", "pgSeg", "pgParc" ] },
+        { id: "vgc", ico: "💰", nome: "VGC", dica: "Comissões geradas (VGC), por corretor e metas", quadros: [ "pgVgcMes", "pgMeta", "pgAneis", "pgCorr" ] },
+        { id: "pagar", ico: "📤", nome: "Contas a pagar", dica: "Contas a pagar, despesas e vencimentos", quadros: [ "pgPend", "pgCal", "pgDesp" ] },
+        { id: "comissoes", ico: "🤝", nome: "Comissões", dica: "Comissões a receber e a pagar aos corretores", quadros: [ "pgAneis", "pgPend", "pgComCor" ] },
+        { id: "mercado", ico: "📍", nome: "Mercado", dica: "Faixas de valor, bairros e tipos que mais fecham ou são procurados", quadros: null }
+    ];
+    const CHAVE_TELA = "sklu_alug_painel_tela";
+    let tela = (() => { try { const t = localStorage.getItem(CHAVE_TELA); return TELAS.some(x => x.id === t) ? t : "completo"; } catch { return "completo"; } })();
+    function escolherTela(t, inicio) {
+        tela = TELAS.some(x => x.id === t) ? t : "completo";
+        try { localStorage.setItem(CHAVE_TELA, tela); } catch { /* sem armazenamento: só não lembra */ }
+        const raiz = $("painelGestao");
+        if (!raiz) return;
+        raiz.querySelectorAll("[data-pg-tela]").forEach(x => x.classList.toggle("ativo", x.dataset.pgTela === tela));
+        // no celular o menu é uma faixa que desliza: deixa o botão escolhido à vista
+        const at = raiz.querySelector(".pg-ico.ativo"), faixa = raiz.querySelector(".pg-lateral");
+        if (at && faixa && faixa.scrollWidth > faixa.clientWidth) faixa.scrollLeft = Math.max(0, at.offsetLeft - (faixa.clientWidth - at.offsetWidth) / 2);
+        // vendas/locação não muda nada em contas a pagar, nas comissões nem no Mercado (que tem a própria escolha)
+        $("pgFinSel").hidden = tela === "pagar" || tela === "comissoes" || tela === "mercado";
+        if (tela === "pagar") abaPend = "pagar";
+        else if (tela === "comissoes") abaPend = "receber";
+        const g = $("pgGrade");
+        if (g) g.scrollTop = 0;
+        const c = raiz.querySelector(".pg-conteudo");
+        if (c) c.scrollTop = 0;
+        if (!inicio && ultimo) desenhar(ultimo);
+    }
 
     const pode = () => !!ctx && (ctx.pode ? ctx.pode("tela_painel") : ctx.veTudo());
     const dinheiro = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -82,10 +113,7 @@
         p.innerHTML = `<div class="pg-moldura">
             <nav class="pg-lateral" aria-label="Filtro do painel">
               <span class="pg-marca"><img src="logo-symbol.png" alt="" /></span>
-              <button type="button" class="pg-ico ativo" data-pg-filtro="todos" title="Tudo">⌂<span>Tudo</span></button>
-              <button type="button" class="pg-ico" data-pg-filtro="venda" title="Só vendas">🏷️<span>Vendas</span></button>
-              <button type="button" class="pg-ico" data-pg-filtro="locacao" title="Só locações">🔑<span>Locação</span></button>
-              <button type="button" class="pg-ico" data-pg-filtro="mercado" title="Mercado: faixas de valor, bairros e tipos que mais fecham ou são procurados">📍<span>Mercado</span></button>
+              ${TELAS.map(t => `<button type="button" class="pg-ico${t.id === tela ? " ativo" : ""}" data-pg-tela="${t.id}" title="${t.dica}">${t.ico}<span>${t.nome}</span></button>`).join("")}
               <span class="pg-espaco"></span>
               <button type="button" class="pg-ico" data-pg-fechar title="Fechar o painel">⟵<span>Fechar</span></button>
             </nav>
@@ -93,6 +121,11 @@
               <header class="pg-topo">
                 <div class="pg-titulo"><img id="pgLogo" class="pg-logo" alt="" hidden /><div><span class="pg-sobre">PAINEL DA IMOBILIÁRIA</span><h1 id="pgTitulo">Visão geral</h1></div></div>
                 <div class="pg-topo-acoes">
+                  <div id="pgFinSel" class="pg-abas pg-fin" role="group" aria-label="Vendas, locações ou os dois">
+                    <button type="button" data-pg-filtro="todos" aria-pressed="true">Todos</button>
+                    <button type="button" data-pg-filtro="venda" aria-pressed="false">🏷️ Vendas</button>
+                    <button type="button" data-pg-filtro="locacao" aria-pressed="false">🔑 Locação</button>
+                  </div>
                   <select id="pgPeriodo" aria-label="Período">
                     <option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="trimestre">Este trimestre</option>
                     <option value="ano" selected>Este ano</option><option value="12m">Últimos 12 meses</option><option value="tudo">Todo o período</option>
@@ -110,9 +143,11 @@
         p.querySelectorAll("[data-pg-fechar]").forEach(b => b.addEventListener("click", fechar));
         p.querySelectorAll("[data-pg-filtro]").forEach(b => b.addEventListener("click", () => {
             filtro = b.dataset.pgFiltro;
-            p.querySelectorAll("[data-pg-filtro]").forEach(x => x.classList.toggle("ativo", x === b));
+            p.querySelectorAll("[data-pg-filtro]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
             if (ultimo) desenhar(ultimo);
         }));
+        p.querySelectorAll("[data-pg-tela]").forEach(b => b.addEventListener("click", () => escolherTela(b.dataset.pgTela)));
+        escolherTela(tela, true);
         $("pgPeriodo").addEventListener("change", () => { if (!$("pgPeriodo").value) return; periodo = $("pgPeriodo").value; per = {}; carregar(); });
         document.addEventListener("keydown", e => { if (e.key === "Escape" && !p.hidden) fechar(); });
         let t = null;
@@ -280,18 +315,23 @@
         if (modoTabela[id]) mostrarTabela(id);
     }
     function desenhar(d) {
-        if (filtro === "mercado") return desenharMercado();
+        $("pgGrade").dataset.tela = tela;
+        if (tela === "mercado") return desenharMercado();
         const grade = $("pgGrade");
         const segP = per.pgSeg || "12m";
-        grade.innerHTML = [
+        const def = TELAS.find(t => t.id === tela) || TELAS[0];
+        const so = def.quadros;             // null = todos
+        const tituloPend = tela === "pagar" ? "Contas a pagar" : tela === "comissoes" ? "Comissões a receber" : "Pendências e recebimentos";
+        const abasPend = tela === "pagar" || tela === "comissoes" ? "" : `<div class="pg-abas" role="tablist">
+                <button type="button" data-pend="receber" aria-pressed="${abaPend === "receber"}">A receber</button>
+                <button type="button" data-pend="pagar" aria-pressed="${abaPend === "pagar"}">A pagar</button></div>`;
+        const pecas = [
             cartao("pgVgv", "pg-c-kpi", filtro === "todos" ? "VGV" : filtro === "venda" ? "VGV de vendas" : "VGV de locações", "", true),
             cartao("pgQtd", "pg-c-kpi", "Negócios fechados", "", true),
             cartao("pgVgcMes", "pg-c-largo", "Comissões (VGC) no tempo", botaoTabela("pgVgcMes"), true),
             cartao("pgCal", "pg-c-cal", "Vencimentos do mês"),
             cartao("pgAneis", "pg-c-aneis", "Indicadores", "", true),
-            cartao("pgPend", "pg-c-largo", "Pendências e recebimentos", `<div class="pg-abas" role="tablist">
-                <button type="button" data-pend="receber" aria-pressed="${abaPend === "receber"}">A receber</button>
-                <button type="button" data-pend="pagar" aria-pressed="${abaPend === "pagar"}">A pagar</button></div>`),
+            cartao("pgPend", "pg-c-largo", tituloPend, abasPend),
             cartao("pgMeta", "pg-c-meta", `Metas — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`),
             cartao("pgCorr", "pg-c-largo", `VGC por corretor — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`, botaoTabela("pgCorr")),
             cartao("pgVxl", "pg-c-largo", "Negócios no tempo: venda × locação", botaoTabela("pgVxl"), true),
@@ -303,16 +343,25 @@
               ${chips("pgSeg", PERIODOS_SEG, segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "mesames" : segP)}
               <input id="pgSegMes" type="month" class="pg-mes" ${segP === "mesames" || /^\d{4}-\d{2}$/.test(segP) ? "" : "hidden"} value="${h(mesSeg || hojeIso().slice(0, 7))}" aria-label="Mês" />
               <div class="pg-corpo"></div></section>`,
-            cartao("pgParc", "pg-c-largo", "Parcerias que mais fecham", `<small class="pg-sub">imobiliárias e corretores parceiros</small>`, true)
-        ].join("");
+            cartao("pgParc", "pg-c-largo", "Parcerias que mais fecham", `<small class="pg-sub">imobiliárias e corretores parceiros</small>`, true),
+            cartao("pgComCor", "pg-c-largo", "Comissões a pagar aos corretores", `<button type="button" class="pg-tab" data-pg-ir="comissoes" title="Abrir a tela Comissões">Abrir Comissões</button>`)
+        ];
+        // só os quadros da tela escolhida, na ordem da tela
+        const idDe = html => (html.match(/id="([^"]+)"/) || [])[1];
+        const escolhidas = so ? so.map(id => pecas.find(x => idDe(x) === id)).filter(Boolean) : pecas;
+        grade.innerHTML = escolhidas.join("");
+        grade.dataset.tela = tela;
         const fazer = {
             pgVgv: () => kpiVgv(), pgQtd: () => kpiQtd(), pgVgcMes: () => vgcTempo(), pgCal: () => calendario(corpo("pgCal"), dadosFin()),
             pgAneis: () => aneis(), pgMeta: () => metas(d), pgPend: () => pendencias(corpo("pgPend")), pgVxl: () => vxl(),
-            pgCorr: () => corretores(d), pgFunil: () => funilConversao(), pgDesp: () => despesasCartao(), pgSeg: () => segmento(), pgParc: () => parcerias()
+            pgCorr: () => corretores(d), pgFunil: () => funilConversao(), pgDesp: () => despesasCartao(), pgSeg: () => segmento(), pgParc: () => parcerias(),
+            pgComCor: () => comissoesCorretores()
         };
+        // só desenha o que está na tela (quadro escondido não existe no HTML)
+        Object.keys(fazer).forEach(id => { if (!$(id)) delete fazer[id]; });
         desenhos = fazer; tabelas = {};
         Object.keys(fazer).forEach(desenharCartao);
-        redesenhar = () => [ "pgVgv", "pgVgcMes", "pgVxl", "pgCorr", "pgParc" ].forEach(desenharCartao);
+        redesenhar = () => [ "pgVgv", "pgVgcMes", "pgVxl", "pgCorr", "pgParc" ].filter(id => fazer[id]).forEach(desenharCartao);
 
         grade.querySelectorAll("[data-per-card]").forEach(b => b.addEventListener("click", () => {
             const id = b.dataset.perCard, v = b.dataset.per;
@@ -321,7 +370,7 @@
             $(id).querySelectorAll("[data-per-card]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
             desenharCartao(id);
         }));
-        $("pgSegMes").addEventListener("change", () => { mesSeg = $("pgSegMes").value; if (mesSeg) { per.pgSeg = mesSeg; desenharCartao("pgSeg"); } });
+        if ($("pgSegMes")) $("pgSegMes").addEventListener("change", () => { mesSeg = $("pgSegMes").value; if (mesSeg) { per.pgSeg = mesSeg; desenharCartao("pgSeg"); } });
         grade.querySelectorAll("[data-tabela]").forEach(b => b.addEventListener("click", () => {
             const id = b.dataset.tabela;
             modoTabela[id] = !modoTabela[id];
@@ -442,6 +491,36 @@
         const depois = async () => { indCache = new Map(); if (FG && FG.carregar) await FG.carregar(); [ "pgPend", "pgCal", "pgAneis" ].forEach(desenharCartao); };
         box.querySelectorAll("[data-baixa]").forEach(b => b.addEventListener("click", () => FG.abrirBaixa(tipo, achar(b.dataset.baixa), depois)));
         box.querySelectorAll("[data-prog]").forEach(b => b.addEventListener("click", () => FG.abrirProgramar(tipo, achar(b.dataset.prog), depois)));
+    }
+    // 9b. comissões a pagar aos corretores e parceiros (pendentes e aprovadas): o que já venceu/vence este mês e o que vem depois
+    async function comissoesCorretores() {
+        const box = corpo("pgComCor");
+        box.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
+        const { data, error } = await ctx.sb.from("comissoes_aluguel")
+            .select("corretor_nome, beneficiario_nome, valor_comissao, competencia, status")
+            .eq("carteira_id", ctx.carteiraId()).in("status", [ "pendente", "aprovada" ]);
+        if (!$("pgComCor")) return;
+        if (error) { box.innerHTML = `<p class="pg-vazio">${h(ctx.traduzErro(error.message))}</p>`; return; }
+        const fimMesAtual = hojeIso().slice(0, 7) + "-31";
+        const agora = c => !c.competencia || String(c.competencia).slice(0, 10) <= fimMesAtual;
+        const pessoas = new Map();
+        let totAgora = 0, totDepois = 0;
+        (data || []).forEach(c => {
+            const nome = c.corretor_nome || c.beneficiario_nome || "Sem nome";
+            const v = Number(c.valor_comissao || 0);
+            const r = pessoas.get(nome) || { nome, agora: 0, depois: 0 };
+            if (agora(c)) { r.agora += v; totAgora += v; } else { r.depois += v; totDepois += v; }
+            pessoas.set(nome, r);
+        });
+        const lista = [ ...pessoas.values() ].sort((a, b) => (b.agora - a.agora) || (b.depois - a.depois));
+        tabelas.pgComCor = [ [ "Pessoa", "A pagar (até este mês)", "Previsto (meses seguintes)" ], ...lista.map(r => [ r.nome, dinheiro(r.agora), dinheiro(r.depois) ]) ];
+        if (!lista.length) { box.innerHTML = `<p class="pg-vazio">Nenhuma comissão pendente para pagar.</p>`; return; }
+        box.innerHTML = `<div class="pg-duplo"><div><strong>${h(curto(totAgora))}</strong><span>a pagar até este mês</span><i style="background:${COR.s2}"></i></div>
+              <div><strong>${h(curto(totDepois))}</strong><span>previsto nos próximos meses</span><i style="background:${COR.s3}"></i></div></div>
+            <div class="pg-tabela"><table><thead><tr><th>Pessoa</th><th>A pagar</th><th>Previsto</th></tr></thead><tbody>
+            ${lista.slice(0, 12).map(r => `<tr><td>${h(r.nome)}</td><td>${h(dinheiro(r.agora))}</td><td>${h(dinheiro(r.depois))}</td></tr>`).join("")}
+            </tbody></table></div>${lista.length > 12 ? `<p class="pg-nota">+ ${lista.length - 12} pessoa(s) na tela Comissões.</p>` : ""}
+            <p class="pg-nota">Comissões pendentes e aprovadas. Para marcar como paga, abra a tela Comissões.</p>`;
     }
     // 10. funil de conversão (meta de cada etapa editável em Configurações)
     async function funilConversao() {

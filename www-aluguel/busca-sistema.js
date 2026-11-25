@@ -46,7 +46,7 @@
     function abrirPainel(filtro) {
         if (!window.SKLPainel) return;
         window.SKLPainel.abrir();
-        if (filtro) setTimeout(() => { const b = document.querySelector(`[data-pg-filtro="${filtro}"], [data-filtro="${filtro}"]`); if (b) b.click(); }, 400);
+        if (filtro) setTimeout(() => { const b = document.querySelector(`[data-pg-tela="${filtro}"], [data-pg-filtro="${filtro}"], [data-filtro="${filtro}"]`); if (b) b.click(); }, 400);
     }
 
     // ------------------------------------------------------------------ o índice (o "banco de dados" da busca)
@@ -128,7 +128,11 @@
 
         // ---- Painel e indicadores
         { titulo: "Painel de vendas e locações (VGV, negócios fechados)", onde: "📊 Painel", palavras: "painel vendas vgv vgc dashboard resultado trimestre mes ano negocios fechados graficos metas faturamento",
-          passos: [ "Toque em 📊 Painel.", "Escolha o ano, o trimestre ou o mês no topo.", "Use Vendas ou Locação no menu do painel." ], ir: () => abrirPainel(), ver: () => pode("tela_painel") && !!window.SKLPainel },
+          passos: [ "Toque em 📊 Painel.", "No menu da esquerda, escolha a tela: Completo, VGV, VGC, Contas a pagar, Comissões ou Mercado.", "Escolha o ano, o trimestre ou o mês no topo; Todos, Vendas ou Locação ao lado do período." ], ir: () => abrirPainel(), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
+        { titulo: "Painel: contas a pagar", onde: "📊 Painel → 📤 Contas a pagar", palavras: "contas a pagar despesas vencimentos boletos pagar vencidas painel financeiro",
+          passos: [ "Toque em 📊 Painel.", "No menu da esquerda, toque em Contas a pagar." ], ir: () => abrirPainel("pagar"), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
+        { titulo: "Painel: comissões a receber e a pagar", onde: "📊 Painel → 🤝 Comissões", palavras: "comissoes receber pagar corretores repasse painel parcelas recebido",
+          passos: [ "Toque em 📊 Painel.", "No menu da esquerda, toque em Comissões." ], ir: () => abrirPainel("comissoes"), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
         { titulo: "Mercado: faixa de valor e bairro que mais saem", onde: "📊 Painel → Mercado", palavras: "mercado faixa de valor bairro procurado fechados captacao direcionar tipos cidades",
           passos: [ "Abra o Painel e toque em Mercado.", "Escolha Fechados ou Procurados e Locação ou Venda." ], ir: () => abrirPainel("mercado"), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-20" },
         { titulo: "Indicadores (relatório e PDF)", onde: "Indicadores", palavras: "indicadores relatorio conversao funil corretor ranking imprimir pdf csv",
