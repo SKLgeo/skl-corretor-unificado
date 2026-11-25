@@ -32,6 +32,8 @@
     // mostra só os quadros daquele assunto. "Completo" = todos, como era antes. A escolha fica guardada no aparelho.
     const TELAS = [
         { id: "completo", ico: "⌂", nome: "Completo", dica: "Todos os quadros juntos", quadros: null },
+        { id: "venda", ico: "🏷️", nome: "Vendas", dica: "Todos os quadros, só com as vendas", quadros: null, filtro: "venda" },
+        { id: "locacao", ico: "🔑", nome: "Locação", dica: "Todos os quadros, só com as locações", quadros: null, filtro: "locacao" },
         { id: "vgv", ico: "📈", nome: "VGV", dica: "Valor geral de vendas e negócios fechados", quadros: [ "pgVgv", "pgQtd", "pgVxl", "pgSeg", "pgParc" ] },
         { id: "vgc", ico: "💰", nome: "VGC", dica: "Comissões geradas (VGC), por corretor e metas", quadros: [ "pgVgcMes", "pgMeta", "pgAneis", "pgCorr" ] },
         { id: "pagar", ico: "📤", nome: "Contas a pagar", dica: "Contas a pagar, despesas e vencimentos", quadros: [ "pgPend", "pgCal", "pgDesp" ] },
@@ -49,8 +51,8 @@
         // no celular o menu é uma faixa que desliza: deixa o botão escolhido à vista
         const at = raiz.querySelector(".pg-ico.ativo"), faixa = raiz.querySelector(".pg-lateral");
         if (at && faixa && faixa.scrollWidth > faixa.clientWidth) faixa.scrollLeft = Math.max(0, at.offsetLeft - (faixa.clientWidth - at.offsetWidth) / 2);
-        // vendas/locação não muda nada em contas a pagar, nas comissões nem no Mercado (que tem a própria escolha)
-        $("pgFinSel").hidden = tela === "pagar" || tela === "comissoes" || tela === "mercado";
+        // Vendas e Locação = todos os quadros, só com aquela finalidade (como era antes); as outras telas usam tudo
+        filtro = (TELAS.find(x => x.id === tela) || {}).filtro || "todos";
         if (tela === "pagar") abaPend = "pagar";
         else if (tela === "comissoes") abaPend = "receber";
         const g = $("pgGrade");
@@ -121,11 +123,6 @@
               <header class="pg-topo">
                 <div class="pg-titulo"><img id="pgLogo" class="pg-logo" alt="" hidden /><div><span class="pg-sobre">PAINEL DA IMOBILIÁRIA</span><h1 id="pgTitulo">Visão geral</h1></div></div>
                 <div class="pg-topo-acoes">
-                  <div id="pgFinSel" class="pg-abas pg-fin" role="group" aria-label="Vendas, locações ou os dois">
-                    <button type="button" data-pg-filtro="todos" aria-pressed="true">Todos</button>
-                    <button type="button" data-pg-filtro="venda" aria-pressed="false">🏷️ Vendas</button>
-                    <button type="button" data-pg-filtro="locacao" aria-pressed="false">🔑 Locação</button>
-                  </div>
                   <select id="pgPeriodo" aria-label="Período">
                     <option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="trimestre">Este trimestre</option>
                     <option value="ano" selected>Este ano</option><option value="12m">Últimos 12 meses</option><option value="tudo">Todo o período</option>
@@ -141,11 +138,6 @@
           <div id="pgDica" class="pg-dica" hidden></div>`;
         document.body.appendChild(p);
         p.querySelectorAll("[data-pg-fechar]").forEach(b => b.addEventListener("click", fechar));
-        p.querySelectorAll("[data-pg-filtro]").forEach(b => b.addEventListener("click", () => {
-            filtro = b.dataset.pgFiltro;
-            p.querySelectorAll("[data-pg-filtro]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
-            if (ultimo) desenhar(ultimo);
-        }));
         p.querySelectorAll("[data-pg-tela]").forEach(b => b.addEventListener("click", () => escolherTela(b.dataset.pgTela)));
         escolherTela(tela, true);
         $("pgPeriodo").addEventListener("change", () => { if (!$("pgPeriodo").value) return; periodo = $("pgPeriodo").value; per = {}; carregar(); });

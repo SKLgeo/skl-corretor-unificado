@@ -128,7 +128,7 @@
 
         // ---- Painel e indicadores
         { titulo: "Painel de vendas e locações (VGV, negócios fechados)", onde: "📊 Painel", palavras: "painel vendas vgv vgc dashboard resultado trimestre mes ano negocios fechados graficos metas faturamento",
-          passos: [ "Toque em 📊 Painel.", "No menu da esquerda, escolha a tela: Completo, VGV, VGC, Contas a pagar, Comissões ou Mercado.", "Escolha o ano, o trimestre ou o mês no topo; Todos, Vendas ou Locação ao lado do período." ], ir: () => abrirPainel(), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
+          passos: [ "Toque em 📊 Painel.", "No menu da esquerda, escolha a tela: Completo, Vendas, Locação, VGV, VGC, Contas a pagar, Comissões ou Mercado.", "Escolha o ano, o trimestre ou o mês no topo." ], ir: () => abrirPainel(), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
         { titulo: "Painel: contas a pagar", onde: "📊 Painel → 📤 Contas a pagar", palavras: "contas a pagar despesas vencimentos boletos pagar vencidas painel financeiro",
           passos: [ "Toque em 📊 Painel.", "No menu da esquerda, toque em Contas a pagar." ], ir: () => abrirPainel("pagar"), ver: () => pode("tela_painel") && !!window.SKLPainel, pop: "POP-GI-43" },
         { titulo: "Painel: comissões a receber e a pagar", onde: "📊 Painel → 🤝 Comissões", palavras: "comissoes receber pagar corretores repasse painel parcelas recebido",

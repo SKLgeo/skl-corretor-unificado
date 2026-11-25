@@ -271,9 +271,9 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
 
 /* 25/11/2026: Painel em telas separadas (menu lateral) — Completo | VGV | VGC | Contas a pagar | Comissões | Mercado */
 .pg-ico span{text-align:center;line-height:1.15;max-width:64px}
-.pg-fin{flex:none;flex-wrap:nowrap}
-.pg-fin button{font-size:12.5px;padding:5px 12px;white-space:nowrap}
-.pg-fin[hidden]{display:none}
+
+
+
 #pgComCor{grid-column:span 6}
 @media(min-width:1181px){
   .pg-grade[data-tela="vgc"] #pgCorr{grid-column:span 12}
