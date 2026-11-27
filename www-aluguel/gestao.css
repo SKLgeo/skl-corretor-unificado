@@ -292,3 +292,21 @@ html.pg-aberto,html.pg-aberto body{overflow:hidden}
   .pg-ico span{max-width:none;white-space:nowrap}
   .pg-topo-acoes{flex-wrap:wrap}
 }
+
+/* 26/11/2026: VGC por corretor com os negócios de cada um (escolher na lista ou tocar na barra) */
+.pg-corr-barra{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:-2px 0 8px}
+.pg-corr-barra .pg-per{margin:0}
+#pgCorrSel{border:1px solid #cfe2e6;border-radius:10px;padding:5px 10px;font:inherit;font-size:13px;background:#fff;color:#18323a;width:auto;min-width:240px;max-width:100%}
+@media (max-width:780px){#pgCorrSel{width:100%;min-width:0}}
+.pg-corr-lista{margin-top:10px}
+.pg-corr-lista:empty{display:none}
+.pg-corr-tab{max-height:380px}
+.pg-corr-tab th{position:sticky;top:0;background:#f5f9fa;z-index:1;white-space:nowrap}
+.pg-corr-tab td{white-space:nowrap}
+.pg-corr-tab td:nth-child(2){white-space:normal;min-width:140px}
+.pg-corr-tab td small{color:#5d7780}
+.pg-corr-tab tfoot td{border-top:2px solid #cfe2e6;background:#f5f9fa;position:sticky;bottom:0}
+.pg-corr-linha{cursor:pointer}
+.pg-corr-linha:hover td,.pg-corr-linha:focus td{background:#eef6f8}
+.pg-corr-topo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:8px}
+.pg-corr-resumo{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:#365560}

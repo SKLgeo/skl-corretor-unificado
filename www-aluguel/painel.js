@@ -25,6 +25,7 @@
     let per = {};                  // período escolhido em cada quadro (sem escolha = o do topo)
     let indCache = new Map();      // fin_indicadores_imobiliaria por período
     let modoTabela = {}, modoDesp = "barras", abaPend = "receber", mesSeg = "";
+    let corrPer = "trimestre", corrSel = "", corrCache = new Map();   // VGC por corretor: período, corretor escolhido, linhas
     let mk = { fonte: "fechados", fin: "locacao", vMin: null, vMax: null, tipos: "pizza" };   // escolhas do Mercado
     const PERIODOS = [ [ "semana", "Semana" ], [ "mes", "Mês" ], [ "trimestre", "Trim." ], [ "ano", "Ano" ], [ "12m", "12 m" ], [ "tudo", "Tudo" ] ];
     const PERIODOS_SEG = [ [ "12m", "12 meses" ], [ "24m", "24 meses" ], [ "tudo", "Tudo" ], [ "mesames", "Mês a mês" ] ];
@@ -199,8 +200,8 @@
     async function carregar() {
         const grade = $("pgGrade");
         grade.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
-        indCache = new Map();
-        const ref = window.SKLFatias ? window.SKLFatias.trimestre(periodo) : { ano: new Date().getFullYear(), tri: Math.floor(new Date().getMonth() / 3) + 1 };
+        indCache = new Map(); corrCache = new Map();
+        const ref =window.SKLFatias ? window.SKLFatias.trimestre(periodo) : { ano: new Date().getFullYear(), tri: Math.floor(new Date().getMonth() / 3) + 1 };
         const tri = ref.tri;
         montarFatias();
         let ind;
@@ -325,7 +326,13 @@
             cartao("pgAneis", "pg-c-aneis", "Indicadores", "", true),
             cartao("pgPend", "pg-c-largo", tituloPend, abasPend),
             cartao("pgMeta", "pg-c-meta", `Metas — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`),
-            cartao("pgCorr", "pg-c-largo", `VGC por corretor — ${d.tri}º trimestre${d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : ""}`, botaoTabela("pgCorr")),
+            `<section class="pg-cartao pg-c-largo" id="pgCorr"><header><h2>VGC por corretor</h2><small class="pg-sub">toque no corretor para ver os negócios dele</small></header>
+              <div class="pg-corr-barra">
+                <div class="pg-per" role="group" aria-label="Período deste quadro">${[ [ "trimestre", `${d.tri}º trimestre` ], [ "ano", String(d.ano || new Date().getFullYear()) ], [ "tudo", "Tudo" ] ]
+                    .map(([ v, r ]) => `<button type="button" data-corr-per="${v}" aria-pressed="${v === corrPer}">${h(r)}</button>`).join("")}</div>
+                <select id="pgCorrSel" aria-label="Corretor"><option value="">Todos os corretores (ranking)</option></select>
+              </div>
+              <div class="pg-corpo"></div><div id="pgCorrLista" class="pg-corr-lista"></div></section>`,
             cartao("pgVxl", "pg-c-largo", "Negócios no tempo: venda × locação", botaoTabela("pgVxl"), true),
             cartao("pgFunil", "pg-c-largo", "Funil de conversão", `<button type="button" class="pg-tab" data-pg-ir="settings" title="Metas de conversão por etapa">⚙ metas</button>`, true),
             cartao("pgDesp", "pg-c-largo", "Despesas pagas por plano de contas", `<div class="pg-abas" role="group">
@@ -361,6 +368,11 @@
             else { per[id] = v; if (id === "pgSeg") $("pgSegMes").hidden = true; }
             $(id).querySelectorAll("[data-per-card]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
             desenharCartao(id);
+        }));
+        grade.querySelectorAll("[data-corr-per]").forEach(b => b.addEventListener("click", () => {
+            corrPer = b.dataset.corrPer;
+            grade.querySelectorAll("[data-corr-per]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+            desenharCartao("pgCorr");
         }));
         if ($("pgSegMes")) $("pgSegMes").addEventListener("change", () => { mesSeg = $("pgSegMes").value; if (mesSeg) { per.pgSeg = mesSeg; desenharCartao("pgSeg"); } });
         grade.querySelectorAll("[data-tabela]").forEach(b => b.addEventListener("click", () => {
@@ -449,12 +461,92 @@
         tabelas.pgVxl = [ [ "Período", "Vendas", "Locações" ], ...ex.chaves.map((k, i) => [ ex.rotulo(k), v[i], l[i] ]) ];
         linhas(corpo("pgVxl"), ex.chaves.map(ex.rotulo), [ { nome: "Vendas", cor: COR.s1, valores: v }, { nome: "Locações", cor: COR.s2, valores: l } ], x => String(Math.round(x)), true);
     }
-    // 8. VGC por corretor (trimestre atual) com a meta como referência
-    function corretores(d) {
-        const ps = (d.metas && d.metas.pessoas) || [];
-        const top = ps.filter(p => Number(p.vgc) > 0).sort((a, b) => Number(b.vgc) - Number(a.vgc)).slice(0, 10);
-        tabelas.pgCorr = [ [ "Corretor", "VGC no trimestre", "Meta" ], ...top.map(p => [ p.nome, dinheiro(p.vgc), p.meta_prop != null ? dinheiro(p.meta_prop) : "—" ]) ];
-        barras(corpo("pgCorr"), top.map(p => p.nome.split(" ").slice(0, 2).join(" ")), top.map(p => Number(p.vgc)), COR.s3, d.metas && d.metas.meta != null ? Number(d.metas.meta) : null, curto, top.map(p => p.nome));
+    // 8. VGC por corretor, com a meta como referência (no trimestre). 26/11/2026 (Cerrado, "como no Power BI"): escolher o
+    // corretor (na lista ou tocando na barra) mostra os negócios dele logo abaixo; "Todos" mostra o ranking da equipe.
+    // As linhas vêm de metas_vgc_negocios (mesma conta das metas: a soma de cada pessoa é o VGC do gráfico).
+    const chaveCorr = r => r.usuario_id || "n:" + String(r.nome || "").trim().toLowerCase();
+    const pctTxt = v => v == null || !isFinite(v) ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
+    function intervaloCorr(d) {
+        const ano = d.ano || new Date().getFullYear();
+        if (corrPer === "ano") return [ `${ano}-01-01`, `${ano}-12-31` ];
+        if (corrPer === "tudo") return [ "2000-01-01", "2100-12-31" ];
+        return [ `${ano}-${pad(d.tri * 3 - 2)}-01`, fimMes(ano, d.tri * 3) ];
+    }
+    function linhasCorr(ini, fim) {
+        const k = ini + "|" + fim;
+        if (!corrCache.has(k)) {
+            corrCache.set(k, ctx.sb.rpc("metas_vgc_negocios", { p_carteira: ctx.carteiraId(), p_ini: ini, p_fim: fim })
+                .then(r => { if (r.error) { corrCache.delete(k); throw r.error; } return r.data || []; }));
+        }
+        return corrCache.get(k);
+    }
+    async function corretores(d) {
+        const box = corpo("pgCorr"), lista = $("pgCorrLista"), sel = $("pgCorrSel");
+        if (!box) return;
+        const [ ini, fim ] = intervaloCorr(d), perAtual = corrPer;
+        if (!box.firstChild) box.innerHTML = `<p class="pg-carregando">Carregando…</p>`;
+        let todas;
+        try { todas = await linhasCorr(ini, fim); }
+        catch (e) { box.innerHTML = `<p class="pg-vazio">${h(ctx.traduzErro(e.message))}</p>`; lista.innerHTML = ""; return; }
+        if (!$("pgCorr") || corrPer !== perAtual) return;
+        const linhas = todas.filter(l => filtro === "todos" || l.finalidade === filtro);
+        // pessoas (ranking por VGC)
+        const mapa = new Map();
+        linhas.forEach(l => {
+            const k = chaveCorr(l), p = mapa.get(k) || { chave: k, nome: l.nome || "Sem nome", vgc: 0, negocios: new Set(), vgv: 0, comissao: 0, temCom: false };
+            p.vgc += Number(l.vgc || 0); p.negocios.add(l.ref_id); p.vgv += Number(l.valor || 0);
+            if (l.comissao_corretor != null) { p.comissao += Number(l.comissao_corretor); p.temCom = true; }
+            mapa.set(k, p);
+        });
+        const pessoas = [ ...mapa.values() ].sort((a, b) => b.vgc - a.vgc || a.nome.localeCompare(b.nome));
+        if (corrSel && !mapa.has(corrSel)) corrSel = "";
+        // meta só no trimestre e com venda + locação juntas (a meta é sobre o VGC todo)
+        const comMeta = corrPer === "trimestre" && filtro === "todos";
+        const metaDe = new Map(((d.metas && d.metas.pessoas) || []).map(p => [ chaveCorr(p), p ]));
+        const ref = comMeta && d.metas && d.metas.meta != null ? Number(d.metas.meta) : null;
+        sel.innerHTML = `<option value="">Todos os corretores (ranking)</option>` +
+            pessoas.map(p => `<option value="${h(p.chave)}"${p.chave === corrSel ? " selected" : ""}>${h(p.nome)}</option>`).join("");
+        sel.onchange = () => { corrSel = sel.value; corretores(d); };
+        const titulo = $("pgCorr").querySelector("h2");
+        titulo.textContent = `VGC por corretor — ${corrPer === "tudo" ? "todo o período" : corrPer === "ano" ? (d.ano || new Date().getFullYear()) : d.tri + "º trimestre" + (d.ano && d.ano !== new Date().getFullYear() ? " de " + d.ano : "")}${filtro === "venda" ? " · vendas" : filtro === "locacao" ? " · locações" : ""}`;
+        // gráfico: os 10 maiores (o escolhido entra mesmo fora dos 10)
+        let top = pessoas.filter(p => p.vgc > 0).slice(0, 10);
+        const escolhido = corrSel ? mapa.get(corrSel) : null;
+        if (escolhido && !top.includes(escolhido)) top = top.slice(0, 9).concat(escolhido);
+        barras(box, top.map(p => p.nome.split(" ").slice(0, 2).join(" ")), top.map(p => p.vgc), COR.s3, ref, curto, top.map(p => p.nome), {
+            vazio: "Nenhum negócio de corretor neste período.",
+            cores: top.map(p => corrSel && p.chave === corrSel ? COR.s2 : COR.s3),
+            aoClicar: i => { corrSel = corrSel === top[i].chave ? "" : top[i].chave; corretores(d); },
+            dica: i => `<b>${h(top[i].nome)}</b><br>VGC: <b>${h(dinheiro(top[i].vgc))}</b><br>${top[i].negocios.size} negócio(s)${ref != null ? `<br>${top[i].vgc > ref ? "bateu a meta" : "abaixo da meta"} (${h(curto(ref))})` : ""}<br><i>toque para ver os negócios</i>`
+        });
+        if (!pessoas.length) { lista.innerHTML = ""; return; }
+        if (!escolhido) {
+            // ranking da equipe
+            const totVgc = pessoas.reduce((s, p) => s + p.vgc, 0);
+            lista.innerHTML = `<div class="pg-tabela pg-corr-tab"><table><thead><tr><th>#</th><th>Corretor</th><th>Negócios</th><th>VGV</th><th>VGC</th>${comMeta ? "<th>Meta</th><th>% da meta</th>" : ""}</tr></thead><tbody>
+                ${pessoas.map((p, i) => { const m = metaDe.get(p.chave), mp = m && m.meta_prop != null ? Number(m.meta_prop) : null;
+                    return `<tr class="pg-corr-linha" data-corr="${h(p.chave)}" tabindex="0" title="Ver os negócios de ${h(p.nome)}"><td>${i + 1}º</td><td><b>${h(p.nome)}</b></td><td>${p.negocios.size}</td><td>${h(dinheiro(p.vgv))}</td><td><b>${h(dinheiro(p.vgc))}</b></td>${comMeta ? `<td>${mp != null ? h(dinheiro(mp)) : "—"}</td><td>${mp ? h(pctTxt(p.vgc / mp * 100)) : "—"}</td>` : ""}</tr>`; }).join("")}
+                </tbody><tfoot><tr><td></td><td><b>Total</b></td><td>${new Set(linhas.map(l => l.ref_id)).size}</td><td></td><td><b>${h(dinheiro(totVgc))}</b></td>${comMeta ? "<td></td><td></td>" : ""}</tr></tfoot></table></div>
+              <p class="pg-nota">VGV = valor dos imóveis dos negócios de cada corretor (negócio dividido conta para cada um). VGC = a parte da comissão que vale para a meta.</p>`;
+            lista.querySelectorAll("[data-corr]").forEach(tr => {
+                const ir = () => { corrSel = tr.dataset.corr; corretores(d); };
+                tr.addEventListener("click", ir);
+                tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); } });
+            });
+            return;
+        }
+        // negócios do corretor escolhido
+        const dele = linhas.filter(l => chaveCorr(l) === corrSel).sort((a, b) => String(b.dia).localeCompare(String(a.dia)));
+        const tipo = l => l.finalidade === "venda" ? "Venda" : "Locação";
+        const origem = l => l.origem === "contrato_venda" ? `Contrato de venda nº ${l.numero || "—"}` : l.origem === "contrato_locacao" ? `Contrato de locação nº ${l.numero || "—"}` : "";
+        const pctCom = l => Number(l.valor) > 0 && l.comissao_total != null ? Number(l.comissao_total) / Number(l.valor) * 100 : null;
+        lista.innerHTML = `<div class="pg-corr-topo"><button type="button" class="pg-tab" data-corr-voltar>← Todos os corretores</button>
+              <div class="pg-corr-resumo"><span><b>${h(escolhido.nome)}</b></span><span>${escolhido.negocios.size} negócio(s)</span><span>VGV <b>${h(dinheiro(escolhido.vgv))}</b></span><span>VGC <b>${h(dinheiro(escolhido.vgc))}</b></span>${escolhido.temCom ? `<span>Comissão do corretor <b>${h(dinheiro(escolhido.comissao))}</b></span>` : ""}</div></div>
+            <div class="pg-tabela pg-corr-tab"><table><thead><tr><th>Código</th><th>Imóvel</th><th>Tipo</th><th>Data</th><th>Valor do imóvel</th><th>% comissão</th><th>Comissão total</th><th>% corretor</th><th>VGC</th><th>Comissão do corretor</th></tr></thead><tbody>
+              ${dele.map(l => `<tr><td>${h(l.codigo || "—")}</td><td>${h(l.imovel || "—")}${origem(l) ? `<br><small>${h(origem(l))}</small>` : ""}${l.com_parceiro ? `<br><small>🤝 com parceiro</small>` : ""}</td><td>${tipo(l)}</td><td>${h(dataBr(l.dia))}</td><td>${h(dinheiro(l.valor))}</td><td>${h(pctTxt(pctCom(l)))}</td><td>${h(dinheiro(l.comissao_total))}</td><td>${h(pctTxt(l.pct_corretor))}</td><td><b>${h(dinheiro(l.vgc))}</b></td><td>${l.comissao_corretor != null ? h(dinheiro(l.comissao_corretor)) : "—"}</td></tr>`).join("")}
+            </tbody><tfoot><tr><td></td><td><b>Total</b></td><td></td><td></td><td>${h(dinheiro(escolhido.vgv))}</td><td></td><td></td><td></td><td><b>${h(dinheiro(escolhido.vgc))}</b></td><td>${escolhido.temCom ? h(dinheiro(escolhido.comissao)) : "—"}</td></tr></tfoot></table></div>
+            <p class="pg-nota">“Comissão do corretor” aparece quando a divisão da comissão foi lançada no negócio. “—” = negócio sem divisão lançada.</p>`;
+        lista.querySelector("[data-corr-voltar]").addEventListener("click", () => { corrSel = ""; corretores(d); });
     }
     // 9. pendências: vencidas e próximos 30 dias, com baixa e data programada ali mesmo
     function pendencias(box) {
@@ -884,7 +976,8 @@
             const x = esq + i * banda + (banda - bw) / 2, y = py(v), hb = Math.max(py(0) - y, 1), r = Math.min(4, bw / 2, hb);
             el("path", { d: `M${x},${py(0)}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${py(0)}Z`, fill: op.cores ? op.cores[i] : cor }, s);
             const t = el("text", { x: x + bw / 2, y: hgt - base + 14, "text-anchor": "middle", class: "pg-eixo" }, s);
-            t.textContent = rotulos[i].length > 11 ? rotulos[i].slice(0, 10) + "…" : rotulos[i];
+            const cabe = Math.max(3, Math.min(11, Math.floor(banda / 7)));   // celular: barras estreitas, nome mais curto
+            t.textContent = rotulos[i].length > cabe ? rotulos[i].slice(0, cabe - 1) + "…" : rotulos[i];
             const alvo = el("rect", { x: esq + i * banda, y: topo, width: banda, height: alt + 20, fill: "transparent" }, s);
             if (op.aoClicar) { alvo.style.cursor = "pointer"; alvo.addEventListener("click", () => op.aoClicar(i)); }
             ligarDica(alvo, () => op.dica ? op.dica(i) : `<b>${h(nomes[i])}</b><br>VGC: <b>${h(dinheiro(v))}</b>${ref != null ? `<br>${v > ref ? "bateu a meta" : "abaixo da meta"} (${h(curto(ref))})` : ""}`);
